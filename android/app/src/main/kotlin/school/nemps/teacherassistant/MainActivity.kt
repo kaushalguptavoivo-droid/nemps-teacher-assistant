@@ -1,4 +1,4 @@
-package in.nemps.teacherassistant
+package school.nemps.teacherassistant
 
 import io.flutter.embedding.android.FlutterActivity
 
