@@ -839,15 +839,25 @@ class _NoticeTabState extends ConsumerState<_NoticeTab> {
           Text('Send Notice', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           widget.classes.when(
-            data: (items) => DropdownButton<String>(
+            data: (items) => DropdownButton<String?>(
               value: selectedClassId,
               hint: const Text('Select Class (optional)'),
               isExpanded: true,
-              items: [
-                const DropdownMenuItem(value: null, child: Text('All Classes')),
-                ...items.map((c) => DropdownMenuItem(value: c.id, child: Text('Class ${c.label}'))).toList(),
-              ].toList(),
-              onChanged: (value) => setState(() => selectedClassId = value),
+              items: <DropdownMenuItem<String?>>[
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('All Classes'),
+                ),
+                ...items.map<DropdownMenuItem<String?>>(
+                  (c) => DropdownMenuItem<String?>(
+                    value: c.id,
+                    child: Text('Class ${c.label}'),
+                  ),
+                ),
+              ],
+              onChanged: (String? value) {
+                setState(() => selectedClassId = value);
+              },
             ),
             loading: () => const CircularProgressIndicator(),
             error: (e, st) => const SizedBox.shrink(),
