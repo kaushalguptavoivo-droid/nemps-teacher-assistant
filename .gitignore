@@ -1,0 +1,23 @@
+# Flutter and Dart
+.dart_tool/
+.packages
+build/
+.flutter-sdk/
+.metadata
+
+# Secrets and local machine configuration
+.env
+android/local.properties
+*.keystore
+key.properties
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Generated / local cache
+outputs/
+work/

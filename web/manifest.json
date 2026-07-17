@@ -1,0 +1,9 @@
+{
+  "name": "NEMPS Teacher Assistant",
+  "short_name": "NEMPS",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#315ca8",
+  "description": "Teacher workspace for New Era Modern Public School, Vrindavan."
+}
