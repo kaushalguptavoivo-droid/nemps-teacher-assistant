@@ -83,6 +83,155 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       : const Icon(Icons.login),
                   label: Text(busy ? 'Signing in...' : 'Sign in'),
                 ),
+                const SizedBox(height: 12),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.go('/signup'),
+                    child: const Text('Create new account'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class SignupScreen extends ConsumerStatefulWidget {
+  const SignupScreen({super.key});
+  @override
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
+}
+
+class _SignupScreenState extends ConsumerState<SignupScreen> {
+  final email = TextEditingController();
+  final password = TextEditingController();
+  final fullName = TextEditingController();
+  final phone = TextEditingController();
+  bool busy = false;
+  bool agreeTerms = false;
+
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    fullName.dispose();
+    phone.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signUp() async {
+    if (email.text.isEmpty || password.text.isEmpty || fullName.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+
+    if (password.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be at least 6 characters')),
+      );
+      return;
+    }
+
+    setState(() => busy = true);
+    try {
+      await Supabase.instance.client.auth.signUp(
+        email: email.text.trim(),
+        password: password.text,
+        data: {
+          'full_name': fullName.text,
+          'phone': phone.text,
+        },
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account created! Please check your email to verify.')),
+      );
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) context.go('/login');
+      });
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Create Account')),
+    body: SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(28),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Join NEMPS', style: Theme.of(context).textTheme.headlineSmall),
+                const Text('Create your teacher account'),
+                const SizedBox(height: 24),
+                TextField(
+                  controller: fullName,
+                  decoration: const InputDecoration(labelText: 'Full Name'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: email,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'School Email'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: password,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Password',
+                    helperText: 'At least 6 characters',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phone,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'Phone Number (optional)'),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: agreeTerms,
+                      onChanged: (v) => setState(() => agreeTerms = v ?? false),
+                    ),
+                    const Expanded(
+                      child: Text('I agree to the terms & conditions'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: (busy || !agreeTerms) ? null : _signUp,
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                  icon: busy
+                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.person_add),
+                  label: Text(busy ? 'Creating account...' : 'Sign Up'),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.go('/login'),
+                    child: const Text('Already have an account? Sign in'),
+                  ),
+                ),
               ],
             ),
           ),

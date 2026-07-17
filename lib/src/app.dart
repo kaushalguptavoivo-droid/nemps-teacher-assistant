@@ -15,6 +15,7 @@ class NempsApp extends ConsumerWidget {
       redirect: (_, __) => Supabase.instance.client.auth.currentSession == null ? '/login' : null,
       routes: [
         GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+        GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
         GoRoute(
           path: '/dashboard',
           builder: (_, __) => const ShellScreen(child: DashboardScreen()),
