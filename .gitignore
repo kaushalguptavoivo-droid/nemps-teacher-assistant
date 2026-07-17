@@ -13,7 +13,7 @@ key.properties
 
 # IDE and OS files
 .idea/
-.vscode/
+# Keep shared VS Code workspace recommendations/settings in version control.
 *.iml
 .DS_Store
 Thumbs.db
