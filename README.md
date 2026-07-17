@@ -14,7 +14,7 @@ Flutter Android application for **New Era Modern Public School, Vrindavan**, usi
 ## Setup
 
 1. Install Flutter stable and Android Studio. Run `flutter create .` once to generate the Flutter Gradle wrapper and platform boilerplate, then run `flutter pub get`. This preserves the provided Dart, Supabase, and Android configuration.
-2. Create a Supabase project. In SQL Editor run [supabase/schema.sql](supabase/schema.sql), then [supabase/seed.sql](supabase/seed.sql).
+2. In the supplied Supabase project, open **SQL Editor** and run `supabase/schema.sql`, then `supabase/seed.sql`. This is required before the deployed site can log in or display data.
 3. In Authentication, create teacher/admin accounts. Add their Auth UUIDs to `profiles` and class IDs to `teacher_classes`.
 4. Create a **private** Storage bucket named `student-photos`. Add storage policies granting teachers access only to photos belonging to their assigned students; use signed URLs in the app.
 5. Run locally without committing secrets:
@@ -34,7 +34,7 @@ APK output: `build/app/outputs/flutter-apk/app-release.apk`.
 ## Deploy on Vercel (web)
 
 1. Push this project to a GitHub repository and import that repository in Vercel.
-2. In **Project Settings → Environment Variables**, add `SUPABASE_URL` and `SUPABASE_ANON_KEY` for Production, Preview, and Development. Use the public **anon** key only—never a service-role key.
+2. The supplied school Supabase URL and public publishable key are already configured for this deployment. Optionally add `SUPABASE_URL` and `SUPABASE_ANON_KEY` in **Project Settings → Environment Variables** to override them for a different environment. Never use a service-role key.
 3. Leave the build settings as detected from `vercel.json`, then click **Deploy**. The first build downloads Flutter, so allow a few extra minutes.
 4. In Supabase **Authentication → URL Configuration**, add your Vercel domain to Site URL and Redirect URLs, for example `https://nemps-teacher.vercel.app/**`.
 
