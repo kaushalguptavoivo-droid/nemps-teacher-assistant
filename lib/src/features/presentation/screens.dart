@@ -4,29 +4,116 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../core/models/models.dart';
 import '../data/providers.dart';
 
-class LoginScreen extends ConsumerStatefulWidget { const LoginScreen({super.key}); @override ConsumerState<LoginScreen> createState()=>_LoginScreenState(); }
-class _LoginScreenState extends ConsumerState<LoginScreen> { final email=TextEditingController(), password=TextEditingController(); bool busy=false;
-  @override Widget build(BuildContext context)=>Scaffold(body: SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(28),child: ConstrainedBox(constraints: const BoxConstraints(maxWidth:420),child: Column(crossAxisAlignment: CrossAxisAlignment.start,children:[
-    Icon(Icons.school_rounded,size:52,color:Theme.of(context).colorScheme.primary),const SizedBox(height:16),Text('NEMPS Teacher Assistant',style:Theme.of(context).textTheme.headlineSmall),const Text('New Era Modern Public School, Vrindavan'),const SizedBox(height:32),
-    TextField(controller:email,keyboardType:TextInputType.emailAddress,decoration:const InputDecoration(labelText:'School email')),const SizedBox(height:12),TextField(controller:password,obscureText:true,decoration:const InputDecoration(labelText:'Password')),const SizedBox(height:20),
-    FilledButton.icon(style:FilledButton.styleFrom(minimumSize:const Size.fromHeight(52)),onPressed:busy?null:() async {setState(()=>busy=true);try{await Supabase.instance.client.auth.signInWithPassword(email:email.text.trim(),password:password.text);if(mounted)context.go('/dashboard');}on AuthException catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.message)));}finally{if(mounted)setState(()=>busy=false);}},icon:busy?const SizedBox(height:18,width:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.login),label:Text(busy?'Signing in…':'Sign in')),
-  ]))))); }
+class LoginScreen extends ConsumerStatefulWidget {
+  const LoginScreen({super.key});
+  @override
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class ShellScreen extends StatelessWidget { const ShellScreen({super.key,required this.child}); final Widget child; @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('NEMPS'),actions:[IconButton(icon:const Icon(Icons.dark_mode_outlined),onPressed:()=>showModalBottomSheet(context:context,builder:(c)=>ListTile(title:const Text('Appearance'),subtitle:const Text('Follow system, light or dark theme'))),),IconButton(onPressed:()=>Supabase.instance.client.auth.signOut(),icon:const Icon(Icons.logout))]),body:child); }
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final email = TextEditingController();
+  final password = TextEditingController();
+  bool busy = false;
 
-class DashboardScreen extends ConsumerWidget { const DashboardScreen({super.key}); @override Widget build(BuildContext context,WidgetRef ref){final classes=ref.watch(classesProvider);return RefreshIndicator(onRefresh:()=>ref.read(repoProvider).sync(),child:ListView(padding:const EdgeInsets.all(16),children:[Text('Good morning 👋',style:Theme.of(context).textTheme.headlineSmall),const Text('Finish today’s work in a few taps.'),const SizedBox(height:20),const Wrap(spacing:10,runSpacing:10,children:[_Metric('Attendance','—',Icons.how_to_reg),_Metric('Absent','—',Icons.person_off),_Metric('Homework','—',Icons.assignment_late),_Metric('Fee due','—',Icons.currency_rupee)]),const SizedBox(height:24),Text('My classes',style:Theme.of(context).textTheme.titleLarge),classes.when(data:(items)=>Column(children:items.map((c)=>Card(child:ListTile(leading:CircleAvatar(child:Text(c.label)),title:Text('Class ${c.label}'),subtitle:const Text('Tap to manage students'),trailing:const Icon(Icons.chevron_right),onTap:()=>context.go('/students/${c.id}'))).toList()),error:(_,__)=>const Text('Could not load classes. Pull down to sync.'),loading:()=>const Padding(padding:EdgeInsets.all(24),child:Center(child:CircularProgressIndicator()))),const SizedBox(height:20),Text('Quick actions',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:8),FilledButton.icon(onPressed:()=>classes.valueOrNull?.isNotEmpty==true?context.go('/attendance/${classes.value!.first.id}'):null,icon:const Icon(Icons.fact_check),label:const Text('Mark attendance'))]));}}
-class _Metric extends StatelessWidget { const _Metric(this.label,this.value,this.icon);final String label,value;final IconData icon;@override Widget build(BuildContext c)=>SizedBox(width:165,child:Card(color:Theme.of(c).colorScheme.secondaryContainer,child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Icon(icon),const SizedBox(height:10),Text(value,style:Theme.of(c).textTheme.headlineSmall),Text(label)])))); }
+  @override
+  void dispose() { email.dispose(); password.dispose(); super.dispose(); }
 
-class StudentsScreen extends ConsumerWidget { const StudentsScreen({super.key,required this.classId});final String classId;@override Widget build(BuildContext c,WidgetRef ref){final data=ref.watch(studentsProvider(classId));return data.when(data:(students)=>ListView.builder(padding:const EdgeInsets.all(12),itemCount:students.length,itemBuilder:(_,i){final s=students[i];return Card(child:ListTile(leading:CircleAvatar(backgroundImage:s.photoUrl==null?null:NetworkImage(s.photoUrl),child:s.photoUrl==null?Text(s.fullName[0]):null),title:Text(s.fullName),subtitle:Text('Roll ${s.rollNo} • ${s.parentName}'),trailing:Chip(label:Text(s.feeStatus.name.toUpperCase())));}),error:(_,__)=>const Center(child:Text('Students unavailable offline')),loading:()=>const Center(child:CircularProgressIndicator()));}}
+  Future<void> _signIn() async {
+    setState(() => busy = true);
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(email: email.text.trim(), password: password.text);
+      if (!mounted) return;
+      context.go('/dashboard');
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
 
-class AttendanceScreen extends ConsumerStatefulWidget { const AttendanceScreen({super.key,required this.classId});final String classId;@override ConsumerState<AttendanceScreen> createState()=>_AttendanceScreenState(); }
-class _AttendanceScreenState extends ConsumerState<AttendanceScreen>{final statuses=<String,AttendanceStatus>{};@override Widget build(BuildContext c){final students=ref.watch(studentsProvider(widget.classId));return Scaffold(body:students.when(data:(items)=>Column(children:[Padding(padding:const EdgeInsets.all(16),child:Row(children:[Expanded(child:Text('Attendance • ${DateFormat('dd MMM').format(DateTime.now())}',style:Theme.of(c).textTheme.titleLarge)),TextButton(onPressed:(){setState((){for(final s in items){statuses[s.id]=AttendanceStatus.present;}});},child:const Text('All present'))])),Expanded(child:ListView.builder(itemCount:items.length,itemBuilder:(_,i){final s=items[i];final v=statuses[s.id]??AttendanceStatus.present;return ListTile(title:Text(s.fullName),subtitle:Text('Roll ${s.rollNo}'),trailing:SegmentedButton<AttendanceStatus>(segments:const [ButtonSegment(value:AttendanceStatus.present,label:Text('P')),ButtonSegment(value:AttendanceStatus.absent,label:Text('A'))],selected:{v},onSelectionChanged:(x)=>setState(()=>statuses[s.id]=x.first)));})),Padding(padding:const EdgeInsets.all(16),child:FilledButton(onPressed:()async{for(final s in items){await ref.read(repoProvider).saveAttendance(classId:widget.classId,studentId:s.id,status:statuses[s.id]??AttendanceStatus.present,date:DateTime.now());}if(mounted)ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content:Text('Attendance saved and queued if offline.')));},style:FilledButton.styleFrom(minimumSize:const Size.fromHeight(52)),child:const Text('Save attendance')))]),error:(_,__)=>const Center(child:Text('No cached students')),loading:()=>const Center(child:CircularProgressIndicator())));}}
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(child: Center(child: SingleChildScrollView(
+      padding: const EdgeInsets.all(28),
+      child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(Icons.school_rounded, size: 52, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(height: 16), Text('NEMPS Teacher Assistant', style: Theme.of(context).textTheme.headlineSmall),
+        const Text('New Era Modern Public School, Vrindavan'), const SizedBox(height: 32),
+        TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'School email')),
+        const SizedBox(height: 12), TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'Password')),
+        const SizedBox(height: 20),
+        FilledButton.icon(onPressed: busy ? null : _signIn, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+          icon: busy ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.login),
+          label: Text(busy ? 'Signing in...' : 'Sign in')),
+      ])),
+    ))),
+  );
+}
 
-class HomeworkScreen extends StatelessWidget { const HomeworkScreen({super.key,required this.classId});final String classId;@override Widget build(BuildContext c)=>Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Post homework',style:Theme.of(c).textTheme.headlineSmall),const SizedBox(height:16),DropdownButtonFormField(items:const ['Math','English','Hindi','Science','SST','Computer','GK','Others'].map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(_){},decoration:const InputDecoration(labelText:'Subject')),const SizedBox(height:12),const TextField(maxLines:4,decoration:InputDecoration(labelText:'Homework details')),const Spacer(),FilledButton(onPressed:(){},style:FilledButton.styleFrom(minimumSize:const Size.fromHeight(52)),child:const Text('Publish homework'))]));}
-class ReportsScreen extends StatelessWidget { const ReportsScreen({super.key});@override Widget build(BuildContext c)=>ListView(padding:const EdgeInsets.all(16),children:[Text('Reports',style:Theme.of(c).textTheme.headlineSmall),const SizedBox(height:12),...['Attendance report','Homework report','Fee due report'].map((x)=>Card(child:ListTile(leading:const Icon(Icons.insights),title:Text(x),subtitle:const Text('PDF / Excel export available'),trailing:const Icon(Icons.download))))]);}
+class ShellScreen extends StatelessWidget {
+  const ShellScreen({super.key, required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('NEMPS'), actions: [
+      IconButton(icon: const Icon(Icons.dark_mode_outlined), onPressed: () => showModalBottomSheet(context: context, builder: (_) => const ListTile(title: Text('Appearance'), subtitle: Text('Follow system, light or dark theme')))),
+      IconButton(onPressed: () => Supabase.instance.client.auth.signOut(), icon: const Icon(Icons.logout)),
+    ]), body: child,
+  );
+}
 
-Future<void> openWhatsApp(String phone,String message) async {final uri=Uri.parse('https://wa.me/${phone.replaceAll(RegExp(r'[^0-9]'), '')}?text=${Uri.encodeComponent(message)}');if(!await launchUrl(uri,mode:LaunchMode.externalApplication))throw Exception('WhatsApp could not be opened');}
+class DashboardScreen extends ConsumerWidget {
+  const DashboardScreen({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final classes = ref.watch(classesProvider);
+    return RefreshIndicator(onRefresh: () => ref.read(repoProvider).sync(), child: ListView(padding: const EdgeInsets.all(16), children: [
+      Text('Good morning', style: Theme.of(context).textTheme.headlineSmall), const Text('Finish today\'s work in a few taps.'), const SizedBox(height: 20),
+      const Wrap(spacing: 10, runSpacing: 10, children: [_Metric('Attendance', '-', Icons.how_to_reg), _Metric('Absent', '-', Icons.person_off), _Metric('Homework', '-', Icons.assignment_late), _Metric('Fee due', '-', Icons.currency_rupee)]),
+      const SizedBox(height: 24), Text('My classes', style: Theme.of(context).textTheme.titleLarge),
+      classes.when(
+        data: (items) => Column(children: items.map((room) => Card(child: ListTile(leading: CircleAvatar(child: Text(room.label)), title: Text('Class ${room.label}'), subtitle: const Text('Tap to manage students'), trailing: const Icon(Icons.chevron_right), onTap: () => context.go('/students/${room.id}')))).toList()),
+        error: (error, stackTrace) => const Text('Could not load classes. Pull down to sync.'), loading: () => const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))),
+      const SizedBox(height: 20), Text('Quick actions', style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 8),
+      FilledButton.icon(onPressed: classes.valueOrNull?.isNotEmpty == true ? () => context.go('/attendance/${classes.value!.first.id}') : null, icon: const Icon(Icons.fact_check), label: const Text('Mark attendance')),
+    ]));
+  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric(this.label, this.value, this.icon); final String label, value; final IconData icon;
+  @override Widget build(BuildContext context) => SizedBox(width: 165, child: Card(color: Theme.of(context).colorScheme.secondaryContainer, child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(icon), const SizedBox(height: 10), Text(value, style: Theme.of(context).textTheme.headlineSmall), Text(label)]))));
+}
+
+class StudentsScreen extends ConsumerWidget {
+  const StudentsScreen({super.key, required this.classId}); final String classId;
+  @override Widget build(BuildContext context, WidgetRef ref) {
+    final students = ref.watch(studentsProvider(classId));
+    return students.when(data: (items) => ListView.builder(padding: const EdgeInsets.all(12), itemCount: items.length, itemBuilder: (_, index) {
+      final student = items[index];
+      return Card(child: ListTile(leading: CircleAvatar(backgroundImage: student.photoUrl == null ? null : NetworkImage(student.photoUrl!), child: student.photoUrl == null ? Text(student.fullName[0]) : null), title: Text(student.fullName), subtitle: Text('Roll ${student.rollNo} - ${student.parentName}'), trailing: Chip(label: Text(student.feeStatus.name.toUpperCase()))));
+    }), error: (error, stackTrace) => const Center(child: Text('Students unavailable offline')), loading: () => const Center(child: CircularProgressIndicator()));
+  }
+}
+
+class AttendanceScreen extends ConsumerStatefulWidget { const AttendanceScreen({super.key, required this.classId}); final String classId; @override ConsumerState<AttendanceScreen> createState() => _AttendanceScreenState(); }
+class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
+  final statuses = <String, AttendanceStatus>{};
+  @override Widget build(BuildContext context) {
+    final students = ref.watch(studentsProvider(widget.classId));
+    return Scaffold(body: students.when(data: (items) => Column(children: [
+      Padding(padding: const EdgeInsets.all(16), child: Row(children: [Expanded(child: Text('Attendance - ${DateFormat('dd MMM').format(DateTime.now())}', style: Theme.of(context).textTheme.titleLarge)), TextButton(onPressed: () => setState(() { for (final student in items) { statuses[student.id] = AttendanceStatus.present; } }), child: const Text('All present'))])),
+      Expanded(child: ListView.builder(itemCount: items.length, itemBuilder: (_, index) { final student = items[index]; final status = statuses[student.id] ?? AttendanceStatus.present; return ListTile(title: Text(student.fullName), subtitle: Text('Roll ${student.rollNo}'), trailing: SegmentedButton<AttendanceStatus>(segments: const [ButtonSegment(value: AttendanceStatus.present, label: Text('P')), ButtonSegment(value: AttendanceStatus.absent, label: Text('A'))], selected: {status}, onSelectionChanged: (value) => setState(() => statuses[student.id] = value.first))); })),
+      Padding(padding: const EdgeInsets.all(16), child: FilledButton(onPressed: () async { for (final student in items) { await ref.read(repoProvider).saveAttendance(classId: widget.classId, studentId: student.id, status: statuses[student.id] ?? AttendanceStatus.present, date: DateTime.now()); } if (!context.mounted) return; ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Attendance saved and queued if offline.'))); }, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)), child: const Text('Save attendance'))),
+    ]), error: (error, stackTrace) => const Center(child: Text('No cached students')), loading: () => const Center(child: CircularProgressIndicator())));
+  }
+}
+
+class HomeworkScreen extends StatelessWidget { const HomeworkScreen({super.key, required this.classId}); final String classId; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Post homework', style: Theme.of(context).textTheme.headlineSmall), const SizedBox(height: 16), DropdownButtonFormField<String>(items: const ['Math', 'English', 'Hindi', 'Science', 'SST', 'Computer', 'GK', 'Others'].map((subject) => DropdownMenuItem(value: subject, child: Text(subject))).toList(), onChanged: (_) {}, decoration: const InputDecoration(labelText: 'Subject')), const SizedBox(height: 12), const TextField(maxLines: 4, decoration: InputDecoration(labelText: 'Homework details')), const Spacer(), FilledButton(onPressed: () {}, style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)), child: const Text('Publish homework'))])); }
+class ReportsScreen extends StatelessWidget { const ReportsScreen({super.key}); @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(16), children: [Text('Reports', style: Theme.of(context).textTheme.headlineSmall), const SizedBox(height: 12), ...['Attendance report', 'Homework report', 'Fee due report'].map((name) => Card(child: ListTile(leading: const Icon(Icons.insights), title: Text(name), subtitle: const Text('PDF / Excel export available'), trailing: const Icon(Icons.download))))]); }
+Future<void> openWhatsApp(String phone, String message) async { final uri = Uri.parse('https://wa.me/${phone.replaceAll(RegExp(r'[^0-9]'), '')}?text=${Uri.encodeComponent(message)}'); if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) throw Exception('WhatsApp could not be opened'); }

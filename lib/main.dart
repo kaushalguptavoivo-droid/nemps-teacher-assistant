@@ -21,6 +21,6 @@ Future<void> main() async {
     await secureStorage.write(key: 'nemps_hive_aes_key', value: key);
   }
   await Hive.openBox<Map>('nemps_offline_queue', encryptionCipher: HiveAesCipher(Uint8List.fromList(base64Url.decode(key))));
-  await Supabase.initialize(url: AppConfig.supabaseUrl, anonKey: AppConfig.supabaseAnonKey);
+  await Supabase.initialize(url: AppConfig.supabaseUrl, publishableKey: AppConfig.supabaseAnonKey);
   runApp(const ProviderScope(child: NempsApp()));
 }

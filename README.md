@@ -40,6 +40,10 @@ APK output: `build/app/outputs/flutter-apk/app-release.apk`.
 
 The `vercel.json` rewrite keeps GoRouter deep links such as `/attendance/<class-id>` working after a browser refresh.
 
+## Netlify alternative
+
+Import the same GitHub repository in Netlify and deploy. The included `netlify.toml` compiles and publishes the same Flutter web build; use **either Vercel or Netlify**, not both. See `docs/RELEASE_AND_DEPLOYMENT.md` for the joint Android/web release process.
+
 ## Architecture
 
 `presentation → Riverpod providers → repository → Supabase / encrypted-device queue`.

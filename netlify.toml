@@ -1,0 +1,11 @@
+[build]
+  command = "git clone --depth 1 --branch stable https://github.com/flutter/flutter.git .flutter-sdk && ./.flutter-sdk/bin/flutter config --enable-web && ./.flutter-sdk/bin/flutter pub get && ./.flutter-sdk/bin/flutter build web --release --dart-define=SUPABASE_URL=$SUPABASE_URL --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+  publish = "build/web"
+
+[build.environment]
+  FLUTTER_VERSION = "stable"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
