@@ -1,17 +1,31 @@
-import 'dart:convert';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:convert';
 
-/// Durable outbox: actions remain on device and replay when a connection returns.
 class OfflineQueue {
-  OfflineQueue(this._client);
   final SupabaseClient _client;
-  Box<Map> get _box => Hive.box<Map>('nemps_offline_queue');
-  Future<void> enqueue(String table, Map<String, dynamic> row) async => _box.put(row['id'] ?? DateTime.now().microsecondsSinceEpoch.toString(), {'table': table, 'row': jsonEncode(row)});
+  late final Box<Map> _queue;
+
+  OfflineQueue(this._client);
+
+  Future<void> enqueue(String table, Map<String, dynamic> row) async {
+    await Hive.openBox<Map>('nemps_offline_queue');
+    _queue = Hive.box('nemps_offline_queue');
+    final key = '${table}_${DateTime.now().millisecondsSinceEpoch}';
+    await _queue.put(key, {'table': table, 'data': row});
+  }
+
   Future<void> flush() async {
-    final pending = Map<dynamic, Map>.from(_box.toMap());
-    for (final entry in pending.entries) {
-      try { await _client.from(entry.value['table'] as String).upsert(jsonDecode(entry.value['row'] as String)); await _box.delete(entry.key); } catch (_) { /* retry later */ }
+    if (_queue.isEmpty) return;
+    
+    final entries = _queue.values.toList();
+    for (var entry in entries) {
+      try {
+        final table = entry['table'];
+        final data = entry['data'];
+        await _client.from(table).upsert(data);
+        await _queue.delete(entry);
+      } catch (_) {}
     }
   }
 }
