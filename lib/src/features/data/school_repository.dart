@@ -35,6 +35,30 @@ class SchoolRepository {
     }
   }
 
+  Future<void> saveStudent({
+    String? id,
+    required String classId,
+    required String fullName,
+    required String rollNo,
+    String fatherName = '',
+    String whatsapp = '',
+  }) async {
+    final row = {
+      if (id != null) 'id': id,
+      'class_id': classId,
+      'full_name': fullName.trim(),
+      'roll_no': rollNo.trim(),
+      'father_name': fatherName.trim(),
+      'whatsapp': whatsapp.trim(),
+      'active': true,
+    };
+    await _client.from('students').upsert(row, onConflict: 'class_id,roll_no');
+  }
+
+  Future<void> deactivateStudent(String studentId) async {
+    await _client.from('students').update({'active': false}).eq('id', studentId);
+  }
+
   Future<void> saveAttendance({
     required String classId,
     required String studentId,
