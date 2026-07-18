@@ -773,8 +773,9 @@ class AbsentNotifyScreen extends ConsumerWidget {
 
   Future<void> _sendWhatsApp(BuildContext context, String phone, String message) async {
     final uri = Uri.parse('https://wa.me/${phone.replaceAll(RegExp(r'[^0-9]'), '')}?text=${Uri.encodeComponent(message)}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final opened = await launchUrl(uri, mode: LaunchMode.platformDefault);
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('WhatsApp could not be opened. Check the parent number.')));
     }
   }
 }
