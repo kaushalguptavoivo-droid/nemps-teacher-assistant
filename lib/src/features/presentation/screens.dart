@@ -257,7 +257,10 @@ class ShellScreen extends StatelessWidget {
           ),
         ),
         IconButton(
-          onPressed: () => Supabase.instance.client.auth.signOut(),
+          onPressed: () async {
+            await Supabase.instance.client.auth.signOut();
+            if (context.mounted) context.go('/login');
+          },
           icon: const Icon(Icons.logout),
         ),
       ],
@@ -352,19 +355,19 @@ class ClassDetailScreen extends ConsumerWidget {
         ],
       ),
       body: students.when(
-        data: (items) => ListView.builder(
+        data: (items) => ListView(
           padding: const EdgeInsets.all(12),
-          itemCount: items.length,
-          itemBuilder: (_, index) {
-            final student = items[index];
-            return Card(
-              child: ListTile(
-                title: Text(student.fullName),
-                subtitle: Text('Roll No: ${student.rollNo}'),
-                leading: CircleAvatar(child: Text(student.rollNo)),
-              ),
-            );
-          },
+          children: [
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              FilledButton.icon(onPressed: () => context.go('/attendance/$classId'), icon: const Icon(Icons.fact_check), label: const Text('Attendance')),
+              FilledButton.tonalIcon(onPressed: () => context.go('/homework/$classId'), icon: const Icon(Icons.assignment), label: const Text('Homework')),
+              FilledButton.tonalIcon(onPressed: () => context.go('/absent/$classId'), icon: const Icon(Icons.message), label: const Text('WhatsApp')),
+            ]),
+            const SizedBox(height: 16),
+            Text('Students (${items.length})', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            ...items.map((student) => Card(child: ListTile(title: Text(student.fullName), subtitle: Text('Roll No: ${student.rollNo}'), leading: CircleAvatar(child: Text(student.rollNo))))),
+          ],
         ),
         error: (error, stackTrace) => Center(child: Text('Error: $error')),
         loading: () => const Center(child: CircularProgressIndicator()),
