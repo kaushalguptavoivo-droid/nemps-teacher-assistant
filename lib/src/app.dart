@@ -12,7 +12,13 @@ class NempsApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = GoRouter(
       initialLocation: '/dashboard',
-      redirect: (_, __) => Supabase.instance.client.auth.currentSession == null ? '/login' : null,
+      redirect: (context, state) {
+        final signedIn = Supabase.instance.client.auth.currentSession != null;
+        final publicRoute = state.matchedLocation == '/login' || state.matchedLocation == '/signup';
+        if (!signedIn && !publicRoute) return '/login';
+        if (signedIn && publicRoute) return '/dashboard';
+        return null;
+      },
       routes: [
         GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
         GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
