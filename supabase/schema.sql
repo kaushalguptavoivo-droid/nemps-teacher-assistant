@@ -135,4 +135,6 @@ create policy "activity admin" on teacher_activity for all using (is_admin()) wi
 
 -- Notices policies
 create policy "notices read" on notices for select using (audience_class_id is null or can_access_class(audience_class_id) or created_by=auth.uid());
-create policy "notices admin" on notices for insert using (is_admin());
+-- FIX: INSERT must use WITH CHECK, not USING (original had a bug here)
+create policy "notices insert teachers" on notices for insert with check (auth.uid() is not null);
+create policy "notices admin all" on notices for all using (is_admin()) with check (is_admin());
