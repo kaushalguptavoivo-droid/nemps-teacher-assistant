@@ -27,6 +27,10 @@ final noticesProvider =
 final themeProvider =
     StateProvider<ThemeMode>((_) => ThemeMode.system);
 
+/// Current logged-in user's role fetched from profiles table.
+final currentUserRoleProvider = FutureProvider<UserRole>(
+    (ref) => ref.watch(repoProvider).getCurrentUserRole());
+
 /// Absent students for a given class + date.
 final absentStudentsProvider =
     FutureProvider.family<List<Student>, (String, DateTime)>(

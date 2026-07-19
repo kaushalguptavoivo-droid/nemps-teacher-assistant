@@ -349,9 +349,8 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final classes = ref.watch(classesProvider);
-    final isAdmin = Supabase.instance.client.auth.currentUser
-            ?.userMetadata?['role'] ==
-        'admin';
+    final roleAsync = ref.watch(currentUserRoleProvider);
+    final isAdmin = roleAsync.valueOrNull == UserRole.admin;
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good morning'
@@ -1176,6 +1175,29 @@ class HomeworkMarkDialog extends ConsumerStatefulWidget {
 class _HomeworkMarkDialogState extends ConsumerState<HomeworkMarkDialog> {
   final statuses = <String, String>{};
   bool saving = false;
+  bool loadingStatuses = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _preloadStatuses();
+  }
+
+  Future<void> _preloadStatuses() async {
+    try {
+      final existing =
+          await ref.read(repoProvider).getHomeworkStatus(widget.homeworkId);
+      if (!mounted) return;
+      setState(() {
+        for (final record in existing) {
+          statuses[record.studentId] = record.status;
+        }
+        loadingStatuses = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => loadingStatuses = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1186,7 +1208,9 @@ class _HomeworkMarkDialogState extends ConsumerState<HomeworkMarkDialog> {
       content: SizedBox(
         width: double.maxFinite,
         child: students.when(
-          data: (items) => ListView.builder(
+          data: (items) => loadingStatuses
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
             itemCount: items.length,
             itemBuilder: (_, index) {
               final student = items[index];

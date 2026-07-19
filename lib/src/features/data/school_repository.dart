@@ -13,6 +13,22 @@ class SchoolRepository {
   final SupabaseClient _client;
   late final OfflineQueue _outbox;
 
+  /// Returns the role of the currently logged-in user from the profiles table.
+  Future<UserRole> getCurrentUserRole() async {
+    try {
+      final uid = _client.auth.currentUser!.id;
+      final data = await _client
+          .from('profiles')
+          .select('role')
+          .eq('id', uid)
+          .single();
+      final roleStr = data['role'] as String? ?? 'teacher';
+      return roleStr == 'admin' ? UserRole.admin : UserRole.teacher;
+    } catch (_) {
+      return UserRole.teacher;
+    }
+  }
+
   Future<List<ClassRoom>> myClasses() async {
     try {
       final data = await _client
