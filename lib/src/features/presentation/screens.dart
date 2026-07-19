@@ -603,34 +603,189 @@ class ClassDetailScreen extends ConsumerWidget {
 // Students
 // ---------------------------------------------------------------------------
 
-class StudentsScreen extends ConsumerWidget {
+class StudentsScreen extends ConsumerStatefulWidget {
   const StudentsScreen({super.key, required this.classId});
   final String classId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final students = ref.watch(studentsProvider(classId));
+  ConsumerState<StudentsScreen> createState() => _StudentsScreenState();
+}
+
+class _StudentsScreenState extends ConsumerState<StudentsScreen> {
+  Future<void> _showStudentDialog({Student? existing}) async {
+    final nameCtrl = TextEditingController(text: existing?.fullName ?? '');
+    final rollCtrl = TextEditingController(text: existing?.rollNo ?? '');
+    final fatherCtrl = TextEditingController(text: existing?.parentName ?? '');
+    final waCtrl = TextEditingController(text: existing?.whatsapp ?? '');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(existing == null ? 'Student Add Karein' : 'Student Edit Karein'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                    labelText: 'Full Name', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: rollCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Roll No', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: fatherCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                    labelText: 'Father Name', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: waCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                    labelText: 'WhatsApp Number (10 digit)',
+                    border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(existing == null ? 'Add' : 'Save')),
+        ],
+      ),
+    );
+
+    if (confirmed != true ||
+        nameCtrl.text.trim().isEmpty ||
+        rollCtrl.text.trim().isEmpty) return;
+
+    try {
+      await ref.read(repoProvider).saveStudent(
+            id: existing?.id,
+            classId: widget.classId,
+            fullName: nameCtrl.text,
+            rollNo: rollCtrl.text,
+            fatherName: fatherCtrl.text,
+            whatsapp: waCtrl.text,
+          );
+      ref.invalidate(studentsProvider(widget.classId));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(existing == null
+                ? 'Student add ho gaya!'
+                : 'Student update ho gaya!')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _deleteStudent(Student student) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Student Hatayein?'),
+        content: Text('${student.fullName} ko class se remove karein?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(repoProvider).deactivateStudent(student.id);
+      ref.invalidate(studentsProvider(widget.classId));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Student remove ho gaya!')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final students = ref.watch(studentsProvider(widget.classId));
     return Scaffold(
       appBar: AppBar(title: const Text('Students')),
       body: students.when(
-        data: (items) => ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: items.length,
-          itemBuilder: (_, index) {
-            final student = items[index];
-            return Card(
-              child: ListTile(
-                leading: CircleAvatar(child: Text(student.rollNo)),
-                title: Text(student.fullName),
-                subtitle: Text(
-                    '${student.parentName}  |  ${student.whatsapp}'),
+        data: (items) => items.isEmpty
+            ? const Center(
+                child: Text('Koi student nahi.\nNeeche + se add karein.',
+                    textAlign: TextAlign.center))
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+                itemCount: items.length,
+                itemBuilder: (_, index) {
+                  final s = items[index];
+                  return Card(
+                    child: ListTile(
+                      leading: CircleAvatar(child: Text(s.rollNo)),
+                      title: Text(s.fullName),
+                      subtitle: Text(
+                          '${s.parentName.isNotEmpty ? s.parentName : 'Father name nahi hai'}  |  ${s.whatsapp.isNotEmpty ? s.whatsapp : 'No WhatsApp'}'),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (v) {
+                          if (v == 'edit') _showStudentDialog(existing: s);
+                          if (v == 'delete') _deleteStudent(s);
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: ListTile(
+                                leading: Icon(Icons.edit),
+                                title: Text('Edit'),
+                                contentPadding: EdgeInsets.zero),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: ListTile(
+                                leading:
+                                    Icon(Icons.person_remove, color: Colors.red),
+                                title: Text('Remove',
+                                    style: TextStyle(color: Colors.red)),
+                                contentPadding: EdgeInsets.zero),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
         error: (_, __) =>
             const Center(child: Text('Students unavailable offline')),
         loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showStudentDialog(),
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add Student'),
       ),
     );
   }
