@@ -81,7 +81,7 @@ class SchoolRepository {
     try {
       await _client.from('attendance').upsert(
         row,
-        onConflict: 'student_id,date',
+        onConflict: 'id',          // PK is the composite id field, not a separate unique index
       );
       await _logActivity('attendance_marked', classId, {'students': 1});
     } catch (_) {

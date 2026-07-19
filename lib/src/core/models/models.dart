@@ -85,7 +85,7 @@ class HomeworkStatusRecord {
     homeworkId: m['homework_id'],
     studentId: m['student_id'],
     status: m['status'],
-    studentName: m['students']['full_name'] ?? '',
+    studentName: (m['students'] as Map<String, dynamic>?)?['full_name'] ?? '',
     markedBy: m['marked_by'] ?? '',
   );
 }
