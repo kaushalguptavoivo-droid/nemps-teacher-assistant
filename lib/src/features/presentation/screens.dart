@@ -2100,7 +2100,7 @@ class _AdminStudentsTabState extends ConsumerState<_AdminStudentsTab> {
     try {
       await ref.read(repoProvider).saveStudent(
             id: existing?.id,
-            classId: classId,
+            classId: classId!,
             fullName: nameCtrl.text,
             rollNo: rollCtrl.text,
             fatherName: fatherCtrl.text,
