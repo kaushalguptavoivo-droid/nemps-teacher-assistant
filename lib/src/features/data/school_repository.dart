@@ -411,5 +411,108 @@ class SchoolRepository {
     }
   }
 
+  // ── Admin methods ────────────────────────────────────────────────────────
+
+  /// Admin: fetch ALL classes (not filtered by teacher).
+  Future<List<ClassRoom>> getAllClasses() async {
+    final data = await _client.from('classes').select().order('name');
+    return data.map<ClassRoom>((e) => ClassRoom.fromMap(e)).toList();
+  }
+
+  /// Admin: create or update a class.
+  Future<void> saveClass({
+    String? id,
+    required String name,
+    required String section,
+    String academicYear = '',
+  }) async {
+    final row = <String, dynamic>{
+      'name': name.trim(),
+      'section': section.trim(),
+      if (academicYear.isNotEmpty) 'academic_year': academicYear.trim(),
+    };
+    if (id != null) {
+      await _client.from('classes').update(row).eq('id', id);
+    } else {
+      await _client.from('classes').insert(row);
+    }
+  }
+
+  /// Admin: delete a class.
+  Future<void> deleteClass(String classId) async {
+    await _client.from('classes').delete().eq('id', classId);
+  }
+
+  /// Admin: get all user profiles.
+  Future<List<TeacherProfile>> getAllTeachers() async {
+    final data = await _client.from('profiles').select().order('full_name');
+    return data.map<TeacherProfile>((e) => TeacherProfile.fromMap(e)).toList();
+  }
+
+  /// Admin: update a teacher profile (name, phone, role).
+  Future<void> updateTeacherProfile({
+    required String id,
+    required String fullName,
+    String phone = '',
+    String role = 'teacher',
+  }) async {
+    await _client.from('profiles').update({
+      'full_name': fullName.trim(),
+      'phone': phone.trim(),
+      'role': role,
+    }).eq('id', id);
+  }
+
+  /// Admin: get classes currently assigned to a teacher.
+  Future<List<ClassRoom>> getTeacherAssignedClasses(String teacherId) async {
+    final data = await _client
+        .from('teacher_classes')
+        .select('classes(id,name,section)')
+        .eq('teacher_id', teacherId);
+    return data
+        .map<ClassRoom>((e) => ClassRoom.fromMap(e['classes'] as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Admin: assign a class to a teacher.
+  Future<void> assignTeacherToClass(String teacherId, String classId) async {
+    await _client.from('teacher_classes').upsert(
+      {'teacher_id': teacherId, 'class_id': classId},
+      onConflict: 'teacher_id,class_id',
+    );
+  }
+
+  /// Admin: remove a class from a teacher.
+  Future<void> removeTeacherFromClass(String teacherId, String classId) async {
+    await _client
+        .from('teacher_classes')
+        .delete()
+        .eq('teacher_id', teacherId)
+        .eq('class_id', classId);
+  }
+
+  /// Admin: get ALL active students across every class.
+  Future<List<Student>> getAllStudents() async {
+    final data = await _client
+        .from('students')
+        .select('*, classes(name, section)')
+        .eq('active', true)
+        .order('full_name');
+    return data.map<Student>((e) => Student.fromMap(e)).toList();
+  }
+
+  /// Admin: move a student to a different class.
+  Future<void> moveStudentToClass(String studentId, String classId) async {
+    await _client
+        .from('students')
+        .update({'class_id': classId})
+        .eq('id', studentId);
+  }
+
+  /// Admin: permanently delete a student record.
+  Future<void> deleteStudent(String studentId) async {
+    await _client.from('students').delete().eq('id', studentId);
+  }
+
   Future<void> sync() => _outbox.flush();
 }

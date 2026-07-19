@@ -11,13 +11,14 @@ class Student {
     required this.rollNo,
     required this.className,
     required this.section,
+    this.classId = '',
     this.parentName = '',
     this.whatsapp = '',
     this.dob,
     this.feeStatus = FeeStatus.due,
     this.photoUrl,
   });
-  final String id, fullName, rollNo, className, section, parentName, whatsapp;
+  final String id, fullName, rollNo, className, section, classId, parentName, whatsapp;
   final DateTime? dob;
   final FeeStatus feeStatus;
   final String? photoUrl;
@@ -26,6 +27,7 @@ class Student {
     id: m['id'],
     fullName: m['full_name'],
     rollNo: m['roll_no'],
+    classId: m['class_id'] ?? '',
     className: (m['classes'] as Map<String, dynamic>?)?['name'] ?? m['class_name'] ?? '',
     section: (m['classes'] as Map<String, dynamic>?)?['section'] ?? m['section'] ?? '',
     parentName: m['father_name'] ?? '',
@@ -132,5 +134,23 @@ class TeacherActivity {
     activityType: m['activity_type'],
     activityDate: DateTime.parse(m['activity_date']),
     details: m['details'] ?? {},
+  );
+}
+
+class TeacherProfile {
+  const TeacherProfile({
+    required this.id,
+    required this.fullName,
+    this.phone = '',
+    required this.role,
+  });
+  final String id, fullName, phone;
+  final UserRole role;
+  String get roleLabel => role == UserRole.admin ? 'Admin' : 'Teacher';
+  factory TeacherProfile.fromMap(Map<String, dynamic> m) => TeacherProfile(
+    id: m['id'],
+    fullName: m['full_name'] ?? '',
+    phone: m['phone'] ?? '',
+    role: (m['role'] as String?) == 'admin' ? UserRole.admin : UserRole.teacher,
   );
 }

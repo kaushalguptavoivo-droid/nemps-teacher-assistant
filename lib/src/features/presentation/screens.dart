@@ -1665,24 +1665,29 @@ class AdminPanelScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final classes = ref.watch(classesProvider);
-
     return DefaultTabController(
-      length: 3,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin Panel'),
-          bottom: const TabBar(tabs: [
-            Tab(text: 'Notices'),
-            Tab(text: 'Activity'),
-            Tab(text: 'Students'),
-          ]),
+          bottom: const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(icon: Icon(Icons.class_), text: 'Classes'),
+              Tab(icon: Icon(Icons.people), text: 'Students'),
+              Tab(icon: Icon(Icons.person), text: 'Teachers'),
+              Tab(icon: Icon(Icons.notifications), text: 'Notices'),
+              Tab(icon: Icon(Icons.history), text: 'Activity'),
+            ],
+          ),
         ),
         body: TabBarView(
           children: [
-            _NoticeTab(classes: classes),
+            const _AdminClassesTab(),
+            const _AdminStudentsTab(),
+            const _AdminTeachersTab(),
+            _NoticeTab(classes: ref.watch(allClassesProvider)),
             const _TeacherActivityTab(),
-            _StudentsTab(classes: classes),
           ],
         ),
       ),
@@ -1847,58 +1852,654 @@ class _TeacherActivityTab extends ConsumerWidget {
   }
 }
 
-class _StudentsTab extends ConsumerWidget {
-  const _StudentsTab({required this.classes});
-  final AsyncValue<List<ClassRoom>> classes;
+// ---------------------------------------------------------------------------
+// Admin Panel Tabs
+// ---------------------------------------------------------------------------
+
+// ── Classes Tab ─────────────────────────────────────────────────────────────
+class _AdminClassesTab extends ConsumerStatefulWidget {
+  const _AdminClassesTab();
+  @override
+  ConsumerState<_AdminClassesTab> createState() => _AdminClassesTabState();
+}
+
+class _AdminClassesTabState extends ConsumerState<_AdminClassesTab> {
+  Future<void> _showClassDialog({ClassRoom? existing}) async {
+    final nameCtrl = TextEditingController(text: existing?.name ?? '');
+    final sectionCtrl = TextEditingController(text: existing?.section ?? '');
+    final yearCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(existing == null ? 'Nai Class Banayein' : 'Class Edit Karein'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Class Name (jaise 5, 6, 7)',
+                  border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: sectionCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Section (jaise A, B)',
+                  border: OutlineInputBorder()),
+            ),
+            if (existing == null) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: yearCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Academic Year (jaise 2025-26)',
+                    border: OutlineInputBorder()),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(existing == null ? 'Banayein' : 'Save')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (nameCtrl.text.trim().isEmpty || sectionCtrl.text.trim().isEmpty) return;
+    try {
+      await ref.read(repoProvider).saveClass(
+            id: existing?.id,
+            name: nameCtrl.text,
+            section: sectionCtrl.text,
+            academicYear: yearCtrl.text,
+          );
+      ref.invalidate(allClassesProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(existing == null ? 'Class ban gayi!' : 'Class update ho gayi!')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _deleteClass(ClassRoom c) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Class Delete Karein?'),
+        content: Text(
+            'Class ${c.label} delete karne se uske saare students bhi hata diye jayenge. Pakka?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(repoProvider).deleteClass(c.id);
+      ref.invalidate(allClassesProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Class delete ho gayi!')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return classes.when(
-      data: (items) => ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: items.length,
-        itemBuilder: (_, index) {
-          final classroom = items[index];
-          return Card(
-            child: ListTile(
-              title: Text('Class ${classroom.label}'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () => showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: Text('Class ${classroom.label} Students'),
-                  content: SizedBox(
-                    width: double.maxFinite,
-                    height: 300,
-                    child: ref
-                        .watch(studentsProvider(classroom.id))
-                        .when(
-                          data: (students) => ListView.builder(
-                            itemCount: students.length,
-                            itemBuilder: (_, idx) => ListTile(
-                              leading: CircleAvatar(
-                                  child: Text(students[idx].rollNo)),
-                              title: Text(students[idx].fullName),
-                              subtitle:
-                                  Text(students[idx].parentName),
-                            ),
+  Widget build(BuildContext context) {
+    final classes = ref.watch(allClassesProvider);
+    return Scaffold(
+      body: classes.when(
+        data: (items) => items.isEmpty
+            ? const Center(
+                child: Text('Koi class nahi hai.\nNeeche + se add karein.',
+                    textAlign: TextAlign.center))
+            : ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: items.length,
+                itemBuilder: (_, i) {
+                  final c = items[i];
+                  return Card(
+                    child: ListTile(
+                      leading: CircleAvatar(child: Text(c.name)),
+                      title: Text('Class ${c.label}'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            tooltip: 'Edit',
+                            onPressed: () => _showClassDialog(existing: c),
                           ),
-                          loading: () => const Center(
-                              child: CircularProgressIndicator()),
-                          error: (e, _) => Text('Error: $e'),
-                        ),
-                  ),
-                  actions: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Close')),
-                  ],
-                ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            tooltip: 'Delete',
+                            onPressed: () => _deleteClass(c),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-            ),
-          );
-        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showClassDialog(),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Class'),
+      ),
+    );
+  }
+}
+
+// ── Students Tab ─────────────────────────────────────────────────────────────
+class _AdminStudentsTab extends ConsumerStatefulWidget {
+  const _AdminStudentsTab();
+  @override
+  ConsumerState<_AdminStudentsTab> createState() => _AdminStudentsTabState();
+}
+
+class _AdminStudentsTabState extends ConsumerState<_AdminStudentsTab> {
+  String? _filterClassId;
+
+  Future<void> _showStudentDialog({Student? existing}) async {
+    final allClasses = await ref.read(allClassesProvider.future);
+    if (!mounted) return;
+    String? classId = existing?.classId.isNotEmpty == true
+        ? existing!.classId
+        : (_filterClassId ?? allClasses.firstOrNull?.id);
+    final nameCtrl = TextEditingController(text: existing?.fullName ?? '');
+    final rollCtrl = TextEditingController(text: existing?.rollNo ?? '');
+    final fatherCtrl = TextEditingController(text: existing?.parentName ?? '');
+    final waCtrl = TextEditingController(text: existing?.whatsapp ?? '');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setSt) => AlertDialog(
+          title: Text(existing == null ? 'Student Add Karein' : 'Student Edit Karein'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: classId,
+                  decoration: const InputDecoration(
+                      labelText: 'Class', border: OutlineInputBorder()),
+                  items: allClasses
+                      .map((c) => DropdownMenuItem(
+                          value: c.id, child: Text('Class ${c.label}')))
+                      .toList(),
+                  onChanged: (v) => setSt(() => classId = v),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Full Name', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(
+                    controller: rollCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Roll No', border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(
+                    controller: fatherCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Father Name',
+                        border: OutlineInputBorder())),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: waCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                      labelText: 'WhatsApp Number',
+                      border: OutlineInputBorder()),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(existing == null ? 'Add' : 'Save')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true ||
+        classId == null ||
+        nameCtrl.text.trim().isEmpty ||
+        rollCtrl.text.trim().isEmpty) return;
+    try {
+      await ref.read(repoProvider).saveStudent(
+            id: existing?.id,
+            classId: classId,
+            fullName: nameCtrl.text,
+            rollNo: rollCtrl.text,
+            fatherName: fatherCtrl.text,
+            whatsapp: waCtrl.text,
+          );
+      ref.invalidate(allStudentsProvider);
+      ref.invalidate(studentsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(existing == null
+                ? 'Student add ho gaya!'
+                : 'Student update ho gaya!')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _deleteStudent(Student s) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Student Delete Karein?'),
+        content: Text('${s.fullName} ko permanently delete karein?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(repoProvider).deleteStudent(s.id);
+      ref.invalidate(allStudentsProvider);
+      ref.invalidate(studentsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Student delete ho gaya!')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _moveStudent(Student s) async {
+    final allClasses = await ref.read(allClassesProvider.future);
+    if (!mounted) return;
+    String? newClassId;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setSt) => AlertDialog(
+          title: Text('${s.fullName} ko Move Karein'),
+          content: DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+                labelText: 'Nai Class', border: OutlineInputBorder()),
+            items: allClasses
+                .map((c) => DropdownMenuItem(
+                    value: c.id, child: Text('Class ${c.label}')))
+                .toList(),
+            onChanged: (v) => setSt(() => newClassId = v),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Move')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || newClassId == null) return;
+    try {
+      await ref.read(repoProvider).moveStudentToClass(s.id, newClassId!);
+      ref.invalidate(allStudentsProvider);
+      ref.invalidate(studentsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Student move ho gaya!')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allStudents = ref.watch(allStudentsProvider);
+    final allClasses = ref.watch(allClassesProvider);
+    return Scaffold(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: allClasses.when(
+              data: (classes) => DropdownButtonFormField<String?>(
+                value: _filterClassId,
+                decoration: const InputDecoration(
+                  labelText: 'Class se filter karein',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: <DropdownMenuItem<String?>>[
+                  const DropdownMenuItem<String?>(
+                      value: null, child: Text('Saare Students')),
+                  ...classes.map((c) => DropdownMenuItem<String?>(
+                      value: c.id, child: Text('Class ${c.label}'))),
+                ],
+                onChanged: (v) => setState(() => _filterClassId = v),
+              ),
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: allStudents.when(
+              data: (all) {
+                final filtered = _filterClassId == null
+                    ? all
+                    : all
+                        .where((s) => s.classId == _filterClassId)
+                        .toList();
+                if (filtered.isEmpty) {
+                  return const Center(
+                      child: Text('Koi student nahi mila.'));
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) {
+                    final s = filtered[i];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(child: Text(s.rollNo)),
+                        title: Text(s.fullName),
+                        subtitle: Text(
+                            'Class ${s.classLabel} • ${s.parentName}'),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (v) {
+                            if (v == 'edit') _showStudentDialog(existing: s);
+                            if (v == 'move') _moveStudent(s);
+                            if (v == 'delete') _deleteStudent(s);
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'edit',
+                              child: ListTile(
+                                  leading: Icon(Icons.edit),
+                                  title: Text('Edit'),
+                                  contentPadding: EdgeInsets.zero),
+                            ),
+                            PopupMenuItem(
+                              value: 'move',
+                              child: ListTile(
+                                  leading: Icon(Icons.swap_horiz),
+                                  title: Text('Class Change'),
+                                  contentPadding: EdgeInsets.zero),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: ListTile(
+                                  leading: Icon(Icons.delete,
+                                      color: Colors.red),
+                                  title: Text('Delete',
+                                      style:
+                                          TextStyle(color: Colors.red)),
+                                  contentPadding: EdgeInsets.zero),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showStudentDialog(),
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add Student'),
+      ),
+    );
+  }
+}
+
+// ── Teachers Tab ─────────────────────────────────────────────────────────────
+class _AdminTeachersTab extends ConsumerStatefulWidget {
+  const _AdminTeachersTab();
+  @override
+  ConsumerState<_AdminTeachersTab> createState() => _AdminTeachersTabState();
+}
+
+class _AdminTeachersTabState extends ConsumerState<_AdminTeachersTab> {
+  Future<void> _manageClasses(TeacherProfile teacher) async {
+    final allClasses = await ref.read(allClassesProvider.future);
+    final assigned = await ref
+        .read(repoProvider)
+        .getTeacherAssignedClasses(teacher.id);
+    if (!mounted) return;
+
+    final assignedIds = assigned.map((c) => c.id).toSet();
+    final selected = <String, bool>{
+      for (final c in allClasses) c.id: assignedIds.contains(c.id)
+    };
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setSt) => AlertDialog(
+          title: Text('${teacher.fullName} — Classes'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300,
+            child: allClasses.isEmpty
+                ? const Center(child: Text('Pehle classes banayein.'))
+                : ListView(
+                    children: allClasses.map((c) {
+                      return CheckboxListTile(
+                        value: selected[c.id] ?? false,
+                        title: Text('Class ${c.label}'),
+                        onChanged: (val) async {
+                          setSt(() => selected[c.id] = val ?? false);
+                          try {
+                            if (val == true) {
+                              await ref
+                                  .read(repoProvider)
+                                  .assignTeacherToClass(teacher.id, c.id);
+                            } else {
+                              await ref
+                                  .read(repoProvider)
+                                  .removeTeacherFromClass(teacher.id, c.id);
+                            }
+                          } catch (e) {
+                            setSt(
+                                () => selected[c.id] = !(val ?? false));
+                            if (ctx2.mounted) {
+                              ScaffoldMessenger.of(ctx2).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')));
+                            }
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                ref.invalidate(teacherAssignedClassesProvider);
+                Navigator.pop(ctx);
+              },
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editProfile(TeacherProfile teacher) async {
+    final nameCtrl = TextEditingController(text: teacher.fullName);
+    final phoneCtrl = TextEditingController(text: teacher.phone);
+    String role = teacher.role == UserRole.admin ? 'admin' : 'teacher';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setSt) => AlertDialog(
+          title: const Text('Profile Edit Karein'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Full Name',
+                    border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                    labelText: 'Phone', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: role,
+                decoration: const InputDecoration(
+                    labelText: 'Role', border: OutlineInputBorder()),
+                items: const [
+                  DropdownMenuItem(
+                      value: 'teacher', child: Text('Teacher')),
+                  DropdownMenuItem(
+                      value: 'admin', child: Text('Admin')),
+                ],
+                onChanged: (v) => setSt(() => role = v ?? 'teacher'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(repoProvider).updateTeacherProfile(
+            id: teacher.id,
+            fullName: nameCtrl.text,
+            phone: phoneCtrl.text,
+            role: role,
+          );
+      ref.invalidate(allTeachersProvider);
+      ref.invalidate(currentUserRoleProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Profile update ho gayi!')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final teachers = ref.watch(allTeachersProvider);
+    return teachers.when(
+      data: (list) => list.isEmpty
+          ? const Center(child: Text('Koi teacher nahi mila.'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: list.length,
+              itemBuilder: (_, i) {
+                final t = list[i];
+                return Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      child: Text(t.fullName.isNotEmpty
+                          ? t.fullName[0].toUpperCase()
+                          : '?'),
+                    ),
+                    title: Text(t.fullName),
+                    subtitle: Text(
+                        '${t.roleLabel}${t.phone.isNotEmpty ? ' • ${t.phone}' : ''}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.class_,
+                              color: Colors.green),
+                          tooltip: 'Classes Assign Karein',
+                          onPressed: () => _manageClasses(t),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit,
+                              color: Colors.blue),
+                          tooltip: 'Profile Edit',
+                          onPressed: () => _editProfile(t),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
     );

@@ -61,3 +61,23 @@ final homeworkStatusProvider =
         (ref, homeworkId) {
   return ref.watch(repoProvider).getHomeworkStatus(homeworkId);
 });
+
+// ── Admin providers ──────────────────────────────────────────────────────────
+
+/// Admin: all classes (not filtered by teacher).
+final allClassesProvider = FutureProvider<List<ClassRoom>>(
+    (ref) => ref.watch(repoProvider).getAllClasses());
+
+/// Admin: all teacher profiles.
+final allTeachersProvider = FutureProvider<List<TeacherProfile>>(
+    (ref) => ref.watch(repoProvider).getAllTeachers());
+
+/// Admin: classes assigned to a specific teacher.
+final teacherAssignedClassesProvider =
+    FutureProvider.family<List<ClassRoom>, String>(
+        (ref, teacherId) =>
+            ref.watch(repoProvider).getTeacherAssignedClasses(teacherId));
+
+/// Admin: all active students across all classes.
+final allStudentsProvider = FutureProvider<List<Student>>(
+    (ref) => ref.watch(repoProvider).getAllStudents());
