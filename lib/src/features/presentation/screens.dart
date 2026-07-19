@@ -980,9 +980,9 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen> {
                                 ),
                                 isThreeLine: true,
                               ),
-                              OverflowBar(
-                                padding: const EdgeInsets.fromLTRB(
-                                    8, 0, 8, 8),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                                child: OverflowBar(
                                 children: [
                                   TextButton.icon(
                                     onPressed: () => _markHomework(
@@ -1017,7 +1017,8 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen> {
                                     ),
                                   ),
                                 ],
-                              ),
+                              ),   // OverflowBar
+                              ),   // Padding
                             ],
                           ),
                         );
