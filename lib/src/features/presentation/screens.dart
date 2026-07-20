@@ -512,7 +512,14 @@ class ClassDetailScreen extends ConsumerWidget {
                             onPressed: () => _openWhatsApp(
                                 context,
                                 student.whatsapp,
-                                'Namaste, ${student.parentName} ji! Aapke bache ${student.fullName} ke baare mein baat karni thi.'),
+                                '🏫 *New Era Modern Public School, Vrindavan*\n\n'
+                                'Dear ${student.parentName.isNotEmpty ? student.parentName : "Madam/Sir"} / '
+                                'नमस्ते ${student.parentName.isNotEmpty ? student.parentName : "Madam/Sir"} जी,\n\n'
+                                'We would like to share some important information regarding *${student.fullName}*.\n'
+                                '*${student.fullName}* के संबंध में आपसे कुछ महत्वपूर्ण जानकारी साझा करनी थी।\n\n'
+                                'Kindly contact the school at your earliest convenience.\n'
+                                'कृपया सुविधानुसार विद्यालय से संपर्क करें। 🙏\n'
+                                '— *New Era Modern Public School, Vrindavan*'),
                           )
                         : null,
                   ),
@@ -1252,10 +1259,16 @@ class _PendingWhatsAppDialogState extends State<_PendingWhatsAppDialog> {
       _advance();
       return;
     }
-    final msg =
-        'Namaste ${current.parentName.isNotEmpty ? current.parentName : "Madam/Sir"}! '
-        'Aapke bache *${current.fullName}* ka aaj ka *${widget.subject}* homework pending hai. '
-        'Kripya aaj raat complete karwayein. NEMPS School.';
+    final parentName =
+        current.parentName.isNotEmpty ? current.parentName : 'Madam/Sir';
+    final msg = '📚 *Homework Reminder | गृहकार्य सूचना*\n\n'
+        'Dear $parentName / नमस्ते $parentName जी,\n\n'
+        'This is a gentle reminder that *${current.fullName}* has not yet completed today\'s *${widget.subject}* homework.\n'
+        '*${current.fullName}* का आज का *${widget.subject}* विषय का गृहकार्य अभी पूर्ण नहीं हुआ है।\n\n'
+        'Kindly ensure it is completed by tonight.\n'
+        'कृपया आज रात तक इसे पूरा करवाने में सहयोग करें।\n\n'
+        'We appreciate your support. 🙏\n'
+        '— *New Era Modern Public School, Vrindavan*';
     final uri = Uri.parse(
         'https://wa.me/${current.whatsapp.replaceAll(RegExp(r"[^0-9]"), "")}?text=${Uri.encodeComponent(msg)}');
     await launchUrl(uri, mode: LaunchMode.platformDefault);
@@ -1653,14 +1666,21 @@ class _AbsentNotifyScreenState extends ConsumerState<AbsentNotifyScreen>
         ? student.parentName
         : 'Madam/Sir';
     if (isAbsent) {
-      return 'Namaste $parentName ji! '
-          'Aapke bache *${student.fullName}* aaj $dateStr school mein *absent* hain. '
-          'Agar koi karan hai to school se sampark karein. '
-          '— NEMPS School, Vrindavan';
+      return '🔔 *Attendance Alert | उपस्थिति सूचना*\n\n'
+          'Dear $parentName / नमस्ते $parentName जी,\n\n'
+          'We wish to inform you that *${student.fullName}* was *absent* from school today, $dateStr.\n'
+          'आपके बच्चे *${student.fullName}* आज $dateStr को विद्यालय में *अनुपस्थित* रहे।\n\n'
+          'If there is a valid reason, kindly notify the school.\n'
+          'यदि कोई कारण हो तो कृपया विद्यालय को सूचित करें।\n\n'
+          'Thank you for your cooperation. 🙏\n'
+          '— *New Era Modern Public School, Vrindavan*';
     } else {
-      return 'Namaste $parentName ji! '
-          'Aapke bache *${student.fullName}* aaj $dateStr school mein *present* hain. '
-          'Dhanyawaad! — NEMPS School, Vrindavan';
+      return '✅ *Attendance Confirmation | उपस्थिति पुष्टि*\n\n'
+          'Dear $parentName / नमस्ते $parentName जी,\n\n'
+          'We are pleased to inform you that *${student.fullName}* is *present* in school today, $dateStr.\n'
+          'आपके बच्चे *${student.fullName}* आज $dateStr को विद्यालय में *उपस्थित* हैं।\n\n'
+          'Thank you for your continued support. 🙏\n'
+          '— *New Era Modern Public School, Vrindavan*';
     }
   }
 
@@ -1717,14 +1737,21 @@ class _BulkWhatsAppDialogState extends State<_BulkWhatsAppDialog> {
         ? current.parentName
         : 'Madam/Sir';
     if (widget.isAbsent) {
-      return 'Namaste $parentName ji! '
-          'Aapke bache *${current.fullName}* aaj ${widget.dateStr} school mein *absent* hain. '
-          'Agar koi karan hai to school se sampark karein. '
-          '— NEMPS School, Vrindavan';
+      return '🔔 *Attendance Alert | उपस्थिति सूचना*\n\n'
+          'Dear $parentName / नमस्ते $parentName जी,\n\n'
+          'We wish to inform you that *${current.fullName}* was *absent* from school today, ${widget.dateStr}.\n'
+          'आपके बच्चे *${current.fullName}* आज ${widget.dateStr} को विद्यालय में *अनुपस्थित* रहे।\n\n'
+          'If there is a valid reason, kindly notify the school.\n'
+          'यदि कोई कारण हो तो कृपया विद्यालय को सूचित करें।\n\n'
+          'Thank you for your cooperation. 🙏\n'
+          '— *New Era Modern Public School, Vrindavan*';
     } else {
-      return 'Namaste $parentName ji! '
-          'Aapke bache *${current.fullName}* aaj ${widget.dateStr} school mein *present* hain. '
-          'Dhanyawaad! — NEMPS School, Vrindavan';
+      return '✅ *Attendance Confirmation | उपस्थिति पुष्टि*\n\n'
+          'Dear $parentName / नमस्ते $parentName जी,\n\n'
+          'We are pleased to inform you that *${current.fullName}* is *present* in school today, ${widget.dateStr}.\n'
+          'आपके बच्चे *${current.fullName}* आज ${widget.dateStr} को विद्यालय में *उपस्थित* हैं।\n\n'
+          'Thank you for your continued support. 🙏\n'
+          '— *New Era Modern Public School, Vrindavan*';
     }
   }
 
