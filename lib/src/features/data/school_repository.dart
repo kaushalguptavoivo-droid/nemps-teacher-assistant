@@ -48,7 +48,7 @@ class SchoolRepository {
           .select('*, classes(name, section)')
           .eq('class_id', classId)
           .eq('active', true)
-          .order('roll_no');
+          .order('full_name');
       return data.map<Student>((e) => Student.fromMap(e)).toList();
     } catch (e) {
       rethrow;
@@ -254,6 +254,84 @@ class SchoolRepository {
       return allStudents.where((s) => pendingIds.contains(s.id)).toList();
     } catch (_) {
       return [];
+    }
+  }
+
+  /// Returns, for every student in the class who has NOT completed at least
+  /// one of TODAY's assigned homeworks, a summary listing all the subjects
+  /// that are still pending for that student. Used to send a single combined
+  /// WhatsApp reminder per parent (instead of one message per subject).
+  /// Result is ordered alphabetically by student name.
+  Future<List<PendingHomeworkSummary>> getTodayPendingByStudent(
+      String classId) async {
+    try {
+      final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+      final hwData = await _client
+          .from('homework')
+          .select()
+          .eq('class_id', classId)
+          .eq('assigned_date', todayStr);
+      final homeworks =
+          hwData.map<Homework>((e) => Homework.fromMap(e)).toList();
+      if (homeworks.isEmpty) return [];
+
+      final allStudents = await students(classId);
+      // studentId -> list of pending subjects (order follows homework order)
+      final pendingSubjects = <String, List<String>>{};
+
+      for (final hw in homeworks) {
+        final statusData = await _client
+            .from('homework_status')
+            .select('student_id, status')
+            .eq('homework_id', hw.id);
+        final completedIds = statusData
+            .where((e) => e['status'] == 'completed')
+            .map((e) => e['student_id'] as String)
+            .toSet();
+        // Anyone not explicitly marked completed is still pending.
+        for (final s in allStudents) {
+          if (!completedIds.contains(s.id)) {
+            pendingSubjects.putIfAbsent(s.id, () => []).add(hw.subject);
+          }
+        }
+      }
+
+      // allStudents is already alphabetical, so preserve that order.
+      return allStudents
+          .where((s) => pendingSubjects.containsKey(s.id))
+          .map((s) => PendingHomeworkSummary(
+                student: s,
+                subjects: pendingSubjects[s.id]!,
+              ))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Returns completion counts for a single homework:
+  /// {'completed': x, 'pending': y, 'total': z}.
+  Future<Map<String, int>> getHomeworkCompletionCount(
+      String classId, String homeworkId) async {
+    try {
+      final allStudents = await students(classId);
+      final statusData = await _client
+          .from('homework_status')
+          .select('student_id, status')
+          .eq('homework_id', homeworkId);
+      final completed = statusData
+          .where((e) => e['status'] == 'completed')
+          .map((e) => e['student_id'] as String)
+          .toSet()
+          .length;
+      final total = allStudents.length;
+      return {
+        'completed': completed,
+        'pending': total - completed,
+        'total': total,
+      };
+    } catch (_) {
+      return {'completed': 0, 'pending': 0, 'total': 0};
     }
   }
 

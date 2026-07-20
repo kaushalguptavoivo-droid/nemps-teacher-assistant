@@ -40,6 +40,14 @@ class Student {
   );
 }
 
+/// Summary of a single student's still-pending homework across all of
+/// today's subjects. Used to send ONE combined WhatsApp reminder per parent.
+class PendingHomeworkSummary {
+  const PendingHomeworkSummary({required this.student, required this.subjects});
+  final Student student;
+  final List<String> subjects;
+}
+
 class ClassRoom {
   const ClassRoom({required this.id, required this.name, required this.section});
   final String id, name, section;

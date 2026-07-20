@@ -51,6 +51,16 @@ class NempsApp extends ConsumerWidget {
           builder: (_, __) => const ShellScreen(child: ReportsScreen()),
         ),
         GoRoute(
+          path: '/reports/attendance',
+          builder: (_, __) =>
+              const ShellScreen(child: AttendanceReportScreen()),
+        ),
+        GoRoute(
+          path: '/reports/homework',
+          builder: (_, __) =>
+              const ShellScreen(child: HomeworkReportScreen()),
+        ),
+        GoRoute(
           path: '/admin',
           builder: (_, __) => const ShellScreen(child: AdminPanelScreen()),
         ),

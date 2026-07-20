@@ -62,6 +62,20 @@ final homeworkStatusProvider =
   return ref.watch(repoProvider).getHomeworkStatus(homeworkId);
 });
 
+/// Students (with their pending subjects) who haven't completed today's
+/// homework. Used for the single combined WhatsApp reminder.
+final todayPendingByStudentProvider =
+    FutureProvider.family<List<PendingHomeworkSummary>, String>(
+        (ref, classId) =>
+            ref.watch(repoProvider).getTodayPendingByStudent(classId));
+
+/// Completion counts for a single homework: completed / pending / total.
+final homeworkCompletionProvider =
+    FutureProvider.family<Map<String, int>, (String, String)>((ref, params) {
+  final (classId, homeworkId) = params;
+  return ref.watch(repoProvider).getHomeworkCompletionCount(classId, homeworkId);
+});
+
 // ── Admin providers ──────────────────────────────────────────────────────────
 
 /// Admin: all classes (not filtered by teacher).

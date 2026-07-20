@@ -13,6 +13,20 @@ import '../../core/models/models.dart';
 import '../data/providers.dart';
 
 // ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+/// A back button for screen AppBars. Navigation uses `context.go` (which
+/// replaces the stack), so when there is nothing to pop we navigate to a
+/// sensible [fallback] route instead.
+Widget backLeading(BuildContext context, String fallback) => IconButton(
+      icon: const Icon(Icons.arrow_back),
+      tooltip: 'Back',
+      onPressed: () =>
+          context.canPop() ? context.pop() : context.go(fallback),
+    );
+
+// ---------------------------------------------------------------------------
 // Login
 // ---------------------------------------------------------------------------
 
@@ -452,6 +466,7 @@ class ClassDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: backLeading(context, '/dashboard'),
         title: const Text('Class Details'),
         actions: [
           PopupMenuButton(
@@ -740,7 +755,10 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   Widget build(BuildContext context) {
     final students = ref.watch(studentsProvider(widget.classId));
     return Scaffold(
-      appBar: AppBar(title: const Text('Students')),
+      appBar: AppBar(
+        leading: backLeading(context, '/class/${widget.classId}'),
+        title: const Text('Students'),
+      ),
       body: students.when(
         data: (items) => items.isEmpty
             ? const Center(
@@ -858,7 +876,10 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         dailyAttendanceCountProvider((widget.classId, selectedDate)));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Attendance')),
+      appBar: AppBar(
+        leading: backLeading(context, '/class/${widget.classId}'),
+        title: const Text('Attendance'),
+      ),
       body: students.when(
         data: (items) => Column(
           children: [
@@ -1060,7 +1081,10 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen> {
     final isAfter1PM = DateTime.now().hour >= 13;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Homework')),
+      appBar: AppBar(
+        leading: backLeading(context, '/class/${widget.classId}'),
+        title: const Text('Homework'),
+      ),
       body: Column(
         children: [
           // Assign new homework
@@ -1120,6 +1144,35 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen> {
             ),
           ),
           const Divider(height: 1),
+          // Single combined WhatsApp reminder for ALL of today's pending subjects
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: isAfter1PM
+                        ? () => _sendCombinedPendingWhatsApp(context)
+                        : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: isAfter1PM ? Colors.green : null,
+                    ),
+                    icon: const Icon(Icons.message),
+                    label: Text(isAfter1PM
+                        ? 'Send Pending Homework Reminder'
+                        : 'WhatsApp Reminder (after 1 PM)'),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Har parent ko aaj ke sabhi pending subjects ka ek hi message jayega.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
           // Homework list
           Expanded(
             child: homework.when(
@@ -1145,42 +1198,17 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen> {
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                                 child: OverflowBar(
-                                children: [
-                                  TextButton.icon(
-                                    onPressed: () => _markHomework(
-                                        context, hw.id),
-                                    icon: const Icon(Icons.edit_note,
-                                        size: 18),
-                                    label: const Text('Mark Status'),
-                                  ),
-                                  TextButton.icon(
-                                    onPressed: isAfter1PM
-                                        ? () =>
-                                            _sendPendingWhatsApp(
-                                                context, hw.id, hw.subject)
-                                        : null,
-                                    icon: Icon(
-                                      Icons.message,
-                                      size: 18,
-                                      color: isAfter1PM
-                                          ? Colors.green
-                                          : null,
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: () =>
+                                          _markHomework(context, hw.id),
+                                      icon: const Icon(Icons.edit_note,
+                                          size: 18),
+                                      label: const Text('Mark Status'),
                                     ),
-                                    label: Text(
-                                      isAfter1PM
-                                          ? 'WhatsApp Pending'
-                                          : 'WhatsApp (after 1 PM)',
-                                      style: TextStyle(
-                                        color: isAfter1PM
-                                            ? Colors.green
-                                            : Theme.of(context)
-                                                .disabledColor,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),   // OverflowBar
-                              ),   // Padding
+                                  ],
+                                ),
+                              )
                             ],
                           ),
                         );
@@ -1207,41 +1235,34 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen> {
     );
   }
 
-  /// Opens WhatsApp for each student with pending homework, one by one.
-  /// Only available after 1 PM.
-  Future<void> _sendPendingWhatsApp(
-      BuildContext context, String homeworkId, String subject) async {
+  /// Opens WhatsApp for each parent with a SINGLE combined message listing
+  /// every subject the student still has pending for today. Only after 1 PM.
+  Future<void> _sendCombinedPendingWhatsApp(BuildContext context) async {
     final pending = await ref
         .read(repoProvider)
-        .getPendingHomeworkStudents(widget.classId, homeworkId);
+        .getTodayPendingByStudent(widget.classId);
 
     if (!mounted) return;
 
     if (pending.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No pending students!')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Aaj koi pending homework nahi hai!')));
       return;
     }
 
-    // Show list and send one by one with confirmation
+    // Send one combined message per parent, one at a time with confirmation.
     showDialog(
       context: context,
-      builder: (ctx) => _PendingWhatsAppDialog(
-        students: pending,
-        subject: subject,
-      ),
+      builder: (ctx) => _PendingWhatsAppDialog(summaries: pending),
     );
   }
 }
 
-/// Dialog that sends WhatsApp messages one at a time for pending students.
+/// Dialog that sends ONE combined WhatsApp message per parent, one at a time.
+/// Each message lists every subject the student still has pending today.
 class _PendingWhatsAppDialog extends StatefulWidget {
-  const _PendingWhatsAppDialog({
-    required this.students,
-    required this.subject,
-  });
-  final List<Student> students;
-  final String subject;
+  const _PendingWhatsAppDialog({required this.summaries});
+  final List<PendingHomeworkSummary> summaries;
 
   @override
   State<_PendingWhatsAppDialog> createState() =>
@@ -1251,26 +1272,31 @@ class _PendingWhatsAppDialog extends StatefulWidget {
 class _PendingWhatsAppDialogState extends State<_PendingWhatsAppDialog> {
   int currentIndex = 0;
 
-  Student get current => widget.students[currentIndex];
-  bool get isLast => currentIndex == widget.students.length - 1;
+  PendingHomeworkSummary get current => widget.summaries[currentIndex];
+  bool get isLast => currentIndex == widget.summaries.length - 1;
 
   Future<void> _sendAndAdvance() async {
-    if (current.whatsapp.isEmpty) {
+    final student = current.student;
+    if (student.whatsapp.isEmpty) {
       _advance();
       return;
     }
     final parentName =
-        current.parentName.isNotEmpty ? current.parentName : 'Madam/Sir';
+        student.parentName.isNotEmpty ? student.parentName : 'Madam/Sir';
+    final subjectLines =
+        current.subjects.map((s) => '• $s').join('\n');
     final msg = '📚 *Homework Reminder | गृहकार्य सूचना*\n\n'
         'Dear $parentName / नमस्ते $parentName जी,\n\n'
-        'This is a gentle reminder that *${current.fullName}* has not yet completed today\'s *${widget.subject}* homework.\n'
-        '*${current.fullName}* का आज का *${widget.subject}* विषय का गृहकार्य अभी पूर्ण नहीं हुआ है।\n\n'
+        'This is a gentle reminder that *${student.fullName}* has not yet completed today\'s homework in the following subject(s):\n'
+        '$subjectLines\n\n'
+        '*${student.fullName}* का आज का निम्नलिखित विषयों का गृहकार्य अभी पूर्ण नहीं हुआ है:\n'
+        '$subjectLines\n\n'
         'Kindly ensure it is completed by tonight.\n'
         'कृपया आज रात तक इसे पूरा करवाने में सहयोग करें।\n\n'
         'We appreciate your support. 🙏\n'
         '— *New Era Modern Public School, Vrindavan*';
     final uri = Uri.parse(
-        'https://wa.me/${current.whatsapp.replaceAll(RegExp(r"[^0-9]"), "")}?text=${Uri.encodeComponent(msg)}');
+        'https://wa.me/${student.whatsapp.replaceAll(RegExp(r"[^0-9]"), "")}?text=${Uri.encodeComponent(msg)}');
     await launchUrl(uri, mode: LaunchMode.platformDefault);
     _advance();
   }
@@ -1285,24 +1311,30 @@ class _PendingWhatsAppDialogState extends State<_PendingWhatsAppDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final student = current.student;
     return AlertDialog(
       title: Text(
-          'Pending: ${currentIndex + 1} of ${widget.students.length}'),
+          'Pending: ${currentIndex + 1} of ${widget.summaries.length}'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(current.fullName,
+          Text(student.fullName,
               style: const TextStyle(
                   fontWeight: FontWeight.bold, fontSize: 18)),
           const SizedBox(height: 4),
-          Text('Parent: ${current.parentName}'),
+          Text('Parent: ${student.parentName}'),
           Text(
-              'WhatsApp: ${current.whatsapp.isNotEmpty ? current.whatsapp : "—Not set—"}'),
-          const SizedBox(height: 16),
-          if (current.whatsapp.isEmpty)
+              'WhatsApp: ${student.whatsapp.isNotEmpty ? student.whatsapp : "—Not set—"}'),
+          const SizedBox(height: 12),
+          const Text('Pending subjects:',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          ...current.subjects.map((s) => Text('• $s')),
+          const SizedBox(height: 12),
+          if (student.whatsapp.isEmpty)
             const Text(
-                '(No WhatsApp number — will skip this student)',
+                '(No WhatsApp number — will skip this parent)',
                 style: TextStyle(color: Colors.orange)),
         ],
       ),
@@ -1315,7 +1347,7 @@ class _PendingWhatsAppDialogState extends State<_PendingWhatsAppDialog> {
             child: Text(isLast ? 'Skip & Done' : 'Skip')),
         FilledButton.icon(
           onPressed:
-              current.whatsapp.isNotEmpty ? _sendAndAdvance : null,
+              student.whatsapp.isNotEmpty ? _sendAndAdvance : null,
           icon: const Icon(Icons.message, size: 18),
           label: Text(isLast ? 'Send & Done' : 'Send & Next'),
         ),
@@ -1496,6 +1528,7 @@ class _AbsentNotifyScreenState extends ConsumerState<AbsentNotifyScreen>
 
     return Scaffold(
       appBar: AppBar(
+        leading: backLeading(context, '/class/${widget.classId}'),
         title: const Text('WhatsApp Notifications'),
         bottom: TabBar(
           controller: _tabController,
@@ -1851,6 +1884,7 @@ class AdminPanelScreen extends ConsumerWidget {
       length: 5,
       child: Scaffold(
         appBar: AppBar(
+          leading: backLeading(context, '/dashboard'),
           title: const Text('Admin Panel'),
           bottom: const TabBar(
             isScrollable: true,
@@ -2697,29 +2731,337 @@ class ReportsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Reports')),
+        appBar: AppBar(
+          leading: backLeading(context, '/dashboard'),
+          title: const Text('Reports'),
+        ),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             Text('Reports',
                 style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 20),
-            const Card(
+            Card(
               child: ListTile(
-                leading: Icon(Icons.bar_chart),
-                title: Text('Attendance Report'),
-                subtitle: Text('View daily/monthly attendance'),
+                leading: const Icon(Icons.bar_chart),
+                title: const Text('Attendance Report'),
+                subtitle: const Text('View daily attendance by class'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go('/reports/attendance'),
               ),
             ),
             const SizedBox(height: 8),
-            const Card(
+            Card(
               child: ListTile(
-                leading: Icon(Icons.assignment_turned_in),
-                title: Text('Homework Report'),
-                subtitle: Text('Track homework completion rates'),
+                leading: const Icon(Icons.assignment_turned_in),
+                title: const Text('Homework Report'),
+                subtitle: const Text('Track homework completion rates'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.go('/reports/homework'),
               ),
             ),
           ],
+        ),
+      );
+}
+
+// ---------------------------------------------------------------------------
+// Attendance Report
+// ---------------------------------------------------------------------------
+
+class AttendanceReportScreen extends ConsumerStatefulWidget {
+  const AttendanceReportScreen({super.key});
+
+  @override
+  ConsumerState<AttendanceReportScreen> createState() =>
+      _AttendanceReportScreenState();
+}
+
+class _AttendanceReportScreenState
+    extends ConsumerState<AttendanceReportScreen> {
+  String? classId;
+  DateTime date = DateTime.now();
+
+  @override
+  Widget build(BuildContext context) {
+    final classes = ref.watch(classesProvider);
+    final dateStr = DateFormat('dd MMM yyyy').format(date);
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: backLeading(context, '/reports'),
+        title: const Text('Attendance Report'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          classes.when(
+            data: (items) => DropdownButtonFormField<String>(
+              value: classId,
+              decoration: const InputDecoration(
+                  labelText: 'Select Class', border: OutlineInputBorder()),
+              items: items
+                  .map((c) => DropdownMenuItem(
+                      value: c.id, child: Text('Class ${c.label}')))
+                  .toList(),
+              onChanged: (v) => setState(() => classId = v),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('Error loading classes: $e'),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text('Date: $dateStr',
+                    style: Theme.of(context).textTheme.titleMedium),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: date,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setState(() => date = picked);
+                },
+                icon: const Icon(Icons.calendar_today, size: 18),
+                label: const Text('Change'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (classId == null)
+            const Card(
+              child: ListTile(
+                leading: Icon(Icons.info_outline),
+                title: Text('Upar se ek class select karein.'),
+              ),
+            )
+          else
+            _AttendanceReportBody(classId: classId!, date: date),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttendanceReportBody extends ConsumerWidget {
+  const _AttendanceReportBody({required this.classId, required this.date});
+  final String classId;
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final counts =
+        ref.watch(dailyAttendanceCountProvider((classId, date)));
+    final absent = ref.watch(absentStudentsProvider((classId, date)));
+
+    return counts.when(
+      data: (c) {
+        final present = c['present'] ?? 0;
+        final absentCount = c['absent'] ?? 0;
+        final total = present + absentCount;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _StatCard(
+                      label: 'Present',
+                      value: '$present',
+                      color: Colors.green),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatCard(
+                      label: 'Absent',
+                      value: '$absentCount',
+                      color: Colors.red),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatCard(label: 'Total', value: '$total'),
+                ),
+              ],
+            ),
+            if (total == 0)
+              const Padding(
+                padding: EdgeInsets.only(top: 16),
+                child: Text('Is din ki attendance mark nahi hui.'),
+              ),
+            const SizedBox(height: 16),
+            Text('Absent Students',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            absent.when(
+              data: (list) => list.isEmpty
+                  ? const Text('Koi absent student nahi.')
+                  : Column(
+                      children: list
+                          .map((s) => Card(
+                                child: ListTile(
+                                  dense: true,
+                                  leading: CircleAvatar(
+                                      child: Text(s.rollNo)),
+                                  title: Text(s.fullName),
+                                  subtitle: Text('Roll: ${s.rollNo}'),
+                                ),
+                              ))
+                          .toList(),
+                    ),
+              loading: () =>
+                  const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Text('Error: $e'),
+            ),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Text('Error: $e'),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Homework Report
+// ---------------------------------------------------------------------------
+
+class HomeworkReportScreen extends ConsumerStatefulWidget {
+  const HomeworkReportScreen({super.key});
+
+  @override
+  ConsumerState<HomeworkReportScreen> createState() =>
+      _HomeworkReportScreenState();
+}
+
+class _HomeworkReportScreenState
+    extends ConsumerState<HomeworkReportScreen> {
+  String? classId;
+
+  @override
+  Widget build(BuildContext context) {
+    final classes = ref.watch(classesProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: backLeading(context, '/reports'),
+        title: const Text('Homework Report'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          classes.when(
+            data: (items) => DropdownButtonFormField<String>(
+              value: classId,
+              decoration: const InputDecoration(
+                  labelText: 'Select Class', border: OutlineInputBorder()),
+              items: items
+                  .map((c) => DropdownMenuItem(
+                      value: c.id, child: Text('Class ${c.label}')))
+                  .toList(),
+              onChanged: (v) => setState(() => classId = v),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('Error loading classes: $e'),
+          ),
+          const SizedBox(height: 12),
+          if (classId == null)
+            const Card(
+              child: ListTile(
+                leading: Icon(Icons.info_outline),
+                title: Text('Upar se ek class select karein.'),
+              ),
+            )
+          else
+            _HomeworkReportBody(classId: classId!),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeworkReportBody extends ConsumerWidget {
+  const _HomeworkReportBody({required this.classId});
+  final String classId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final homework = ref.watch(homeworkProvider(classId));
+
+    return homework.when(
+      data: (items) => items.isEmpty
+          ? const Text('Is class ka koi homework assigned nahi hai.')
+          : Column(
+              children: items.map((hw) {
+                final completion = ref.watch(
+                    homeworkCompletionProvider((classId, hw.id)));
+                return Card(
+                  child: ListTile(
+                    title: Text(hw.subject,
+                        style:
+                            const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(
+                        '${hw.description}\n${DateFormat('dd MMM yyyy').format(hw.assignedDate)}'),
+                    isThreeLine: true,
+                    trailing: completion.when(
+                      data: (c) {
+                        final total = c['total'] ?? 0;
+                        final done = c['completed'] ?? 0;
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('$done/$total',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
+                            const Text('done',
+                                style: TextStyle(fontSize: 11)),
+                          ],
+                        );
+                      },
+                      loading: () => const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child:
+                              CircularProgressIndicator(strokeWidth: 2)),
+                      error: (_, __) => const Icon(Icons.error_outline),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Text('Error: $e'),
+    );
+  }
+}
+
+/// Small stat tile used in the attendance report summary row.
+class _StatCard extends StatelessWidget {
+  const _StatCard({required this.label, required this.value, this.color});
+  final String label;
+  final String value;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          child: Column(
+            children: [
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: color)),
+              const SizedBox(height: 4),
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
         ),
       );
 }
