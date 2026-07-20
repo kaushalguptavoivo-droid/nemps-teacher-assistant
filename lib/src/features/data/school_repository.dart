@@ -426,10 +426,13 @@ class SchoolRepository {
     required String section,
     String academicYear = '',
   }) async {
+    // academic_year has a DB default of '' — always send it to satisfy NOT NULL
     final row = <String, dynamic>{
       'name': name.trim(),
       'section': section.trim(),
-      if (academicYear.isNotEmpty) 'academic_year': academicYear.trim(),
+      'academic_year': academicYear.trim().isNotEmpty
+          ? academicYear.trim()
+          : '${DateTime.now().year}-${(DateTime.now().year + 1).toString().substring(2)}',
     };
     if (id != null) {
       await _client.from('classes').update(row).eq('id', id);
