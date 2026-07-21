@@ -1,0 +1,120 @@
+
+Library
+Tasks
+New
+Background tasks allow you to get more work done at once.
+
+Try creating your first one!
+
+View documentation
+
+Agent
+Jara dekh k batana whatsapp number import krte waqt ya app se add krte waqt +91 country code likh k import kre ya type kre ya app WhatsApp par msg krte waqt automatically save kr lega? Ya kese hora hai jara dekhna? Or students ke data me mothers name or address ka option or add krdena. But ye optional rkhna na bhi kisi bche ka to koi error na aye!
+
+21 minutes ago
+WhatsApp number handling
+Pehle codebase dekh leta hoon — student model, WhatsApp logic, aur import code:
+
+Ab exact code padh leta hoon sab ek saath:
+
+Ab import aur WhatsApp URL code bhi dekh leta hoon:
+
+Ab sab kuch clear hai. Pehle export headers dekh leta hoon, phir saari files ek saath fix karta hoon:
+
+Ab saari files ek saath fix karta hoon — 4 parallel edits:
+
+Ab baaki saari files ek saath fix karta hoon:
+
+Ab baaki 3 files ek saath update karta hoon:
+
+CSV import/export update karta hoon aur WhatsApp URL fix bhi:
+
+Ab WhatsApp URL fix karta hoon dono screens mein + students list display update:
+
+Charon replaceAll occurrences ek saath fix karta hoon:
+
+Ab student list display update karo (mother name + address show karo), phir commit & push:
+
+Ab commit aur push karta hoon:
+
+Push ho gaya ✅ — commit fc0b60a. Ab aapke do sawaalon ka jawab:
+
+WhatsApp Number — Kya karna chahiye?
+Pehle kya ho raha tha: App number ko as-is store karta tha. Agar 9876543210 daalein to wa.me/9876543210 banta tha — jo unreliable hai.
+
+Ab kya fix kiya:
+
+10 digit number bina +91 daalein (e.g. 9876543210)
+App automatically 91 prefix add kar dega wa.me link mein → wa.me/919876543210 ✅
+Agar kisi ne pehle se +919876543210 ya 919876543210 daal rakha hai — woh bhi sahi kaam karega
+Form mein hint bhi likh diya: "WhatsApp (10 digit, bina +91)"
+CSV import mein bhi: Same rule — 10 digit daalein, app handle kar lega.
+
+Mother Name + Address — Kya add hua
+Field	Required?	Kahan dikhta hai
+Mother Name	❌ Optional	Add/Edit dialog, student card
+Address	❌ Optional	Add/Edit dialog, student card (1 line)
+Kisi bache ka bhi nahi dala to koi error nahi — Supabase mein sirf tab save hoga jab value ho
+CSV export mein bhi ye dono columns ab hain
+CSV import dono format support karta hai — purana (6 column) aur naya (8 column)
+Ek kaam aapko karna hoga: Supabase ke students table mein 2 columns add karein:
+
+ALTER TABLE students ADD COLUMN IF NOT EXISTS mother_name text DEFAULT '';
+ALTER TABLE students ADD COLUMN IF NOT EXISTS address text DEFAULT '';
+Bina iske existing students par koi asar nahi, lekin naye data save nahi hoga.
+
+Thik hai sql code dedo me run krdunga
+
+17 minutes ago
+Adding columns
+Ye Supabase SQL Editor mein run karein:
+
+ALTER TABLE students ADD COLUMN IF NOT EXISTS mother_name text DEFAULT '';
+ALTER TABLE students ADD COLUMN IF NOT EXISTS address     text DEFAULT '';
+Bas itna hi — IF NOT EXISTS hai to dobara run karo to bhi koi error nahi aayega. Purane students ka data untouched rahega, sirf nayi columns add hongi.
+
+Are srf ik last feature rah gya ya to har jagah student names ko alphabetically kro ya roll no wise. Dono sort ka option rkhna har jagah class me
+
+8 minutes ago
+Implementing student sorting
+Pehle dekh leta hoon kahan kahan students list show hoti hai:
+
+Saari screens ek saath padh leta hoon:
+
+Baaki screens ka student list rendering part bhi padh leta hoon:
+
+Aur thodi si cheez padh leta hoon — homework screen mein students kahan render hote hain:
+
+Homework screen mein students kahan se aate hain woh jald dekh leta hoon, phir saari files ek saath likhta hoon:
+
+Ab implement karta hoon — saari 6 files ek saath:
+
+Ab baaki saari files ek saath edit karta hoon:
+
+Ab baaki 4 screens ek saath update karta hoon:
+
+Ab baaki 3 screens ek saath update karta hoon:
+
+Ab absent_notify aur homework screen ek saath update karta hoon:
+
+Ab homework screen sort add karta hoon:
+
+Ab homework screen ke 3 changes ek saath karta hoon — AppBar sort button, _CombinedSendTab sort, aur _markHomework sort:
+
+Ab _CombinedSendTab aur _markHomework mein sort apply karta hoon, phir commit & push:
+
+Ab absent_notify_screen.dart mein sorting actually apply karta hoon _StudentNotifyList ke andar, phir commit & push:
+
+Sort _StudentNotifyList ke andar apply karta hoon phir commit & push:
+
+Baaki students references ko sorted se replace karta hoon us widget mein, phir commit & push:
+
+Baaki students → sorted references fix karta hoon:
+
+Replacing student references
+You've reached your daily free quota limit. It will reset at 12:00 AM UTC.
+
+
+Make, test, iterate…
+Agent
+Agent can make changes, review its work, and debug itself automatically.
