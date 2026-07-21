@@ -326,7 +326,14 @@ class _HomeworkCard extends ConsumerWidget {
     // Previously the dialog re-subscribed to studentsProvider from inside
     // showDialog(), causing a fresh Supabase round-trip that left names blank
     // until the new stream emitted (often several seconds).
-    final students = ref.read(studentsProvider(classId)).valueOrNull ?? [];
+    final raw = ref.read(studentsProvider(classId)).valueOrNull ?? [];
+    // Sort by roll number (numeric where possible) so dialog order is consistent.
+    final students = [...raw]..sort((a, b) {
+        final na = int.tryParse(a.rollNo.trim());
+        final nb = int.tryParse(b.rollNo.trim());
+        if (na != null && nb != null) return na.compareTo(nb);
+        return a.rollNo.compareTo(b.rollNo);
+      });
     showDialog(
       context: context,
       builder: (_) => HomeworkMarkDialog(

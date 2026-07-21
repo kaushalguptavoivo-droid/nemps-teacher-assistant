@@ -14,12 +14,22 @@ class AttendanceScreen extends ConsumerStatefulWidget {
   ConsumerState<AttendanceScreen> createState() => _AttendanceScreenState();
 }
 
+enum _SortBy { rollNo, name }
+
+int _compareRollNo(String a, String b) {
+  final na = int.tryParse(a.trim());
+  final nb = int.tryParse(b.trim());
+  if (na != null && nb != null) return na.compareTo(nb);
+  return a.compareTo(b);
+}
+
 class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
   final statuses = <String, AttendanceStatus>{};
   DateTime selectedDate = DateTime.now();
   bool saving = false;
   bool loadingExisting = false;
   bool isHolidayMarked = false;
+  _SortBy _sortBy = _SortBy.rollNo;
 
   @override
   void initState() {
@@ -185,9 +195,23 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         dailyAttendanceCountProvider((widget.classId, selectedDate)));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Attendance')),
+      appBar: AppBar(
+        title: const Text('Attendance'),
+        actions: [
+          IconButton(
+            tooltip: _sortBy == _SortBy.rollNo ? 'Roll No se sorted' : 'Naam se sorted',
+            icon: Icon(_sortBy == _SortBy.rollNo ? Icons.format_list_numbered : Icons.sort_by_alpha),
+            onPressed: () => setState(
+              () => _sortBy = _sortBy == _SortBy.rollNo ? _SortBy.name : _SortBy.rollNo,
+            ),
+          ),
+        ],
+      ),
       body: students.when(
-        data: (items) {
+        data: (rawItems) {
+          final items = [...rawItems]..sort((a, b) => _sortBy == _SortBy.name
+              ? a.fullName.compareTo(b.fullName)
+              : _compareRollNo(a.rollNo, b.rollNo));
           final presentCount = statuses.values
               .where((s) => s == AttendanceStatus.present)
               .length;

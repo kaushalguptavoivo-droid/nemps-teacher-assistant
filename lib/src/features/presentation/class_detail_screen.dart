@@ -6,20 +6,52 @@ import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
 
-class ClassDetailScreen extends ConsumerWidget {
+enum _SortBy { rollNo, name }
+
+int _compareRollNo(String a, String b) {
+  final na = int.tryParse(a.trim());
+  final nb = int.tryParse(b.trim());
+  if (na != null && nb != null) return na.compareTo(nb);
+  return a.compareTo(b);
+}
+
+class ClassDetailScreen extends ConsumerStatefulWidget {
   const ClassDetailScreen({super.key, required this.classId});
   final String classId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ClassDetailScreen> createState() => _ClassDetailScreenState();
+}
+
+class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
+  _SortBy _sortBy = _SortBy.rollNo;
+
+  @override
+  Widget build(BuildContext context) {
+    final classId = widget.classId;
     final students = ref.watch(studentsProvider(classId));
     final groupLink = ref.watch(whatsappGroupLinkProvider(classId));
     final attendanceDone = ref.watch(attendanceDoneTodayProvider(classId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Class Details')),
+      appBar: AppBar(
+        title: const Text('Class Details'),
+        actions: [
+          IconButton(
+            tooltip: _sortBy == _SortBy.rollNo ? 'Roll No se sorted' : 'Naam se sorted',
+            icon: Icon(_sortBy == _SortBy.rollNo ? Icons.format_list_numbered : Icons.sort_by_alpha),
+            onPressed: () => setState(
+              () => _sortBy = _sortBy == _SortBy.rollNo ? _SortBy.name : _SortBy.rollNo,
+            ),
+          ),
+        ],
+      ),
       body: students.when(
-        data: (items) => SingleChildScrollView(
+        data: (rawItems) {
+          final items = [...rawItems]..sort((a, b) => _sortBy == _SortBy.name
+              ? a.fullName.compareTo(b.fullName)
+              : _compareRollNo(a.rollNo, b.rollNo));
+          return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,7 +273,8 @@ class ClassDetailScreen extends ConsumerWidget {
                 ),
             ],
           ),
-        ),
+        );
+        },
         error: (error, _) => Center(child: Text('Error: $error')),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),

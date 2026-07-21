@@ -15,10 +15,20 @@ class AbsentNotifyScreen extends ConsumerStatefulWidget {
       _AbsentNotifyScreenState();
 }
 
+enum _SortBy { rollNo, name }
+
+int _compareRollNo(String a, String b) {
+  final na = int.tryParse(a.trim());
+  final nb = int.tryParse(b.trim());
+  if (na != null && nb != null) return na.compareTo(nb);
+  return a.compareTo(b);
+}
+
 class _AbsentNotifyScreenState extends ConsumerState<AbsentNotifyScreen>
     with SingleTickerProviderStateMixin {
   DateTime selectedDate = DateTime.now();
   late TabController _tabController;
+  _SortBy _sortBy = _SortBy.rollNo;
 
   @override
   void initState() {
@@ -58,6 +68,15 @@ class _AbsentNotifyScreenState extends ConsumerState<AbsentNotifyScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('WhatsApp Notifications'),
+        actions: [
+          IconButton(
+            tooltip: _sortBy == _SortBy.rollNo ? 'Roll No se sorted' : 'Naam se sorted',
+            icon: Icon(_sortBy == _SortBy.rollNo ? Icons.format_list_numbered : Icons.sort_by_alpha),
+            onPressed: () => setState(
+              () => _sortBy = _sortBy == _SortBy.rollNo ? _SortBy.name : _SortBy.rollNo,
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -134,25 +153,35 @@ class _AbsentNotifyScreenState extends ConsumerState<AbsentNotifyScreen>
               controller: _tabController,
               children: [
                 absent.when(
-                  data: (items) => _StudentNotifyList(
-                    classId: widget.classId,
-                    students: items,
-                    isAbsent: true,
-                    date: selectedDate,
-                    dateStr: dateStr,
-                  ),
+                  data: (items) {
+                    final sorted = [...items]..sort((a, b) => _sortBy == _SortBy.name
+                        ? a.fullName.compareTo(b.fullName)
+                        : _compareRollNo(a.rollNo, b.rollNo));
+                    return _StudentNotifyList(
+                      classId: widget.classId,
+                      students: sorted,
+                      isAbsent: true,
+                      date: selectedDate,
+                      dateStr: dateStr,
+                    );
+                  },
                   error: (e, _) => Center(child: Text('Error: $e')),
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
                 ),
                 present.when(
-                  data: (items) => _StudentNotifyList(
-                    classId: widget.classId,
-                    students: items,
-                    isAbsent: false,
-                    date: selectedDate,
-                    dateStr: dateStr,
-                  ),
+                  data: (items) {
+                    final sorted = [...items]..sort((a, b) => _sortBy == _SortBy.name
+                        ? a.fullName.compareTo(b.fullName)
+                        : _compareRollNo(a.rollNo, b.rollNo));
+                    return _StudentNotifyList(
+                      classId: widget.classId,
+                      students: sorted,
+                      isAbsent: false,
+                      date: selectedDate,
+                      dateStr: dateStr,
+                    );
+                  },
                   error: (e, _) => Center(child: Text('Error: $e')),
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),

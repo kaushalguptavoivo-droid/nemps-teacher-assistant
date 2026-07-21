@@ -16,7 +16,17 @@ class StudentsScreen extends ConsumerStatefulWidget {
   ConsumerState<StudentsScreen> createState() => _StudentsScreenState();
 }
 
+enum _SortBy { rollNo, name }
+
+int _compareRollNo(String a, String b) {
+  final na = int.tryParse(a.trim());
+  final nb = int.tryParse(b.trim());
+  if (na != null && nb != null) return na.compareTo(nb);
+  return a.compareTo(b);
+}
+
 class _StudentsScreenState extends ConsumerState<StudentsScreen> {
+  _SortBy _sortBy = _SortBy.rollNo;
   Future<void> _showStudentDialog({Student? existing}) async {
     final nameCtrl   = TextEditingController(text: existing?.fullName   ?? '');
     final rollCtrl   = TextEditingController(text: existing?.rollNo     ?? '');
@@ -211,6 +221,13 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       appBar: AppBar(
         title: const Text('Students'),
         actions: [
+          IconButton(
+            tooltip: _sortBy == _SortBy.rollNo ? 'Roll No se sorted' : 'Naam se sorted',
+            icon: Icon(_sortBy == _SortBy.rollNo ? Icons.format_list_numbered : Icons.sort_by_alpha),
+            onPressed: () => setState(
+              () => _sortBy = _sortBy == _SortBy.rollNo ? _SortBy.name : _SortBy.rollNo,
+            ),
+          ),
           PopupMenuButton(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             itemBuilder: (context) => [
@@ -227,7 +244,11 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
         ],
       ),
       body: students.when(
-        data: (items) => items.isEmpty
+        data: (rawItems) {
+          final items = [...rawItems]..sort((a, b) => _sortBy == _SortBy.name
+              ? a.fullName.compareTo(b.fullName)
+              : _compareRollNo(a.rollNo, b.rollNo));
+          return items.isEmpty
             ? Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -315,6 +336,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                   );
                 },
               ),
+        },
         error: (_, __) =>
             const Center(child: Text('Students unavailable offline')),
         loading: () => const Center(child: CircularProgressIndicator()),
