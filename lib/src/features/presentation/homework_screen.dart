@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -723,7 +722,7 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                           child: Row(
                             children: [
-                              const FaIcon(FontAwesomeIcons.whatsapp,
+                              const Icon(Icons.chat_bubble_rounded,
                                   color: Colors.white, size: 18),
                               const SizedBox(width: 8),
                               const Text('Message Preview',
@@ -1321,7 +1320,7 @@ class _CombinedBulkDialogState extends ConsumerState<_CombinedBulkDialog> {
               children: [
                 Row(
                   children: [
-                    const FaIcon(FontAwesomeIcons.whatsapp,
+                    const Icon(Icons.chat_bubble_rounded,
                         color: Colors.white, size: 20),
                     const SizedBox(width: 8),
                     const Text('Individual Send',
