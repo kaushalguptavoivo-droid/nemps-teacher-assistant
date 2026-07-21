@@ -1876,7 +1876,23 @@ Teacher Marks Entry
 
 Status
 
-Pending
+COMPLETE — 22 July 2026
+
+Files Created
+
+lib/src/features/examination/presentation/marks_entry_screen.dart
+
+Files Modified
+
+lib/src/app.dart
+
+lib/src/features/presentation/class_detail_screen.dart
+
+Summary
+
+marks_entry_screen.dart: Spreadsheet-style grid with DataTable. Rows = students, columns = subjects. One tab per term. TextField for marks subjects (with max-marks validation, absent toggle button). DropdownButtonFormField for grade subjects (A+/A/B+/.../E + Absent option). Lock banner when result is locked. Auto-save per cell on onChanged. Bulk save button with offline fallback via OfflineQueue. AutomaticKeepAliveClientMixin keeps each tab loaded. Loaded marks from DB pre-fill the draft map on screen open.
+app.dart: Added /exam-marks/:id route → MarksEntryScreen.
+class_detail_screen.dart: Added "Exam Marks" tile (purple) in the 2×3 actions grid. No other change.
 
 Phase 5
 

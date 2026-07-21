@@ -6,6 +6,7 @@ import 'core/theme/app_theme.dart';
 import 'core/services/notification_service.dart';
 import 'features/data/providers.dart';
 import 'features/presentation/screens.dart';
+import 'features/examination/presentation/marks_entry_screen.dart';
 
 /// Notifier that GoRouter listens to for auth state changes.
 /// This ensures the router re-evaluates redirects when Supabase restores
@@ -81,6 +82,11 @@ class NempsApp extends ConsumerWidget {
         GoRoute(
           path: '/admin',
           builder: (_, __) => const ShellScreen(child: AdminPanelScreen()),
+        ),
+        GoRoute(
+          path: '/exam-marks/:id',
+          builder: (_, s) => ShellScreen(
+              child: MarksEntryScreen(classId: s.pathParameters['id']!)),
         ),
       ],
     );

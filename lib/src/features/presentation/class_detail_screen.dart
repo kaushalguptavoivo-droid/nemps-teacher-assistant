@@ -128,6 +128,13 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     color: AppTheme.infoColor,
                     onTap: () => context.go('/students/$classId'),
                   ),
+                  _ActionTile(
+                    icon: Icons.assignment_turned_in_rounded,
+                    label: 'Exam Marks',
+                    subtitle: 'Enter & save marks',
+                    color: Color(0xFF7C3AED),
+                    onTap: () => context.go('/exam-marks/$classId'),
+                  ),
                 ],
               ),
 
