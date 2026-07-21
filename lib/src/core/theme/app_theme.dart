@@ -18,7 +18,7 @@ class AppTheme {
     );
     return base.copyWith(
       textTheme: GoogleFonts.poppinsTextTheme(base.textTheme),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         color: const Color(0xFFF8F9FF),
@@ -66,7 +66,7 @@ class AppTheme {
     );
     return base.copyWith(
       textTheme: GoogleFonts.poppinsTextTheme(base.textTheme),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         surfaceTintColor: Colors.transparent,
