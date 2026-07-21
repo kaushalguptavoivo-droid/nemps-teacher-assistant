@@ -1935,7 +1935,7 @@ class _HomeworkMarkDialogState extends ConsumerState<HomeworkMarkDialog> {
         ref.watch(homeworkStatusStreamProvider(widget.homeworkId));
 
     return AlertDialog(
-      title: const Text('Homework Status Mark Karein'),
+      title: const Text('Homework Status'),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       content: SizedBox(
         width: double.maxFinite,
@@ -1956,41 +1956,64 @@ class _HomeworkMarkDialogState extends ConsumerState<HomeworkMarkDialog> {
                 final status = _localOverrides[student.id] ??
                     streamStatuses[student.id] ??
                     'not_checked';
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: _statusColor(status).withOpacity(0.2),
-                    child: Icon(
-                      status == 'completed'
-                          ? Icons.check_circle
-                          : status == 'incomplete'
-                              ? Icons.cancel
-                              : Icons.help_outline,
-                      color: _statusColor(status),
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(student.fullName),
-                  trailing: DropdownButton<String>(
-                    value: status,
-                    isDense: true,
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'completed',
-                          child: Text('✓ Done',
-                              style: TextStyle(
-                                  color: AppTheme.attendanceColor))),
-                      DropdownMenuItem(
-                          value: 'incomplete',
-                          child: Text('✗ Incomplete',
-                              style:
-                                  TextStyle(color: AppTheme.absentColor))),
-                      DropdownMenuItem(
-                          value: 'not_checked',
-                          child: Text('? Not checked')),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: _statusColor(status).withOpacity(0.2),
+                        child: Icon(
+                          status == 'completed'
+                              ? Icons.check_circle
+                              : status == 'incomplete'
+                                  ? Icons.cancel
+                                  : Icons.help_outline,
+                          color: _statusColor(status),
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          student.fullName,
+                          style: const TextStyle(fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      SizedBox(
+                        width: 130,
+                        child: DropdownButton<String>(
+                          value: status,
+                          isDense: true,
+                          isExpanded: true,
+                          underline: const SizedBox.shrink(),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'completed',
+                                child: Text('✓ Done',
+                                    style: TextStyle(
+                                        color: AppTheme.attendanceColor,
+                                        fontSize: 12))),
+                            DropdownMenuItem(
+                                value: 'incomplete',
+                                child: Text('✗ Pending',
+                                    style: TextStyle(
+                                        color: AppTheme.absentColor,
+                                        fontSize: 12))),
+                            DropdownMenuItem(
+                                value: 'not_checked',
+                                child: Text('? Check nahi',
+                                    style: TextStyle(fontSize: 12))),
+                          ],
+                          onChanged: (value) => setState(() =>
+                              _localOverrides[student.id] =
+                                  value ?? 'not_checked'),
+                        ),
+                      ),
                     ],
-                    onChanged: (value) => setState(() =>
-                        _localOverrides[student.id] =
-                            value ?? 'not_checked'),
                   ),
                 );
               },
