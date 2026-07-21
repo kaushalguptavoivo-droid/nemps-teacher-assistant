@@ -7,28 +7,80 @@ import 'school_repository.dart';
 final repoProvider =
     Provider((_) => SchoolRepository(Supabase.instance.client));
 
-final classesProvider = FutureProvider<List<ClassRoom>>(
-    (ref) => ref.watch(repoProvider).myClasses());
+// ── Real-time StreamProviders ─────────────────────────────────────────────────
+// These use Supabase's Postgres Changes listener — any INSERT/UPDATE/DELETE
+// on the table is pushed to the app immediately without polling.
 
+/// Teacher's assigned classes — updates instantly when admin adds/removes a class.
+final classesProvider = StreamProvider<List<ClassRoom>>((ref) {
+  final client = Supabase.instance.client;
+  final uid = client.auth.currentUser?.id ?? '';
+
+  // Stream the join table; on every change re-fetch the full class list.
+  return client
+      .from('teacher_classes')
+      .stream(primaryKey: ['teacher_id', 'class_id'])
+      .eq('teacher_id', uid)
+      .asyncMap((_) => ref.read(repoProvider).myClasses());
+});
+
+/// Students in a class — updates instantly when admin adds/moves/removes a student.
 final studentsProvider =
-    FutureProvider.family<List<Student>, String>(
-        (ref, classId) => ref.watch(repoProvider).students(classId));
+    StreamProvider.family<List<Student>, String>((ref, classId) {
+  final client = Supabase.instance.client;
 
+  return client
+      .from('students')
+      .stream(primaryKey: ['id'])
+      .eq('class_id', classId)
+      .order('roll_no')
+      .map((rows) => rows
+          .where((r) => r['active'] == true)
+          .map((r) => Student.fromMap(r))
+          .toList());
+});
+
+/// Homework for a class — updates when any teacher adds new homework.
 final homeworkProvider =
-    FutureProvider.family<List<Homework>, String>(
-        (ref, classId) =>
-            ref.watch(repoProvider).getHomeworkForClass(classId));
+    StreamProvider.family<List<Homework>, String>((ref, classId) {
+  final client = Supabase.instance.client;
 
+  return client
+      .from('homework')
+      .stream(primaryKey: ['id'])
+      .eq('class_id', classId)
+      .order('assigned_date', ascending: false)
+      .map((rows) => rows.take(30).map((r) => Homework.fromMap(r)).toList());
+});
+
+/// Notices for a class — updates when admin sends a new notice.
 final noticesProvider =
-    FutureProvider.family<List<Notice>, String>(
-        (ref, classId) =>
-            ref.watch(repoProvider).getNotices(classId));
+    StreamProvider.family<List<Notice>, String>((ref, classId) {
+  final client = Supabase.instance.client;
 
-final themeProvider =
-    StateProvider<ThemeMode>((_) => ThemeMode.system);
+  return client
+      .from('notices')
+      .stream(primaryKey: ['id'])
+      .order('created_at', ascending: false)
+      .map((rows) => rows
+          .where((r) =>
+              r['audience_class_id'] == classId ||
+              r['audience_class_id'] == null)
+          .take(20)
+          .map((r) => Notice.fromMap(r))
+          .toList());
+});
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
+
+final themeProvider = StateProvider<ThemeMode>((_) => ThemeMode.system);
+
+// ── Role (one-time fetch, changes rarely) ────────────────────────────────────
 
 final currentUserRoleProvider = FutureProvider<UserRole>(
     (ref) => ref.watch(repoProvider).getCurrentUserRole());
+
+// ── Attendance (FutureProvider — date-specific, not continuous stream) ───────
 
 final absentStudentsProvider =
     FutureProvider.family<List<Student>, (String, DateTime)>(
@@ -53,15 +105,13 @@ final dailyAttendanceCountProvider =
 
 final homeworkStatusProvider =
     FutureProvider.family<List<HomeworkStatusRecord>, String>(
-        (ref, homeworkId) {
-  return ref.watch(repoProvider).getHomeworkStatus(homeworkId);
-});
+        (ref, homeworkId) =>
+            ref.watch(repoProvider).getHomeworkStatus(homeworkId));
 
 /// Whether today's attendance is done for a given class.
 final attendanceDoneTodayProvider =
-    FutureProvider.family<bool, String>((ref, classId) {
-  return ref.watch(repoProvider).isAttendanceDoneToday(classId);
-});
+    FutureProvider.family<bool, String>((ref, classId) =>
+        ref.watch(repoProvider).isAttendanceDoneToday(classId));
 
 /// Homework assigned for a specific date (for combined send).
 final homeworkForDateProvider =
@@ -73,34 +123,57 @@ final homeworkForDateProvider =
 
 /// WhatsApp group link for a class.
 final whatsappGroupLinkProvider =
-    FutureProvider.family<String?, String>((ref, classId) {
-  return ref.watch(repoProvider).getWhatsAppGroupLink(classId);
-});
+    FutureProvider.family<String?, String>((ref, classId) =>
+        ref.watch(repoProvider).getWhatsAppGroupLink(classId));
 
-/// WhatsApp sent students for attendance notification.
+/// WhatsApp sent students for a given date+type.
 final whatsappSentStudentsProvider =
     FutureProvider.family<Set<String>, (String, DateTime, String)>(
         (ref, params) {
   final (classId, date, type) = params;
   return ref.watch(repoProvider).getWhatsAppSentStudents(
-    classId: classId,
-    date: date,
-    type: type,
-  );
+        classId: classId,
+        date: date,
+        type: type,
+      );
 });
 
-// ── Admin providers ──────────────────────────────────────────────────────────
+// ── Admin providers ───────────────────────────────────────────────────────────
 
-final allClassesProvider = FutureProvider<List<ClassRoom>>(
-    (ref) => ref.watch(repoProvider).getAllClasses());
+/// All classes — real-time so admin additions reflect instantly everywhere.
+final allClassesProvider = StreamProvider<List<ClassRoom>>((ref) {
+  final client = Supabase.instance.client;
+  return client
+      .from('classes')
+      .stream(primaryKey: ['id'])
+      .order('name')
+      .map((rows) => rows.map((r) => ClassRoom.fromMap(r)).toList());
+});
 
-final allTeachersProvider = FutureProvider<List<TeacherProfile>>(
-    (ref) => ref.watch(repoProvider).getAllTeachers());
+/// All teachers — real-time.
+final allTeachersProvider = StreamProvider<List<TeacherProfile>>((ref) {
+  final client = Supabase.instance.client;
+  return client
+      .from('profiles')
+      .stream(primaryKey: ['id'])
+      .order('full_name')
+      .map((rows) => rows.map((r) => TeacherProfile.fromMap(r)).toList());
+});
 
 final teacherAssignedClassesProvider =
     FutureProvider.family<List<ClassRoom>, String>(
         (ref, teacherId) =>
             ref.watch(repoProvider).getTeacherAssignedClasses(teacherId));
 
-final allStudentsProvider = FutureProvider<List<Student>>(
-    (ref) => ref.watch(repoProvider).getAllStudents());
+/// All students (admin view) — real-time.
+final allStudentsProvider = StreamProvider<List<Student>>((ref) {
+  final client = Supabase.instance.client;
+  return client
+      .from('students')
+      .stream(primaryKey: ['id'])
+      .order('full_name')
+      .map((rows) => rows
+          .where((r) => r['active'] == true)
+          .map((r) => Student.fromMap(r))
+          .toList());
+});
