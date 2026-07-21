@@ -335,7 +335,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                     ),
                   );
                 },
-              ),
+              );
         },
         error: (_, __) =>
             const Center(child: Text('Students unavailable offline')),

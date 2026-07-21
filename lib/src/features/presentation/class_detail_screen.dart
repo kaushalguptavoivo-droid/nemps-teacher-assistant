@@ -321,8 +321,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     );
     if (confirmed != true || ctrl.text.trim().isEmpty) return;
     try {
-      await ref.read(repoProvider).saveWhatsAppGroupLink(classId, ctrl.text);
-      ref.invalidate(whatsappGroupLinkProvider(classId));
+      await ref.read(repoProvider).saveWhatsAppGroupLink(widget.classId, ctrl.text);
+      ref.invalidate(whatsappGroupLinkProvider(widget.classId));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
