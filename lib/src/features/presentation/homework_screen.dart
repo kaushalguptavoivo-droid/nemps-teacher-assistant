@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -282,7 +283,7 @@ class _HomeworkCard extends ConsumerWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _markHomework(context, hw.id, classId),
+                    onPressed: () => _markHomework(context, ref, hw.id, classId),
                     icon: const Icon(Icons.edit_note, size: 16),
                     label: const Text('Mark Status'),
                     style: OutlinedButton.styleFrom(
@@ -321,7 +322,7 @@ class _HomeworkCard extends ConsumerWidget {
     );
   }
 
-  void _markHomework(BuildContext context, String homeworkId, String classId) {
+  void _markHomework(BuildContext context, WidgetRef ref, String homeworkId, String classId) {
     // Fix: pass the already-loaded students list directly to the dialog.
     // Previously the dialog re-subscribed to studentsProvider from inside
     // showDialog(), causing a fresh Supabase round-trip that left names blank
@@ -722,7 +723,7 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                           child: Row(
                             children: [
-                              const Icon(Icons.whatsapp,
+                              const FaIcon(FontAwesomeIcons.whatsapp,
                                   color: Colors.white, size: 18),
                               const SizedBox(width: 8),
                               const Text('Message Preview',
@@ -1320,7 +1321,7 @@ class _CombinedBulkDialogState extends ConsumerState<_CombinedBulkDialog> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.whatsapp,
+                    const FaIcon(FontAwesomeIcons.whatsapp,
                         color: Colors.white, size: 20),
                     const SizedBox(width: 8),
                     const Text('Individual Send',
