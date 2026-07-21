@@ -48,7 +48,7 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     if (picked != null && picked != selectedDate) {
       setState(() => selectedDate = picked);
       await _loadExistingAttendance();
-      ref.invalidate(dailyAttendanceCountProvider);
+      // dailyAttendanceCountProvider is a StreamProvider — no manual invalidate needed.
     }
   }
 
@@ -66,8 +66,8 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         saved++;
       }
       if (mounted) {
-        ref.invalidate(dailyAttendanceCountProvider);
-        ref.invalidate(attendanceDoneTodayProvider(widget.classId));
+        // Both providers are now StreamProviders — they auto-update via
+        // Supabase realtime; no manual invalidate needed after saving.
         final presentCount =
             statuses.values.where((s) => s == AttendanceStatus.present).length;
         final absentCount =

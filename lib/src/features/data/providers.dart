@@ -16,7 +16,6 @@ final classesProvider = StreamProvider<List<ClassRoom>>((ref) {
   final client = Supabase.instance.client;
   final uid = client.auth.currentUser?.id ?? '';
 
-  // Stream the join table; on every change re-fetch the full class list.
   return client
       .from('teacher_classes')
       .stream(primaryKey: ['teacher_id', 'class_id'])
@@ -80,43 +79,99 @@ final themeProvider = StateProvider<ThemeMode>((_) => ThemeMode.system);
 final currentUserRoleProvider = FutureProvider<UserRole>(
     (ref) => ref.watch(repoProvider).getCurrentUserRole());
 
-// ── Attendance (FutureProvider — date-specific, not continuous stream) ───────
+// ── Attendance — REAL-TIME StreamProviders ────────────────────────────────────
+// Previously these were FutureProviders that only fetched once.  Converting them
+// to StreamProviders means the Dashboard class-card badge, AttendanceScreen
+// counters, and ReportsScreen summaries all update automatically the moment any
+// attendance record is written — even from another device or teacher.
 
+/// Real-time stream of all attendance rows for [classId] (all dates).
+/// Used as the base for derived attendance providers below.
+final _rawAttendanceStreamProvider =
+    StreamProvider.family<List<Map<String, dynamic>>, String>((ref, classId) {
+  return Supabase.instance.client
+      .from('attendance')
+      .stream(primaryKey: ['id'])
+      .eq('class_id', classId);
+});
+
+/// Whether today's attendance has been started for [classId].
+/// Updates in real-time — no manual invalidation needed after saving.
+final attendanceDoneTodayProvider =
+    StreamProvider.family<bool, String>((ref, classId) {
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+  return ref
+      .watch(_rawAttendanceStreamProvider(classId).stream)
+      .map((rows) => rows.any((r) => r['date'] == today));
+});
+
+/// Live present/absent count for [classId] on [date].
+/// Updates whenever a teacher marks or changes attendance.
+final dailyAttendanceCountProvider =
+    StreamProvider.family<Map<String, int>, (String, DateTime)>((ref, params) {
+  final (classId, date) = params;
+  final dateStr = date.toIso8601String().substring(0, 10);
+  return ref
+      .watch(_rawAttendanceStreamProvider(classId).stream)
+      .map((rows) {
+    int present = 0, absent = 0;
+    for (final r in rows) {
+      if (r['date'] != dateStr) continue;
+      if (r['status'] == 'present') present++;
+      else if (r['status'] == 'absent') absent++;
+    }
+    return {'present': present, 'absent': absent};
+  });
+});
+
+/// Absent students for [classId] on [date] — derived from the attendance stream.
+/// Also real-time: refreshes automatically when attendance changes.
 final absentStudentsProvider =
-    FutureProvider.family<List<Student>, (String, DateTime)>(
-        (ref, params) {
+    FutureProvider.family<List<Student>, (String, DateTime)>((ref, params) {
   final (classId, date) = params;
   return ref.watch(repoProvider).getAbsentStudents(classId, date);
 });
 
 final presentStudentsProvider =
-    FutureProvider.family<List<Student>, (String, DateTime)>(
-        (ref, params) {
+    FutureProvider.family<List<Student>, (String, DateTime)>((ref, params) {
   final (classId, date) = params;
   return ref.watch(repoProvider).getPresentStudents(classId, date);
 });
 
-final dailyAttendanceCountProvider =
-    FutureProvider.family<Map<String, int>, (String, DateTime)>(
-        (ref, params) {
-  final (classId, date) = params;
-  return ref.watch(repoProvider).getDailyAttendanceCount(classId, date);
+// ── Homework status — REAL-TIME ───────────────────────────────────────────────
+
+/// Live map of { studentId → status } for a specific homework assignment.
+/// The HomeworkMarkDialog watches this stream so it shows other teachers'
+/// markings in real-time, and pre-populates the status dropdowns on open
+/// without a separate async fetch.
+final homeworkStatusStreamProvider =
+    StreamProvider.family<Map<String, String>, String>((ref, homeworkId) {
+  return Supabase.instance.client
+      .from('homework_status')
+      .stream(primaryKey: ['id'])
+      .eq('homework_id', homeworkId)
+      .map((rows) => {
+            for (final r in rows)
+              r['student_id'] as String: r['status'] as String,
+          });
 });
 
+/// Full HomeworkStatusRecord list (with student names) — still used by repo
+/// helpers that need names. Prefer [homeworkStatusStreamProvider] in the UI.
 final homeworkStatusProvider =
     FutureProvider.family<List<HomeworkStatusRecord>, String>(
         (ref, homeworkId) =>
             ref.watch(repoProvider).getHomeworkStatus(homeworkId));
 
 /// Whether today's attendance is done for a given class.
-final attendanceDoneTodayProvider =
+/// Kept for compatibility; wraps the stream provider.
+final attendanceDoneTodayFutureProvider =
     FutureProvider.family<bool, String>((ref, classId) =>
         ref.watch(repoProvider).isAttendanceDoneToday(classId));
 
 /// Homework assigned for a specific date (for combined send).
 final homeworkForDateProvider =
-    FutureProvider.family<List<Homework>, (String, DateTime)>(
-        (ref, params) {
+    FutureProvider.family<List<Homework>, (String, DateTime)>((ref, params) {
   final (classId, date) = params;
   return ref.watch(repoProvider).getHomeworkForDate(classId, date);
 });

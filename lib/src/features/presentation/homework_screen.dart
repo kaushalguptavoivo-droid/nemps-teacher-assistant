@@ -322,10 +322,18 @@ class _HomeworkCard extends ConsumerWidget {
   }
 
   void _markHomework(BuildContext context, String homeworkId, String classId) {
+    // Fix: pass the already-loaded students list directly to the dialog.
+    // Previously the dialog re-subscribed to studentsProvider from inside
+    // showDialog(), causing a fresh Supabase round-trip that left names blank
+    // until the new stream emitted (often several seconds).
+    final students = ref.read(studentsProvider(classId)).valueOrNull ?? [];
     showDialog(
       context: context,
-      builder: (_) =>
-          HomeworkMarkDialog(homeworkId: homeworkId, classId: classId),
+      builder: (_) => HomeworkMarkDialog(
+        homeworkId: homeworkId,
+        classId: classId,
+        students: students,
+      ),
     );
   }
 
@@ -1010,8 +1018,12 @@ class HomeworkMarkDialog extends ConsumerStatefulWidget {
     super.key,
     required this.homeworkId,
     required this.classId,
+    required this.students,
   });
   final String homeworkId, classId;
+  // Students passed in from the parent so the dialog shows names instantly
+  // without opening a fresh Supabase subscription.
+  final List<Student> students;
 
   @override
   ConsumerState<HomeworkMarkDialog> createState() =>
@@ -1019,31 +1031,9 @@ class HomeworkMarkDialog extends ConsumerStatefulWidget {
 }
 
 class _HomeworkMarkDialogState extends ConsumerState<HomeworkMarkDialog> {
-  final statuses = <String, String>{};
+  // Teacher's in-session changes; merged on top of the stream values on Save.
+  final _localOverrides = <String, String>{};
   bool saving = false;
-  bool loadingStatuses = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _preloadStatuses();
-  }
-
-  Future<void> _preloadStatuses() async {
-    try {
-      final existing =
-          await ref.read(repoProvider).getHomeworkStatus(widget.homeworkId);
-      if (!mounted) return;
-      setState(() {
-        for (final record in existing) {
-          statuses[record.studentId] = record.status;
-        }
-        loadingStatuses = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => loadingStatuses = false);
-    }
-  }
 
   Color _statusColor(String status) {
     switch (status) {
@@ -1058,60 +1048,72 @@ class _HomeworkMarkDialogState extends ConsumerState<HomeworkMarkDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final students = ref.watch(studentsProvider(widget.classId));
+    // homeworkStatusStreamProvider streams { studentId → status } in real time.
+    final statusStream =
+        ref.watch(homeworkStatusStreamProvider(widget.homeworkId));
 
     return AlertDialog(
       title: const Text('Homework Status Mark Karein'),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       content: SizedBox(
         width: double.maxFinite,
-        child: students.when(
-          data: (items) => loadingStatuses
-              ? const Center(child: CircularProgressIndicator())
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: items.length,
-                  itemBuilder: (_, index) {
-                    final student = items[index];
-                    final status = statuses[student.id] ?? 'not_checked';
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: _statusColor(status).withOpacity(0.2),
-                        child: Icon(
-                          status == 'completed'
-                              ? Icons.check_circle
-                              : status == 'incomplete'
-                                  ? Icons.cancel
-                                  : Icons.help_outline,
-                          color: _statusColor(status),
-                          size: 20,
-                        ),
-                      ),
-                      title: Text(student.fullName),
-                      trailing: DropdownButton<String>(
-                        value: status,
-                        isDense: true,
-                        items: const [
-                          DropdownMenuItem(
-                              value: 'completed',
-                              child: Text('✓ Done',
-                                  style: TextStyle(color: AppTheme.attendanceColor))),
-                          DropdownMenuItem(
-                              value: 'incomplete',
-                              child: Text('✗ Incomplete',
-                                  style: TextStyle(color: AppTheme.absentColor))),
-                          DropdownMenuItem(
-                              value: 'not_checked',
-                              child: Text('? Not checked')),
-                        ],
-                        onChanged: (value) => setState(
-                            () => statuses[student.id] = value ?? 'not_checked'),
-                      ),
-                    );
-                  },
-                ),
+        child: statusStream.when(
+          // Show a spinner only on the very first emission (no cached data yet).
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Text('Error: $e'),
+          data: (streamStatuses) {
+            if (widget.students.isEmpty) {
+              return const Center(child: Text('Koi student nahi mila.'));
+            }
+            return ListView.builder(
+              shrinkWrap: true,
+              itemCount: widget.students.length,
+              itemBuilder: (_, index) {
+                final student = widget.students[index];
+                // Teacher's in-session override takes priority over the stream.
+                final status = _localOverrides[student.id] ??
+                    streamStatuses[student.id] ??
+                    'not_checked';
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: _statusColor(status).withOpacity(0.2),
+                    child: Icon(
+                      status == 'completed'
+                          ? Icons.check_circle
+                          : status == 'incomplete'
+                              ? Icons.cancel
+                              : Icons.help_outline,
+                      color: _statusColor(status),
+                      size: 20,
+                    ),
+                  ),
+                  title: Text(student.fullName),
+                  trailing: DropdownButton<String>(
+                    value: status,
+                    isDense: true,
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'completed',
+                          child: Text('✓ Done',
+                              style: TextStyle(
+                                  color: AppTheme.attendanceColor))),
+                      DropdownMenuItem(
+                          value: 'incomplete',
+                          child: Text('✗ Incomplete',
+                              style:
+                                  TextStyle(color: AppTheme.absentColor))),
+                      DropdownMenuItem(
+                          value: 'not_checked',
+                          child: Text('? Not checked')),
+                    ],
+                    onChanged: (value) => setState(() =>
+                        _localOverrides[student.id] =
+                            value ?? 'not_checked'),
+                  ),
+                );
+              },
+            );
+          },
         ),
       ),
       actions: [
@@ -1124,7 +1126,9 @@ class _HomeworkMarkDialogState extends ConsumerState<HomeworkMarkDialog> {
               : () async {
                   setState(() => saving = true);
                   try {
-                    for (final entry in statuses.entries) {
+                    // Only persist rows the teacher actually changed this
+                    // session; untouched rows keep whatever is already in DB.
+                    for (final entry in _localOverrides.entries) {
                       await ref.read(repoProvider).markHomeworkStatus(
                             homeworkId: widget.homeworkId,
                             studentId: entry.key,
