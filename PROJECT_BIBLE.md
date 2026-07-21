@@ -1782,7 +1782,32 @@ Database
 
 Status
 
-Pending
+COMPLETE — 22 July 2026
+
+Files Created
+
+supabase/migrations/20260722_academic_sessions.sql
+
+supabase/migrations/20260722_exam_configs.sql
+
+supabase/migrations/20260722_exam_terms.sql
+
+supabase/migrations/20260722_class_subjects.sql
+
+supabase/migrations/20260722_exam_marks.sql
+
+supabase/migrations/20260722_grade_configs.sql
+
+supabase/migrations/20260722_report_templates.sql
+
+supabase/migrations/20260722_student_remarks.sql
+
+Summary
+
+8 migration files created. Each contains CREATE, INDEX, RLS policies, and ROLLBACK comment.
+exam_marks includes full audit log table and trigger.
+grade_configs seeded with default A1-E grades for 2026-27.
+Existing tables untouched. All new tables use foreign keys to existing tables.
 
 Phase 2
 
@@ -1794,7 +1819,22 @@ Providers
 
 Status
 
-Pending
+COMPLETE — 22 July 2026
+
+Files Created
+
+lib/src/features/examination/models/exam_models.dart
+
+lib/src/features/examination/data/exam_repository.dart
+
+lib/src/features/examination/data/exam_providers.dart
+
+Summary
+
+All 8 models defined with fromMap / toMap. Result engine calculates totals, percentage, grade and rank dynamically — nothing stored.
+ExamRepository covers all CRUD operations including bulk marks save, session activation, result calculation.
+Riverpod providers mirror existing providers.dart pattern. MarksEntryNotifier holds draft marks before bulk save.
+No existing files modified.
 
 Phase 3
 
