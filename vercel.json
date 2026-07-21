@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "installCommand": "echo 'Flutter is downloaded during the build step.'",
+  "buildCommand": "bash scripts/vercel-build.sh",
+  "outputDirectory": "build/web",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

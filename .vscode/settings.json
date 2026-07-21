@@ -1,0 +1,13 @@
+{
+  "dart.flutterSdkPath": "C:\\Users\\school\\development\\flutter",
+  "dart.openDevTools": "flutter",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "files.exclude": {
+    "**/.dart_tool": true,
+    "**/build": true
+  }
+}

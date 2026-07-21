@@ -1,0 +1,13 @@
+.git
+.dart_tool
+.flutter-sdk
+build
+work
+outputs
+android
+test
+docs
+.idea
+.vscode
+.flutter-plugins-dependencies
+SETUP_STATUS.md
