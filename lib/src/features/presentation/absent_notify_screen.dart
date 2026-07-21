@@ -359,7 +359,7 @@ class _StudentNotifyCardState extends ConsumerState<_StudentNotifyCard> {
     setState(() => sending = true);
     try {
       final uri = Uri.parse(
-          'https://wa.me/${widget.student.whatsapp.replaceAll(RegExp(r"[^0-9]"), "")}?text=${Uri.encodeComponent(_buildMessage())}');
+          'https://wa.me/${widget.student.whatsappE164}?text=${Uri.encodeComponent(_buildMessage())}');
       final opened = await launchUrl(uri, mode: LaunchMode.platformDefault);
       if (opened) {
         await ref.read(repoProvider).markWhatsAppSent(
@@ -529,7 +529,7 @@ class _BulkWhatsAppDialogState extends ConsumerState<_BulkWhatsAppDialog> {
       return;
     }
     final uri = Uri.parse(
-        'https://wa.me/${current.whatsapp.replaceAll(RegExp(r"[^0-9]"), "")}?text=${Uri.encodeComponent(message)}');
+        'https://wa.me/${current.whatsappE164}?text=${Uri.encodeComponent(message)}');
     await launchUrl(uri, mode: LaunchMode.platformDefault);
     await ref.read(repoProvider).markWhatsAppSent(
           classId: widget.classId,

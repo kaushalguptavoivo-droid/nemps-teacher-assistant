@@ -1263,7 +1263,7 @@ class _CombinedBulkDialogState extends ConsumerState<_CombinedBulkDialog> {
       return;
     }
     final uri = Uri.parse(
-        'https://wa.me/${current.whatsapp.replaceAll(RegExp(r"[^0-9]"), "")}?text=${Uri.encodeComponent(_buildMessage())}');
+        'https://wa.me/${current.whatsappE164}?text=${Uri.encodeComponent(_buildMessage())}');
     await launchUrl(uri, mode: LaunchMode.platformDefault);
     // Track sent
     for (final hw in widget.selectedHomework) {
@@ -1639,7 +1639,7 @@ class _PendingWhatsAppDialogState
         'Kripaya aaj raat tak karwa dein. 🙏\n'
         '— *New Era Modern Public School, Vrindavan*';
     final uri = Uri.parse(
-        'https://wa.me/${current.whatsapp.replaceAll(RegExp(r"[^0-9]"), "")}?text=${Uri.encodeComponent(msg)}');
+        'https://wa.me/${current.whatsappE164}?text=${Uri.encodeComponent(msg)}');
     await launchUrl(uri, mode: LaunchMode.platformDefault);
     await ref.read(repoProvider).markWhatsAppSent(
           classId: widget.classId,

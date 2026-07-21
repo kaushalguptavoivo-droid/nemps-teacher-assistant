@@ -13,16 +13,27 @@ class Student {
     required this.section,
     this.classId = '',
     this.parentName = '',
+    this.motherName = '',
+    this.address = '',
     this.whatsapp = '',
     this.dob,
     this.feeStatus = FeeStatus.due,
     this.photoUrl,
   });
-  final String id, fullName, rollNo, className, section, classId, parentName, whatsapp;
+  final String id, fullName, rollNo, className, section, classId;
+  final String parentName, motherName, address, whatsapp;
   final DateTime? dob;
   final FeeStatus feeStatus;
   final String? photoUrl;
   String get classLabel => '$className-$section';
+
+  /// Returns a wa.me-ready number: strips non-digits, prepends 91 if 10-digit.
+  String get whatsappE164 {
+    final digits = whatsapp.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length == 10) return '91$digits';
+    return digits; // already has country code or empty
+  }
+
   factory Student.fromMap(Map<String, dynamic> m) => Student(
     id: m['id'],
     fullName: m['full_name'],
@@ -31,6 +42,8 @@ class Student {
     className: (m['classes'] as Map<String, dynamic>?)?['name'] ?? m['class_name'] ?? '',
     section: (m['classes'] as Map<String, dynamic>?)?['section'] ?? m['section'] ?? '',
     parentName: m['father_name'] ?? '',
+    motherName: m['mother_name'] ?? '',
+    address: m['address'] ?? '',
     whatsapp: m['whatsapp'] ?? '',
     dob: m['dob'] != null ? DateTime.parse(m['dob']) : null,
     feeStatus: FeeStatus.values.firstWhere(

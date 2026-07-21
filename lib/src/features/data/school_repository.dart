@@ -67,7 +67,9 @@ class SchoolRepository {
     required String fullName,
     required String rollNo,
     String fatherName = '',
+    String motherName = '',
     String whatsapp = '',
+    String address = '',
   }) async {
     final row = {
       if (id != null) 'id': id,
@@ -75,7 +77,9 @@ class SchoolRepository {
       'full_name': fullName.trim(),
       'roll_no': rollNo.trim(),
       'father_name': fatherName.trim(),
+      if (motherName.trim().isNotEmpty) 'mother_name': motherName.trim(),
       'whatsapp': whatsapp.trim(),
+      if (address.trim().isNotEmpty) 'address': address.trim(),
       'active': true,
     };
     await _client.from('students').upsert(row, onConflict: 'class_id,roll_no');
@@ -450,13 +454,18 @@ class SchoolRepository {
     try {
       final studentList = await students(classId);
       List<List<dynamic>> rows = [];
-      rows.add(['Roll No', 'Full Name', 'Father Name', 'WhatsApp', 'DOB', 'Fee Status']);
+      rows.add([
+        'Roll No', 'Full Name', 'Father Name', 'Mother Name',
+        'WhatsApp', 'Address', 'DOB', 'Fee Status',
+      ]);
       for (var student in studentList) {
         rows.add([
           student.rollNo,
           student.fullName,
           student.parentName,
+          student.motherName,
           student.whatsapp,
+          student.address,
           student.dob?.toString().split(' ')[0] ?? '',
           student.feeStatus.name,
         ]);
@@ -472,19 +481,60 @@ class SchoolRepository {
       final contents = String.fromCharCodes(csvBytes);
       final rowsAsListOfValues = const CsvToListConverter().convert(contents);
       if (rowsAsListOfValues.isEmpty) return;
-      for (int i = 1; i < rowsAsListOfValues.length; i++) {
+
+      // Detect if header row exists and map column indices
+      final firstRow = rowsAsListOfValues[0].map((e) => e.toString().toLowerCase().trim()).toList();
+      final bool hasHeader = firstRow.contains('full name') ||
+          firstRow.contains('roll no') ||
+          firstRow.contains('full_name');
+
+      // Column index helpers — support both old (6-col) and new (8-col) CSV format
+      int col(List<String> hdr, List<String> keys, int fallback) {
+        for (final k in keys) {
+          final idx = hdr.indexOf(k);
+          if (idx >= 0) return idx;
+        }
+        return fallback;
+      }
+
+      final hdr = hasHeader ? firstRow : <String>[];
+      final iRoll    = col(hdr, ['roll no', 'roll_no'], 0);
+      final iName    = col(hdr, ['full name', 'full_name'], 1);
+      final iFather  = col(hdr, ['father name', 'father_name'], 2);
+      final iMother  = col(hdr, ['mother name', 'mother_name'], 3);
+      final iWa      = col(hdr, ['whatsapp'], hasHeader ? 4 : 3);
+      final iAddr    = col(hdr, ['address'], hasHeader ? 5 : -1);
+      final iDob     = col(hdr, ['dob'], hasHeader ? 6 : 4);
+      final iFee     = col(hdr, ['fee status', 'fee_status'], hasHeader ? 7 : 5);
+
+      String _safe(List row, int idx) =>
+          idx >= 0 && idx < row.length ? row[idx].toString().trim() : '';
+
+      final startRow = hasHeader ? 1 : 0;
+      for (int i = startRow; i < rowsAsListOfValues.length; i++) {
         final row = rowsAsListOfValues[i];
         if (row.length < 2) continue;
-        final studentData = {
-          'class_id': classId,
-          'roll_no': row[0].toString(),
-          'full_name': row[1].toString(),
-          'father_name': row.length > 2 ? row[2].toString() : '',
-          'whatsapp': row.length > 3 ? row[3].toString() : '',
-          'dob': row.length > 4 && row[4].toString().isNotEmpty ? row[4].toString() : null,
-          'fee_status': row.length > 5 ? row[5].toString() : 'due',
-          'active': true,
+        final rollNo   = _safe(row, iRoll);
+        final fullName = _safe(row, iName);
+        if (rollNo.isEmpty || fullName.isEmpty) continue;
+
+        final studentData = <String, dynamic>{
+          'class_id':   classId,
+          'roll_no':    rollNo,
+          'full_name':  fullName,
+          'father_name': _safe(row, iFather),
+          'whatsapp':   _safe(row, iWa),
+          'active':     true,
         };
+        final mother = _safe(row, iMother);
+        if (mother.isNotEmpty) studentData['mother_name'] = mother;
+        final addr = _safe(row, iAddr);
+        if (addr.isNotEmpty) studentData['address'] = addr;
+        final dob = _safe(row, iDob);
+        if (dob.isNotEmpty) studentData['dob'] = dob;
+        final fee = _safe(row, iFee);
+        if (fee.isNotEmpty) studentData['fee_status'] = fee;
+
         try {
           await _client.from('students').upsert(studentData, onConflict: 'class_id,roll_no');
         } catch (_) {}

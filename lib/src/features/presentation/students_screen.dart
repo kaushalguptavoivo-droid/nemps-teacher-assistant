@@ -18,10 +18,12 @@ class StudentsScreen extends ConsumerStatefulWidget {
 
 class _StudentsScreenState extends ConsumerState<StudentsScreen> {
   Future<void> _showStudentDialog({Student? existing}) async {
-    final nameCtrl = TextEditingController(text: existing?.fullName ?? '');
-    final rollCtrl = TextEditingController(text: existing?.rollNo ?? '');
+    final nameCtrl   = TextEditingController(text: existing?.fullName   ?? '');
+    final rollCtrl   = TextEditingController(text: existing?.rollNo     ?? '');
     final fatherCtrl = TextEditingController(text: existing?.parentName ?? '');
-    final waCtrl = TextEditingController(text: existing?.whatsapp ?? '');
+    final motherCtrl = TextEditingController(text: existing?.motherName ?? '');
+    final waCtrl     = TextEditingController(text: existing?.whatsapp   ?? '');
+    final addrCtrl   = TextEditingController(text: existing?.address    ?? '');
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -36,13 +38,13 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 controller: nameCtrl,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
-                    labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline)),
+                    labelText: 'Full Name *', prefixIcon: Icon(Icons.person_outline)),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: rollCtrl,
                 decoration: const InputDecoration(
-                    labelText: 'Roll No', prefixIcon: Icon(Icons.numbers)),
+                    labelText: 'Roll No *', prefixIcon: Icon(Icons.numbers)),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -52,12 +54,33 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                     labelText: 'Father Name', prefixIcon: Icon(Icons.family_restroom)),
               ),
               const SizedBox(height: 10),
+              // ── Optional: Mother's Name ──
+              TextField(
+                controller: motherCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                    labelText: 'Mother Name (optional)',
+                    prefixIcon: Icon(Icons.woman_outlined)),
+              ),
+              const SizedBox(height: 10),
               TextField(
                 controller: waCtrl,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
-                    labelText: 'WhatsApp (10 digit)',
+                    labelText: 'WhatsApp (10 digit, bina +91)',
+                    hintText: 'e.g. 9876543210',
                     prefixIcon: Icon(Icons.phone_outlined)),
+              ),
+              const SizedBox(height: 10),
+              // ── Optional: Address ──
+              TextField(
+                controller: addrCtrl,
+                textCapitalization: TextCapitalization.sentences,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                    labelText: 'Address (optional)',
+                    prefixIcon: Icon(Icons.home_outlined),
+                    alignLabelWithHint: true),
               ),
             ],
           ),
@@ -79,7 +102,9 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
             fullName: nameCtrl.text,
             rollNo: rollCtrl.text,
             fatherName: fatherCtrl.text,
+            motherName: motherCtrl.text,
             whatsapp: waCtrl.text,
+            address: addrCtrl.text,
           );
       ref.invalidate(studentsProvider(widget.classId));
       if (mounted) {
@@ -241,6 +266,9 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                           Text(s.parentName.isNotEmpty
                               ? '👨 ${s.parentName}'
                               : 'Father name nahi'),
+                          if (s.motherName.isNotEmpty)
+                            Text('👩 ${s.motherName}',
+                                style: const TextStyle(fontSize: 12)),
                           if (s.whatsapp.isNotEmpty)
                             Row(
                               children: [
@@ -251,9 +279,16 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                         fontSize: 12, color: AppTheme.whatsappColor)),
                               ],
                             ),
+                          if (s.address.isNotEmpty)
+                            Text('🏠 ${s.address}',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
                         ],
                       ),
-                      isThreeLine: s.whatsapp.isNotEmpty,
+                      isThreeLine: s.whatsapp.isNotEmpty || s.motherName.isNotEmpty || s.address.isNotEmpty,
                       trailing: PopupMenuButton<String>(
                         onSelected: (v) {
                           if (v == 'edit') _showStudentDialog(existing: s);
