@@ -27,11 +27,9 @@ final noticesProvider =
 final themeProvider =
     StateProvider<ThemeMode>((_) => ThemeMode.system);
 
-/// Current logged-in user's role fetched from profiles table.
 final currentUserRoleProvider = FutureProvider<UserRole>(
     (ref) => ref.watch(repoProvider).getCurrentUserRole());
 
-/// Absent students for a given class + date.
 final absentStudentsProvider =
     FutureProvider.family<List<Student>, (String, DateTime)>(
         (ref, params) {
@@ -39,7 +37,6 @@ final absentStudentsProvider =
   return ref.watch(repoProvider).getAbsentStudents(classId, date);
 });
 
-/// Present students for a given class + date.
 final presentStudentsProvider =
     FutureProvider.family<List<Student>, (String, DateTime)>(
         (ref, params) {
@@ -51,9 +48,7 @@ final dailyAttendanceCountProvider =
     FutureProvider.family<Map<String, int>, (String, DateTime)>(
         (ref, params) {
   final (classId, date) = params;
-  return ref
-      .watch(repoProvider)
-      .getDailyAttendanceCount(classId, date);
+  return ref.watch(repoProvider).getDailyAttendanceCount(classId, date);
 });
 
 final homeworkStatusProvider =
@@ -62,22 +57,50 @@ final homeworkStatusProvider =
   return ref.watch(repoProvider).getHomeworkStatus(homeworkId);
 });
 
+/// Whether today's attendance is done for a given class.
+final attendanceDoneTodayProvider =
+    FutureProvider.family<bool, String>((ref, classId) {
+  return ref.watch(repoProvider).isAttendanceDoneToday(classId);
+});
+
+/// Homework assigned for a specific date (for combined send).
+final homeworkForDateProvider =
+    FutureProvider.family<List<Homework>, (String, DateTime)>(
+        (ref, params) {
+  final (classId, date) = params;
+  return ref.watch(repoProvider).getHomeworkForDate(classId, date);
+});
+
+/// WhatsApp group link for a class.
+final whatsappGroupLinkProvider =
+    FutureProvider.family<String?, String>((ref, classId) {
+  return ref.watch(repoProvider).getWhatsAppGroupLink(classId);
+});
+
+/// WhatsApp sent students for attendance notification.
+final whatsappSentStudentsProvider =
+    FutureProvider.family<Set<String>, (String, DateTime, String)>(
+        (ref, params) {
+  final (classId, date, type) = params;
+  return ref.watch(repoProvider).getWhatsAppSentStudents(
+    classId: classId,
+    date: date,
+    type: type,
+  );
+});
+
 // ── Admin providers ──────────────────────────────────────────────────────────
 
-/// Admin: all classes (not filtered by teacher).
 final allClassesProvider = FutureProvider<List<ClassRoom>>(
     (ref) => ref.watch(repoProvider).getAllClasses());
 
-/// Admin: all teacher profiles.
 final allTeachersProvider = FutureProvider<List<TeacherProfile>>(
     (ref) => ref.watch(repoProvider).getAllTeachers());
 
-/// Admin: classes assigned to a specific teacher.
 final teacherAssignedClassesProvider =
     FutureProvider.family<List<ClassRoom>, String>(
         (ref, teacherId) =>
             ref.watch(repoProvider).getTeacherAssignedClasses(teacherId));
 
-/// Admin: all active students across all classes.
 final allStudentsProvider = FutureProvider<List<Student>>(
     (ref) => ref.watch(repoProvider).getAllStudents());

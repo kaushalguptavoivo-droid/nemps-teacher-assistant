@@ -154,3 +154,49 @@ class TeacherProfile {
     role: (m['role'] as String?) == 'admin' ? UserRole.admin : UserRole.teacher,
   );
 }
+
+/// Tracks which students received a WhatsApp notification on a given date.
+class WhatsAppNotification {
+  const WhatsAppNotification({
+    required this.id,
+    required this.classId,
+    required this.studentId,
+    required this.notificationDate,
+    required this.notificationType, // 'absent' | 'present' | 'homework'
+    this.subject,
+    required this.notifiedAt,
+    this.notifiedBy = '',
+  });
+  final String id, classId, studentId, notificationType, notifiedBy;
+  final String? subject;
+  final DateTime notificationDate, notifiedAt;
+
+  factory WhatsAppNotification.fromMap(Map<String, dynamic> m) =>
+      WhatsAppNotification(
+        id: m['id'],
+        classId: m['class_id'],
+        studentId: m['student_id'],
+        notificationDate: DateTime.parse(m['notification_date']),
+        notificationType: m['notification_type'],
+        subject: m['subject'],
+        notifiedAt: DateTime.parse(m['notified_at']),
+        notifiedBy: m['notified_by'] ?? '',
+      );
+}
+
+/// WhatsApp group link linked to a class (stored once, reused for group sends).
+class ClassWhatsAppGroup {
+  const ClassWhatsAppGroup({
+    required this.classId,
+    required this.groupLink,
+    this.updatedBy = '',
+  });
+  final String classId, groupLink, updatedBy;
+
+  factory ClassWhatsAppGroup.fromMap(Map<String, dynamic> m) =>
+      ClassWhatsAppGroup(
+        classId: m['class_id'],
+        groupLink: m['group_link'],
+        updatedBy: m['updated_by'] ?? '',
+      );
+}
