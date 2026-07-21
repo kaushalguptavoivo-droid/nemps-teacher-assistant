@@ -67,27 +67,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: Card(
                   elevation: 8,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24)),
                   child: Padding(
                     padding: const EdgeInsets.all(32),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // School logo — large, centered
                         Center(
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: cs.primaryContainer,
-                              shape: BoxShape.circle,
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/logo.png',
+                              width: 90,
+                              height: 90,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 90,
+                                height: 90,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: cs.primaryContainer,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.school_rounded,
+                                    size: 48, color: cs.primary),
+                              ),
                             ),
-                            child: Icon(Icons.school_rounded, size: 48, color: cs.primary),
                           ),
                         ),
                         const SizedBox(height: 20),
                         Center(
                           child: Text('NEMPS',
-                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                  fontWeight: FontWeight.bold, color: cs.primary)),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: cs.primary)),
                         ),
                         Center(
                           child: Text('Teacher Assistant',
@@ -113,8 +130,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             labelText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outlined),
                             suffixIcon: IconButton(
-                              icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                              onPressed: () => setState(() => obscure = !obscure),
+                              icon: Icon(obscure
+                                  ? Icons.visibility_off
+                                  : Icons.visibility),
+                              onPressed: () =>
+                                  setState(() => obscure = !obscure),
                             ),
                           ),
                           onSubmitted: (_) => busy ? null : _signIn(),
@@ -190,7 +210,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     }
     if (password.text.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password kam se kam 6 characters ka hona chahiye')),
+        const SnackBar(
+            content:
+                Text('Password kam se kam 6 characters ka hona chahiye')),
       );
       return;
     }
@@ -240,21 +262,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           .headlineSmall
                           ?.copyWith(fontWeight: FontWeight.bold)),
                   Text('Teacher account banayein',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurfaceVariant)),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: cs.onSurfaceVariant)),
                   const SizedBox(height: 28),
                   TextField(
                     controller: fullName,
                     textCapitalization: TextCapitalization.words,
                     decoration: const InputDecoration(
-                        labelText: 'Full Name *', prefixIcon: Icon(Icons.person_outline)),
+                        labelText: 'Full Name *',
+                        prefixIcon: Icon(Icons.person_outline)),
                   ),
                   const SizedBox(height: 14),
                   TextField(
                     controller: email,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
-                        labelText: 'School Email *', prefixIcon: Icon(Icons.email_outlined)),
+                        labelText: 'School Email *',
+                        prefixIcon: Icon(Icons.email_outlined)),
                   ),
                   const SizedBox(height: 14),
                   TextField(
@@ -265,8 +291,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       helperText: 'Kam se kam 6 characters',
                       prefixIcon: const Icon(Icons.lock_outlined),
                       suffixIcon: IconButton(
-                        icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setState(() => obscure = !obscure),
+                        icon: Icon(obscure
+                            ? Icons.visibility_off
+                            : Icons.visibility),
+                        onPressed: () =>
+                            setState(() => obscure = !obscure),
                       ),
                     ),
                   ),
@@ -283,19 +312,24 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     children: [
                       Checkbox(
                         value: agreeTerms,
-                        onChanged: (v) => setState(() => agreeTerms = v ?? false),
+                        onChanged: (v) =>
+                            setState(() => agreeTerms = v ?? false),
                       ),
-                      const Expanded(child: Text('Terms & conditions se agree karein')),
+                      const Expanded(
+                          child: Text('Terms & conditions se agree karein')),
                     ],
                   ),
                   const SizedBox(height: 20),
                   FilledButton.icon(
                     onPressed: (busy || !agreeTerms) ? null : _signUp,
-                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                    style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52)),
                     icon: busy
                         ? const SizedBox(
-                            height: 18, width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.person_add),
                     label: Text(busy ? 'Creating...' : 'Sign Up'),
                   ),
@@ -303,7 +337,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   Center(
                     child: TextButton(
                       onPressed: () => context.go('/login'),
-                      child: const Text('Pehle se account hai? Sign in karein'),
+                      child:
+                          const Text('Pehle se account hai? Sign in karein'),
                     ),
                   ),
                 ],

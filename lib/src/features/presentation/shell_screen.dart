@@ -13,15 +13,30 @@ class ShellScreen extends ConsumerWidget {
         appBar: AppBar(
           title: Row(
             children: [
+              // School logo in app bar
+              ClipOval(
+                child: Image.asset(
+                  'assets/logo.png',
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.school_rounded, color: Colors.white, size: 28),
+                ),
+              ),
+              const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text('NEMPS',
                     style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
               ),
             ],
           ),
@@ -37,7 +52,9 @@ class ShellScreen extends ConsumerWidget {
               onPressed: () {
                 final current = ref.read(themeProvider);
                 ref.read(themeProvider.notifier).state =
-                    current == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+                    current == ThemeMode.dark
+                        ? ThemeMode.light
+                        : ThemeMode.dark;
               },
             ),
             IconButton(

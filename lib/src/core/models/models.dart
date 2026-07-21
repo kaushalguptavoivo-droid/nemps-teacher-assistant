@@ -1,5 +1,5 @@
 enum UserRole { admin, teacher }
-enum AttendanceStatus { present, absent }
+enum AttendanceStatus { present, absent, holiday }
 enum HomeworkStatus { completed, incomplete, notChecked }
 enum FeeStatus { paid, due, overdue }
 enum ActivityType { attendanceMarked, homeworkMarked, whatsappSent, noticeSent }

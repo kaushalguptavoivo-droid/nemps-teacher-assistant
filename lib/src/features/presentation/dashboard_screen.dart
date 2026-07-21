@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
@@ -20,17 +21,20 @@ class DashboardScreen extends ConsumerWidget {
         : hour < 17
             ? '☀️ Good Afternoon'
             : '🌙 Good Evening';
-    final userName = Supabase.instance.client.auth.currentUser?.email?.split('@').first ?? 'Teacher';
+    final userName =
+        Supabase.instance.client.auth.currentUser?.email?.split('@').first ??
+            'Teacher';
 
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(classesProvider);
         ref.invalidate(currentUserRoleProvider);
+        ref.invalidate(allNoticesProvider);
       },
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Greeting card
+          // Greeting card with logo
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -63,19 +67,33 @@ class DashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
+                // School logo
+                ClipOval(
+                  child: Image.asset(
+                    'assets/logo.png',
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.school_rounded,
+                          color: Colors.white, size: 32),
+                    ),
                   ),
-                  child: const Icon(Icons.school_rounded,
-                      color: Colors.white, size: 32),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // ── Notices Section ─────────────────────────────────────────────────
+          _NoticesBanner(isAdmin: isAdmin),
+          const SizedBox(height: 16),
 
           // My Classes section
           Row(
@@ -106,7 +124,9 @@ class DashboardScreen extends ConsumerWidget {
                         children: [
                           Icon(Icons.class_outlined,
                               size: 48,
-                              color: Theme.of(context).colorScheme.outlineVariant),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outlineVariant),
                           const SizedBox(height: 8),
                           const Text('Koi class assign nahi.\nAdmin se contact karein.',
                               textAlign: TextAlign.center),
@@ -130,7 +150,8 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () =>
+                const Center(child: CircularProgressIndicator()),
           ),
 
           const SizedBox(height: 24),
@@ -155,7 +176,8 @@ class DashboardScreen extends ConsumerWidget {
                 label: 'Attendance',
                 color: AppTheme.attendanceColor,
                 onTap: classes.valueOrNull?.isNotEmpty == true
-                    ? () => context.go('/attendance/${classes.value!.first.id}')
+                    ? () => context
+                        .go('/attendance/${classes.value!.first.id}')
                     : null,
               ),
               _QuickActionCard(
@@ -163,7 +185,8 @@ class DashboardScreen extends ConsumerWidget {
                 label: 'Homework',
                 color: AppTheme.homeworkColor,
                 onTap: classes.valueOrNull?.isNotEmpty == true
-                    ? () => context.go('/homework/${classes.value!.first.id}')
+                    ? () =>
+                        context.go('/homework/${classes.value!.first.id}')
                     : null,
               ),
               _QuickActionCard(
@@ -171,7 +194,8 @@ class DashboardScreen extends ConsumerWidget {
                 label: 'WhatsApp',
                 color: AppTheme.whatsappColor,
                 onTap: classes.valueOrNull?.isNotEmpty == true
-                    ? () => context.go('/absent/${classes.value!.first.id}')
+                    ? () =>
+                        context.go('/absent/${classes.value!.first.id}')
                     : null,
               ),
               _QuickActionCard(
@@ -198,7 +222,8 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 28),
+                    Icon(Icons.admin_panel_settings_rounded,
+                        color: Colors.white, size: 28),
                     SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -210,7 +235,8 @@ class DashboardScreen extends ConsumerWidget {
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16)),
                           Text('Classes, Teachers, Students manage karein',
-                              style: TextStyle(color: Colors.white70, fontSize: 12)),
+                              style: TextStyle(
+                                  color: Colors.white70, fontSize: 12)),
                         ],
                       ),
                     ),
@@ -226,6 +252,123 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 }
+
+// ── Notices Banner ─────────────────────────────────────────────────────────────
+
+class _NoticesBanner extends ConsumerWidget {
+  const _NoticesBanner({required this.isAdmin});
+  final bool isAdmin;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notices = ref.watch(allNoticesProvider);
+
+    return notices.when(
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.campaign_rounded,
+                    color: Color(0xFF7C3AED), size: 20),
+                const SizedBox(width: 6),
+                Text('School Notices',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF7C3AED))),
+                const Spacer(),
+                Text('${items.length} notice',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.outline,
+                        fontSize: 12)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...items.take(3).map((n) => _NoticeCard(notice: n)),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _NoticeCard extends StatelessWidget {
+  const _NoticeCard({required this.notice});
+  final Notice notice;
+
+  @override
+  Widget build(BuildContext context) {
+    final timeAgo = _formatTime(notice.createdAt);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: const Color(0xFF7C3AED).withOpacity(0.06),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: const Color(0xFF7C3AED).withOpacity(0.2),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF7C3AED).withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.notifications_rounded,
+                  size: 16, color: Color(0xFF7C3AED)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(notice.title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 13)),
+                  if (notice.body.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(notice.body,
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                  ],
+                ],
+              ),
+            ),
+            Text(timeAgo,
+                style: TextStyle(
+                    fontSize: 10,
+                    color: Theme.of(context).colorScheme.outline)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return DateFormat('dd MMM').format(dt);
+  }
+}
+
+// ── Class Card ─────────────────────────────────────────────────────────────────
 
 class _ClassCard extends ConsumerWidget {
   const _ClassCard({required this.room});
@@ -325,6 +468,8 @@ class _ClassCard extends ConsumerWidget {
     );
   }
 }
+
+// ── Quick Action Card ──────────────────────────────────────────────────────────
 
 class _QuickActionCard extends StatelessWidget {
   const _QuickActionCard({

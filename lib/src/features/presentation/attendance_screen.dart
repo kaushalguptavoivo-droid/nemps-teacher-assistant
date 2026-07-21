@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../core/models/models.dart';
+import '../../core/services/notification_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
 
@@ -18,6 +19,7 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
   DateTime selectedDate = DateTime.now();
   bool saving = false;
   bool loadingExisting = false;
+  bool isHolidayMarked = false;
 
   @override
   void initState() {
@@ -34,6 +36,9 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     if (!mounted) return;
     setState(() {
       statuses..clear()..addAll(existing);
+      // Check if holiday was previously marked (any student has holiday status)
+      isHolidayMarked =
+          statuses.values.any((s) => s == AttendanceStatus.holiday);
       loadingExisting = false;
     });
   }
@@ -46,9 +51,11 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
       lastDate: DateTime.now(),
     );
     if (picked != null && picked != selectedDate) {
-      setState(() => selectedDate = picked);
+      setState(() {
+        selectedDate = picked;
+        isHolidayMarked = false;
+      });
       await _loadExistingAttendance();
-      // dailyAttendanceCountProvider is a StreamProvider — no manual invalidate needed.
     }
   }
 
@@ -66,18 +73,98 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         saved++;
       }
       if (mounted) {
-        // Both providers are now StreamProviders — they auto-update via
-        // Supabase realtime; no manual invalidate needed after saving.
-        final presentCount =
-            statuses.values.where((s) => s == AttendanceStatus.present).length;
-        final absentCount =
-            statuses.values.where((s) => s == AttendanceStatus.absent).length;
+        final presentCount = statuses.values
+            .where((s) => s == AttendanceStatus.present)
+            .length;
+        final absentCount = statuses.values
+            .where((s) => s == AttendanceStatus.absent)
+            .length;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
                 'Attendance save ho gayi! ✓ $saved students | Present: $presentCount | Absent: $absentCount'),
             backgroundColor: AppTheme.attendanceColor,
             duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  /// Mark the selected date as a holiday for all students.
+  Future<void> _markHoliday(List<Student> items) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.beach_access_rounded, color: Color(0xFFf97316)),
+            SizedBox(width: 8),
+            Text('Holiday Mark Karein?'),
+          ],
+        ),
+        content: Text(
+          '${DateFormat('dd MMM yyyy').format(selectedDate)} ko holiday mark karna chahte hain?\n\n'
+          'Aaj koi attendance ya homework nahi chahiye.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton.icon(
+            style:
+                FilledButton.styleFrom(backgroundColor: const Color(0xFFf97316)),
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.beach_access_rounded),
+            label: const Text('Holiday Mark Karein'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => saving = true);
+    try {
+      for (final student in items) {
+        await ref.read(repoProvider).saveAttendance(
+              classId: widget.classId,
+              studentId: student.id,
+              status: AttendanceStatus.holiday,
+              date: selectedDate,
+            );
+      }
+      setState(() {
+        for (final s in items) {
+          statuses[s.id] = AttendanceStatus.holiday;
+        }
+        isHolidayMarked = true;
+      });
+
+      // Cancel today's reminders if marking today as holiday
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      final selDay = selectedDate.toIso8601String().substring(0, 10);
+      if (today == selDay) {
+        await NotificationService.cancelTodayReminders();
+        // Reschedule so future weeks still get reminders
+        await NotificationService.scheduleDailyAttendanceReminder();
+        await NotificationService.scheduleDailyHomeworkReminder();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '${DateFormat('dd MMM yyyy').format(selectedDate)} — Holiday mark ho gaya! 🏖️'),
+            backgroundColor: const Color(0xFFf97316),
           ),
         );
       }
@@ -101,16 +188,21 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
       appBar: AppBar(title: const Text('Attendance')),
       body: students.when(
         data: (items) {
-          final presentCount =
-              statuses.values.where((s) => s == AttendanceStatus.present).length;
-          final absentCount =
-              statuses.values.where((s) => s == AttendanceStatus.absent).length;
+          final presentCount = statuses.values
+              .where((s) => s == AttendanceStatus.present)
+              .length;
+          final absentCount = statuses.values
+              .where((s) => s == AttendanceStatus.absent)
+              .length;
 
           return Column(
             children: [
               // Header
               Container(
-                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                color: Theme.of(context)
+                    .colorScheme
+                    .primaryContainer
+                    .withOpacity(0.3),
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
@@ -121,25 +213,56 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                DateFormat('dd MMM yyyy, EEEE').format(selectedDate),
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold),
+                                DateFormat('dd MMM yyyy, EEEE')
+                                    .format(selectedDate),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
-                              count.when(
-                                data: (data) => Row(
-                                  children: [
-                                    _StatusPill(
-                                        label: 'Present ${data['present'] ?? 0}',
-                                        color: AppTheme.attendanceColor),
-                                    const SizedBox(width: 6),
-                                    _StatusPill(
-                                        label: 'Absent ${data['absent'] ?? 0}',
-                                        color: AppTheme.absentColor),
-                                  ],
+                              if (isHolidayMarked)
+                                Container(
+                                  margin: const EdgeInsets.only(top: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFf97316)
+                                        .withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.beach_access_rounded,
+                                          size: 14,
+                                          color: Color(0xFFf97316)),
+                                      SizedBox(width: 4),
+                                      Text('HOLIDAY',
+                                          style: TextStyle(
+                                              color: Color(0xFFf97316),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12)),
+                                    ],
+                                  ),
+                                )
+                              else
+                                count.when(
+                                  data: (data) => Row(
+                                    children: [
+                                      _StatusPill(
+                                          label:
+                                              'Present ${data['present'] ?? 0}',
+                                          color: AppTheme.attendanceColor),
+                                      const SizedBox(width: 6),
+                                      _StatusPill(
+                                          label:
+                                              'Absent ${data['absent'] ?? 0}',
+                                          color: AppTheme.absentColor),
+                                    ],
+                                  ),
+                                  loading: () => const SizedBox.shrink(),
+                                  error: (_, __) => const SizedBox.shrink(),
                                 ),
-                                loading: () => const SizedBox.shrink(),
-                                error: (_, __) => const SizedBox.shrink(),
-                              ),
                             ],
                           ),
                         ),
@@ -155,176 +278,248 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                         padding: EdgeInsets.only(top: 8),
                         child: LinearProgressIndicator(),
                       ),
-                    const SizedBox(height: 10),
-                    // Live counters
-                    Row(
+
+                    if (!isHolidayMarked) ...[
+                      const SizedBox(height: 10),
+                      // Live counters
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color:
+                                    AppTheme.attendanceColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.check_circle_rounded,
+                                      color: AppTheme.attendanceColor,
+                                      size: 18),
+                                  const SizedBox(width: 6),
+                                  Text('$presentCount Present',
+                                      style: const TextStyle(
+                                          color: AppTheme.attendanceColor,
+                                          fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppTheme.absentColor.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.cancel_rounded,
+                                      color: AppTheme.absentColor, size: 18),
+                                  const SizedBox(width: 6),
+                                  Text('$absentCount Absent',
+                                      style: const TextStyle(
+                                          color: AppTheme.absentColor,
+                                          fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              if (isHolidayMarked)
+                // Holiday view — full screen message
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppTheme.attendanceColor.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.check_circle_rounded,
-                                    color: AppTheme.attendanceColor, size: 18),
-                                const SizedBox(width: 6),
-                                Text('$presentCount Present',
-                                    style: const TextStyle(
-                                        color: AppTheme.attendanceColor,
-                                        fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
+                        const Icon(Icons.beach_access_rounded,
+                            size: 72, color: Color(0xFFf97316)),
+                        const SizedBox(height: 12),
+                        Text(
+                          '${DateFormat('dd MMM yyyy').format(selectedDate)}\nHoliday Hai! 🎉',
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFFf97316),
+                                  ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppTheme.absentColor.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.cancel_rounded,
-                                    color: AppTheme.absentColor, size: 18),
-                                const SizedBox(width: 6),
-                                Text('$absentCount Absent',
-                                    style: const TextStyle(
-                                        color: AppTheme.absentColor,
-                                        fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Aaj koi attendance nahi chahiye.',
+                          style: TextStyle(
+                              color:
+                                  Theme.of(context).colorScheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 24),
+                        OutlinedButton.icon(
+                          onPressed: () => setState(() {
+                            isHolidayMarked = false;
+                            for (final s in items) {
+                              statuses[s.id] = AttendanceStatus.present;
+                            }
+                          }),
+                          icon: const Icon(Icons.undo_rounded),
+                          label: const Text('Holiday Hatao'),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-
-              // Mark all row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    const Text('Mark all:',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
-                    const Spacer(),
-                    OutlinedButton.icon(
-                      onPressed: () => setState(() {
-                        for (final s in items) {
-                          statuses[s.id] = AttendanceStatus.present;
-                        }
-                      }),
-                      icon: const Icon(Icons.check_circle_rounded,
-                          color: AppTheme.attendanceColor, size: 16),
-                      label: const Text('All Present'),
-                      style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.attendanceColor,
-                          side: const BorderSide(color: AppTheme.attendanceColor)),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed: () => setState(() {
-                        for (final s in items) {
-                          statuses[s.id] = AttendanceStatus.absent;
-                        }
-                      }),
-                      icon: const Icon(Icons.cancel_rounded,
-                          color: AppTheme.absentColor, size: 16),
-                      label: const Text('All Absent'),
-                      style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.absentColor,
-                          side: const BorderSide(color: AppTheme.absentColor)),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-
-              // Student list
-              Expanded(
-                child: ListView.builder(
-                  itemCount: items.length,
-                  itemBuilder: (_, index) {
-                    final student = items[index];
-                    final status =
-                        statuses[student.id] ?? AttendanceStatus.present;
-                    final isPresent = status == AttendanceStatus.present;
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      decoration: BoxDecoration(
-                        color: isPresent
-                            ? AppTheme.attendanceColor.withOpacity(0.04)
-                            : AppTheme.absentColor.withOpacity(0.04),
+                  ),
+                )
+              else ...[
+                // Mark all row + Holiday button
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Text('Mark all:',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() {
+                          for (final s in items) {
+                            statuses[s.id] = AttendanceStatus.present;
+                          }
+                        }),
+                        icon: const Icon(Icons.check_circle_rounded,
+                            color: AppTheme.attendanceColor, size: 16),
+                        label: const Text('P'),
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.attendanceColor,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            side: const BorderSide(
+                                color: AppTheme.attendanceColor)),
                       ),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: isPresent
-                              ? AppTheme.attendanceColor
-                              : AppTheme.absentColor,
-                          child: Text(student.rollNo,
+                      const SizedBox(width: 6),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(() {
+                          for (final s in items) {
+                            statuses[s.id] = AttendanceStatus.absent;
+                          }
+                        }),
+                        icon: const Icon(Icons.cancel_rounded,
+                            color: AppTheme.absentColor, size: 16),
+                        label: const Text('A'),
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.absentColor,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            side:
+                                const BorderSide(color: AppTheme.absentColor)),
+                      ),
+                      const Spacer(),
+                      // Holiday button
+                      OutlinedButton.icon(
+                        onPressed: () => _markHoliday(items),
+                        icon: const Icon(Icons.beach_access_rounded,
+                            color: Color(0xFFf97316), size: 16),
+                        label: const Text('Holiday'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFf97316),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          side: const BorderSide(color: Color(0xFFf97316)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+
+                // Student list
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: items.length,
+                    itemBuilder: (_, index) {
+                      final student = items[index];
+                      final status =
+                          statuses[student.id] ?? AttendanceStatus.present;
+                      final isPresent = status == AttendanceStatus.present;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        decoration: BoxDecoration(
+                          color: isPresent
+                              ? AppTheme.attendanceColor.withOpacity(0.04)
+                              : AppTheme.absentColor.withOpacity(0.04),
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: isPresent
+                                ? AppTheme.attendanceColor
+                                : AppTheme.absentColor,
+                            child: Text(student.rollNo,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12)),
+                          ),
+                          title: Text(student.fullName,
                               style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12)),
+                                  fontWeight: FontWeight.w600)),
+                          subtitle: Text(student.parentName,
+                              style: const TextStyle(fontSize: 12)),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _AttendanceChip(
+                                label: 'P',
+                                selected: isPresent,
+                                color: AppTheme.attendanceColor,
+                                onTap: () => setState(() =>
+                                    statuses[student.id] =
+                                        AttendanceStatus.present),
+                              ),
+                              const SizedBox(width: 6),
+                              _AttendanceChip(
+                                label: 'A',
+                                selected: !isPresent,
+                                color: AppTheme.absentColor,
+                                onTap: () => setState(() =>
+                                    statuses[student.id] =
+                                        AttendanceStatus.absent),
+                              ),
+                            ],
+                          ),
                         ),
-                        title: Text(student.fullName,
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(student.parentName,
-                            style: const TextStyle(fontSize: 12)),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _AttendanceChip(
-                              label: 'P',
-                              selected: isPresent,
-                              color: AppTheme.attendanceColor,
-                              onTap: () => setState(
-                                  () => statuses[student.id] = AttendanceStatus.present),
-                            ),
-                            const SizedBox(width: 6),
-                            _AttendanceChip(
-                              label: 'A',
-                              selected: !isPresent,
-                              color: AppTheme.absentColor,
-                              onTap: () => setState(
-                                  () => statuses[student.id] = AttendanceStatus.absent),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
-              ),
 
-              // Save button
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: FilledButton.icon(
-                  onPressed: saving ? null : () => _saveAttendance(items),
-                  style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                      backgroundColor: AppTheme.attendanceColor),
-                  icon: saving
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.save_rounded),
-                  label: Text(saving
-                      ? 'Saving...'
-                      : 'Save Attendance (${items.length} students)'),
+                // Save button
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: FilledButton.icon(
+                    onPressed: saving ? null : () => _saveAttendance(items),
+                    style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        backgroundColor: AppTheme.attendanceColor),
+                    icon: saving
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.save_rounded),
+                    label: Text(saving
+                        ? 'Saving...'
+                        : 'Save Attendance (${items.length} students)'),
+                  ),
                 ),
-              ),
+              ],
             ],
           );
         },
@@ -350,7 +545,8 @@ class _StatusPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(label,
-          style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+          style: TextStyle(
+              color: color, fontSize: 11, fontWeight: FontWeight.bold)),
     );
   }
 }
@@ -387,7 +583,9 @@ class _AttendanceChip extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+              color: selected
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold,
               fontSize: 15,
             ),

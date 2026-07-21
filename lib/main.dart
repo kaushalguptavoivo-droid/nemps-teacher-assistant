@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'src/app.dart';
 import 'src/core/config/app_config.dart';
+import 'src/core/services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +21,32 @@ Future<void> main() async {
     key = base64UrlEncode(bytes);
     await secureStorage.write(key: 'nemps_hive_aes_key', value: key);
   }
-  await Hive.openBox<Map>('nemps_offline_queue', encryptionCipher: HiveAesCipher(Uint8List.fromList(base64Url.decode(key))));
-  await Supabase.initialize(url: AppConfig.supabaseUrl, publishableKey: AppConfig.supabaseAnonKey);
+  await Hive.openBox<Map>(
+    'nemps_offline_queue',
+    encryptionCipher:
+        HiveAesCipher(Uint8List.fromList(base64Url.decode(key))),
+  );
+
+  await Supabase.initialize(
+    url: AppConfig.supabaseUrl,
+    publishableKey: AppConfig.supabaseAnonKey,
+    // Persist session so teachers don't have to login every time
+    authOptions: const FlutterAuthClientOptions(
+      authFlowType: AuthFlowType.pkce,
+      autoRefreshToken: true,
+    ),
+  );
+
+  // Initialize local notifications & schedule daily reminders
+  await NotificationService.init();
+  // Only schedule if a user is already logged in (session persisted)
+  if (Supabase.instance.client.auth.currentSession != null) {
+    unawaited(NotificationService.scheduleDailyAttendanceReminder());
+    unawaited(NotificationService.scheduleDailyHomeworkReminder());
+  }
+
   runApp(const ProviderScope(child: NempsApp()));
 }
+
+// ignore: unused_element
+void unawaited(Future<void> f) {}
