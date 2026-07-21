@@ -1900,7 +1900,26 @@ Report Engine
 
 Status
 
-Pending
+COMPLETE — 22 July 2026
+
+Files Created
+
+lib/src/features/examination/presentation/result_screen.dart
+
+lib/src/features/examination/presentation/report_card_screen.dart
+
+Files Modified
+
+lib/src/app.dart
+
+lib/src/features/presentation/class_detail_screen.dart
+
+Summary
+
+result_screen.dart: Class-level result overview. Loads active session → exam config → terms → subjects → grades → students, calls classResultsProvider (Phase 2 Result Engine). Displays ranked list of all students with rank badge, name, roll no, total marks, percentage, grade, pass/fail chip. Summary banner shows total/pass/fail counts, pass%, and class topper. Filter popup (All / Pass / Fail). Tap any student opens their individual report card.
+report_card_screen.dart: Individual student report card. Shows header card (name, roll no, session, total, %, grade, rank, pass/fail). Subject-wise DataTable with columns for each term + total + grade + P/F. Overall summary card. PDF generation using pdf package — A4 layout with school name (from ReportTemplate), student info, subject table, grand total, pass/fail result, class teacher + principal signature fields. Share PDF via share_plus.
+app.dart: Added /results/:id → ResultScreen and /report-card/:classId/:studentId → ReportCardScreen routes. ReportCardArgs passed via GoRouter extra so no duplicate Supabase fetch needed.
+class_detail_screen.dart: Added "Results" tile (teal, bar_chart icon) in actions grid alongside existing 5 tiles. No other change.
 
 Phase 6
 

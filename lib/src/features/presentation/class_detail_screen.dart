@@ -132,8 +132,16 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     icon: Icons.assignment_turned_in_rounded,
                     label: 'Exam Marks',
                     subtitle: 'Enter & save marks',
-                    color: Color(0xFF7C3AED),
+                    color: const Color(0xFF7C3AED),
                     onTap: () => context.go('/exam-marks/$classId'),
+                  ),
+                  // ── Phase 5: Results tile ─────────────────────────────────
+                  _ActionTile(
+                    icon: Icons.bar_chart_rounded,
+                    label: 'Results',
+                    subtitle: 'View ranks & report cards',
+                    color: const Color(0xFF0D9488), // teal
+                    onTap: () => context.go('/results/$classId'),
                   ),
                 ],
               ),
