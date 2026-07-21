@@ -381,266 +381,555 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
     final groupLink = ref.watch(whatsappGroupLinkProvider(widget.classId));
     final students = ref.watch(studentsProvider(widget.classId));
     final isAfter12PM = DateTime.now().hour >= 12;
+    final theme = Theme.of(context);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
       children: [
-        // Info banner
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppTheme.homeworkColor.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.homeworkColor.withOpacity(0.3)),
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.info_outline, color: AppTheme.homeworkColor),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Yahan aap multiple subjects ka homework ek saath sab parents ko bhej sakte hain.',
-                  style: TextStyle(fontSize: 13),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Date selector
+        // ── Section heading ────────────────────────────────────────────
         Row(
           children: [
-            Text('Date: ${DateFormat('dd MMM yyyy').format(selectedDate)}',
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (picked != null) {
-                  setState(() {
-                    selectedDate = picked;
-                    selectedHomeworkIds.clear();
-                  });
-                  ref.invalidate(homeworkForDateProvider);
-                }
-              },
-              icon: const Icon(Icons.calendar_today, size: 16),
-              label: const Text('Date Badlo'),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.whatsappColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.send_rounded,
+                  color: AppTheme.whatsappColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Homework Bhejein',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text('Subjects chunein, parents ko notify karein',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant)),
+              ],
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 20),
 
-        // Homework list for that date
-        homeworkToday.when(
-          data: (hwList) => hwList.isEmpty
-              ? Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.assignment_outlined,
-                            size: 48, color: Colors.grey),
-                        const SizedBox(height: 8),
-                        Text(
-                            'Is date ko koi homework assign nahi hua.\n"Assign" tab mein pehle assign karein.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant)),
-                      ],
-                    ),
+        // ── Date selector card ─────────────────────────────────────────
+        InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: selectedDate,
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now(),
+            );
+            if (picked != null) {
+              setState(() {
+                selectedDate = picked;
+                selectedHomeworkIds.clear();
+              });
+              ref.invalidate(homeworkForDateProvider);
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: theme.colorScheme.outlineVariant, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.homeworkColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                )
-              : Column(
+                  child: const Icon(Icons.calendar_month_rounded,
+                      color: AppTheme.homeworkColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('${hwList.length} subjects assigned',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w600)),
-                        TextButton(
-                          onPressed: () => setState(() {
-                            if (selectedHomeworkIds.length == hwList.length) {
-                              selectedHomeworkIds.clear();
-                            } else {
-                              selectedHomeworkIds.addAll(hwList.map((h) => h.id));
-                            }
-                          }),
-                          child: Text(
-                              selectedHomeworkIds.length == hwList.length
-                                  ? 'Deselect All'
-                                  : 'Select All'),
-                        ),
-                      ],
+                    Text('Homework ki Date',
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant)),
+                    const SizedBox(height: 2),
+                    Text(
+                      DateFormat('EEEE, dd MMMM yyyy').format(selectedDate),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 15),
                     ),
-                    ...hwList.map((hw) {
-                      final color = _colorForSubject(hw.subject);
-                      final selected = selectedHomeworkIds.contains(hw.id);
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(
-                              color: selected ? color : Colors.transparent,
-                              width: 2),
-                        ),
-                        child: CheckboxListTile(
-                          value: selected,
-                          onChanged: (v) => setState(() {
-                            if (v == true) {
-                              selectedHomeworkIds.add(hw.id);
-                            } else {
-                              selectedHomeworkIds.remove(hw.id);
-                            }
-                          }),
-                          activeColor: color,
-                          secondary: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                                color: color.withOpacity(0.15),
-                                shape: BoxShape.circle),
-                            child: Icon(Icons.book, color: color, size: 20),
-                          ),
-                          title: Text(hw.subject,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: hw.description.isNotEmpty
-                              ? Text(hw.description,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis)
-                              : null,
-                        ),
-                      );
-                    }),
+                  ],
+                ),
+                const Spacer(),
+                Icon(Icons.edit_calendar_rounded,
+                    color: theme.colorScheme.onSurfaceVariant, size: 18),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
 
-                    if (selectedHomeworkIds.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      // Preview message
+        // ── Homework list for chosen date ──────────────────────────────
+        homeworkToday.when(
+          loading: () => const Center(
+              child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: CircularProgressIndicator())),
+          error: (e, _) => Text('Error: $e'),
+          data: (hwList) {
+            if (hwList.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                    vertical: 36, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.assignment_outlined,
+                        size: 52,
+                        color: theme.colorScheme.onSurfaceVariant
+                            .withOpacity(0.5)),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Is date ka koi homework nahi mila',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 15),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '"Assign" tab mein pehle homework add karein',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            final selectedList = hwList
+                .where((h) => selectedHomeworkIds.contains(h.id))
+                .toList();
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Subject list header
+                Row(
+                  children: [
+                    Text(
+                      '${hwList.length} subject${hwList.length > 1 ? 's' : ''} assigned',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 13),
+                    ),
+                    const Spacer(),
+                    if (selectedHomeworkIds.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.all(14),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
+                          color:
+                              AppTheme.whatsappColor.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Message Preview:',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 12)),
-                            const SizedBox(height: 6),
-                            Text(
-                              _buildCombinedGroupMessage(
-                                  hwList
-                                      .where((h) =>
-                                          selectedHomeworkIds.contains(h.id))
-                                      .toList(),
-                                  DateFormat('dd MMM yyyy')
-                                      .format(selectedDate)),
-                              style: const TextStyle(
-                                  fontSize: 12, fontFamily: 'monospace'),
-                            ),
-                          ],
+                        child: Text(
+                          '${selectedHomeworkIds.length} selected',
+                          style: const TextStyle(
+                              color: AppTheme.whatsappColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(60, 32)),
+                      onPressed: () => setState(() {
+                        if (selectedHomeworkIds.length == hwList.length) {
+                          selectedHomeworkIds.clear();
+                        } else {
+                          selectedHomeworkIds
+                              .addAll(hwList.map((h) => h.id));
+                        }
+                      }),
+                      child: Text(
+                          selectedHomeworkIds.length == hwList.length
+                              ? 'Deselect All'
+                              : 'Select All',
+                          style: const TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
 
-                      // Action buttons
-                      if (!isAfter12PM)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                              color: AppTheme.pendingColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10)),
-                          child: const Row(
+                // Subject cards
+                ...hwList.map((hw) {
+                  final color = _colorForSubject(hw.subject);
+                  final selected = selectedHomeworkIds.contains(hw.id);
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      if (selected) {
+                        selectedHomeworkIds.remove(hw.id);
+                      } else {
+                        selectedHomeworkIds.add(hw.id);
+                      }
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? color.withOpacity(0.07)
+                            : theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: selected
+                                ? color
+                                : theme.colorScheme.outlineVariant,
+                            width: selected ? 2 : 1),
+                        boxShadow: selected
+                            ? [
+                                BoxShadow(
+                                    color: color.withOpacity(0.15),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3))
+                              ]
+                            : [
+                                BoxShadow(
+                                    color: Colors.black.withOpacity(0.04),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1))
+                              ],
+                      ),
+                      child: Row(
+                        children: [
+                          // Colored left accent bar
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            width: 5,
+                            height: 68,
+                            decoration: BoxDecoration(
+                              color: selected ? color : Colors.transparent,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(12),
+                                bottomLeft: Radius.circular(12),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Subject icon
+                          Container(
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                                color: color.withOpacity(0.13),
+                                borderRadius: BorderRadius.circular(10)),
+                            child: Icon(Icons.menu_book_rounded,
+                                color: color, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          // Subject info
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(hw.subject,
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                        color: selected
+                                            ? color
+                                            : theme.colorScheme.onSurface)),
+                                if (hw.description.isNotEmpty)
+                                  Text(hw.description,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: theme.colorScheme
+                                              .onSurfaceVariant)),
+                              ],
+                            ),
+                          ),
+                          // Checkmark
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(right: 14),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: selected ? color : Colors.transparent,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: selected
+                                        ? color
+                                        : theme.colorScheme.outlineVariant,
+                                    width: 2),
+                              ),
+                              child: selected
+                                  ? const Icon(Icons.check,
+                                      color: Colors.white, size: 14)
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+
+                // ── Selected: preview + send buttons ────────────────
+                if (selectedList.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+
+                  // WhatsApp message preview bubble
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF075E54), Color(0xFF128C7E)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Preview header
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                          child: Row(
                             children: [
-                              Icon(Icons.access_time,
-                                  color: AppTheme.pendingColor),
-                              SizedBox(width: 8),
-                              Text(
-                                  'WhatsApp send karne ki facility\n12 baje ke baad available hogi.',
-                                  style: TextStyle(fontSize: 13)),
+                              const Icon(Icons.whatsapp,
+                                  color: Colors.white, size: 18),
+                              const SizedBox(width: 8),
+                              const Text('Message Preview',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13)),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '${selectedList.length} subject${selectedList.length > 1 ? 's' : ''}',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
                             ],
                           ),
                         ),
-
-                      if (isAfter12PM) ...[
-                        // Send to group button
-                        groupLink.when(
-                          data: (link) => link != null && link.isNotEmpty
-                              ? SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton.icon(
-                                    onPressed: () => _sendToGroup(
-                                        context,
-                                        ref,
-                                        link,
-                                        hwList
-                                            .where((h) =>
-                                                selectedHomeworkIds.contains(h.id))
-                                            .toList()),
-                                    style: FilledButton.styleFrom(
-                                        backgroundColor: AppTheme.whatsappColor),
-                                    icon: const Icon(Icons.groups_rounded),
-                                    label: const Text(
-                                        'Group mein bhejo (Copy + Open)'),
-                                  ),
-                                )
-                              : Card(
-                                  child: ListTile(
-                                    leading: const Icon(Icons.groups_outlined,
-                                        color: Colors.grey),
-                                    title: const Text('Group link nahi set hai'),
-                                    subtitle: const Text(
-                                        'Class Detail screen mein group link add karein'),
-                                    trailing: const Icon(Icons.info_outline),
-                                  ),
-                                ),
-                          loading: () => const LinearProgressIndicator(),
-                          error: (_, __) => const SizedBox.shrink(),
-                        ),
-                        const SizedBox(height: 8),
-                        // Send individually
-                        students.when(
-                          data: (studentList) => SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _sendIndividually(
-                                  context,
-                                  ref,
-                                  studentList,
-                                  hwList
-                                      .where((h) =>
-                                          selectedHomeworkIds.contains(h.id))
-                                      .toList()),
-                              icon: const Icon(Icons.person_rounded),
-                              label: Text(
-                                  'Parents ko individually bhejo (${studentList.length})'),
-                              style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.whatsappColor,
-                                  side: const BorderSide(
-                                      color: AppTheme.whatsappColor)),
-                            ),
+                        // Message bubble
+                        Container(
+                          margin: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          loading: () => const LinearProgressIndicator(),
-                          error: (_, __) => const SizedBox.shrink(),
+                          child: Text(
+                            _buildCombinedGroupMessage(
+                                selectedList,
+                                DateFormat('dd MMM yyyy')
+                                    .format(selectedDate)),
+                            style: const TextStyle(
+                                fontSize: 12.5,
+                                height: 1.6,
+                                color: Color(0xFF1a1a1a)),
+                          ),
                         ),
                       ],
-                    ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Time restriction warning
+                  if (!isAfter12PM)
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFFFF8E1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: AppTheme.pendingColor.withOpacity(0.4))),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.schedule_rounded,
+                              color: AppTheme.pendingColor, size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: const [
+                                Text('Abhi send nahi kar sakte',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: AppTheme.pendingColor,
+                                        fontSize: 13)),
+                                SizedBox(height: 2),
+                                Text(
+                                  'WhatsApp send facility dopahar 12 baje ke baad milegi',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.brown),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Send buttons (only after 12 PM)
+                  if (isAfter12PM) ...[
+                    groupLink.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, __) => const SizedBox.shrink(),
+                      data: (link) {
+                        final hasLink = link != null && link.isNotEmpty;
+                        return Column(
+                          children: [
+                            // Group send button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: hasLink
+                                  ? FilledButton.icon(
+                                      onPressed: () => _sendToGroup(
+                                          context,
+                                          ref,
+                                          link!,
+                                          selectedList),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor:
+                                            AppTheme.whatsappColor,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(14)),
+                                      ),
+                                      icon: const Icon(Icons.groups_rounded,
+                                          size: 20),
+                                      label: const Text(
+                                        'WhatsApp Group mein Bhejo',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15),
+                                      ),
+                                    )
+                                  : OutlinedButton.icon(
+                                      onPressed: null,
+                                      style: OutlinedButton.styleFrom(
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(14)),
+                                        side: BorderSide(
+                                            color: theme.colorScheme
+                                                .outlineVariant),
+                                      ),
+                                      icon: Icon(Icons.groups_outlined,
+                                          color: theme.colorScheme
+                                              .onSurfaceVariant,
+                                          size: 20),
+                                      label: Text(
+                                        'Group link set nahi hai',
+                                        style: TextStyle(
+                                            color: theme.colorScheme
+                                                .onSurfaceVariant),
+                                      ),
+                                    ),
+                            ),
+                            if (!hasLink)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'Class Detail screen mein group link add karein',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: theme.colorScheme
+                                          .onSurfaceVariant),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            const SizedBox(height: 10),
+
+                            // Individual send button
+                            students.when(
+                              loading: () =>
+                                  const LinearProgressIndicator(),
+                              error: (_, __) =>
+                                  const SizedBox.shrink(),
+                              data: (studentList) => SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _sendIndividually(
+                                      context,
+                                      ref,
+                                      studentList,
+                                      selectedList),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor:
+                                        AppTheme.whatsappColor,
+                                    side: const BorderSide(
+                                        color: AppTheme.whatsappColor,
+                                        width: 1.5),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14)),
+                                  ),
+                                  icon: const Icon(
+                                      Icons.person_pin_rounded,
+                                      size: 20),
+                                  label: Text(
+                                    'Har Parent ko Alag Bhejo (${studentList.length})',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   ],
-                ),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text('Error: $e'),
+                ],
+              ],
+            );
+          },
         ),
       ],
     );
@@ -681,71 +970,164 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
     }
   }
 
-  Future<void> _sendToGroup(BuildContext context, WidgetRef ref, String groupLink,
-      List<Homework> selected) async {
+  Future<void> _sendToGroup(BuildContext context, WidgetRef ref,
+      String groupLink, List<Homework> selected) async {
     final dateStr = DateFormat('dd MMM yyyy').format(selectedDate);
     final message = _buildCombinedGroupMessage(selected, dateStr);
-    // Copy to clipboard
     await Clipboard.setData(ClipboardData(text: message));
     if (!context.mounted) return;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.groups_rounded, color: AppTheme.whatsappColor),
-            SizedBox(width: 8),
-            Text('Group mein bhejo'),
-          ],
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(10)),
-              child: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 16),
-                  SizedBox(width: 6),
-                  Expanded(
-                      child: Text('Message clipboard mein copy ho gaya!',
-                          style: TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13))),
-                ],
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Green header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 18),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF075E54), Color(0xFF128C7E)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.groups_rounded,
+                            color: Colors.white, size: 24),
+                        SizedBox(width: 10),
+                        Text('WhatsApp Group mein Bhejo',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline,
+                              color: Colors.white, size: 16),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Message clipboard mein copy ho gaya!',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '1. "Open Group" tap karein\n'
-              '2. Group mein message paste karein (long press → paste)\n'
-              '3. Send karein',
-              style: TextStyle(fontSize: 13),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton.icon(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final uri = Uri.parse(groupLink);
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            },
-            style:
-                FilledButton.styleFrom(backgroundColor: AppTheme.whatsappColor),
-            icon: const Icon(Icons.open_in_new, size: 16),
-            label: const Text('Open Group'),
+
+              // Step-by-step instructions
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                child: Column(
+                  children: [
+                    _StepTile(
+                      number: '1',
+                      icon: Icons.open_in_new_rounded,
+                      title: 'Group kholo',
+                      subtitle:
+                          'Neeche "Open Group" button dabao — WhatsApp group khul jayega',
+                    ),
+                    const SizedBox(height: 10),
+                    _StepTile(
+                      number: '2',
+                      icon: Icons.content_paste_rounded,
+                      title: 'Message paste karo',
+                      subtitle:
+                          'Message box mein long-press karo → "Paste" chunein',
+                    ),
+                    const SizedBox(height: 10),
+                    _StepTile(
+                      number: '3',
+                      icon: Icons.send_rounded,
+                      title: 'Send karo',
+                      subtitle:
+                          'Green send button dabao — sab parents ko ek saath message jayega',
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: TextButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                      color:
+                                          theme.colorScheme.outlineVariant)),
+                            ),
+                            child: Text('Cancel',
+                                style: TextStyle(
+                                    color:
+                                        theme.colorScheme.onSurfaceVariant)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: FilledButton.icon(
+                            onPressed: () async {
+                              Navigator.pop(ctx);
+                              final uri = Uri.parse(groupLink);
+                              await launchUrl(uri,
+                                  mode: LaunchMode.externalApplication);
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppTheme.whatsappColor,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: const Icon(Icons.open_in_new_rounded,
+                                size: 18),
+                            label: const Text(
+                              'Open Group',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -760,6 +1142,66 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
         classId: widget.classId,
         date: selectedDate,
       ),
+    );
+  }
+}
+
+// ── Step tile helper (used in group-send dialog) ──────────────────────────────
+
+class _StepTile extends StatelessWidget {
+  const _StepTile({
+    required this.number,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+  final String number, title, subtitle;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Numbered circle
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: AppTheme.whatsappColor.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(number,
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.whatsappColor,
+                  fontSize: 14)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, size: 16, color: AppTheme.whatsappColor),
+                  const SizedBox(width: 6),
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 14)),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(subtitle,
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -846,63 +1288,312 @@ class _CombinedBulkDialogState extends ConsumerState<_CombinedBulkDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(
-        children: [
-          const Icon(Icons.message, color: AppTheme.whatsappColor),
-          const SizedBox(width: 8),
-          Text('${currentIndex + 1} / ${widget.students.length}'),
-        ],
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      content: Column(
+    final theme = Theme.of(context);
+    final hasNumber = current.whatsapp.isNotEmpty;
+    final progress = (currentIndex + 1) / widget.students.length;
+    final initials = current.fullName.trim().isNotEmpty
+        ? current.fullName.trim().split(' ').take(2).map((w) => w[0]).join()
+        : '?';
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      insetPadding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(current.fullName,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 4),
-          Text('Parent: ${current.parentName.isNotEmpty ? current.parentName : "—"}'),
-          Text('WhatsApp: ${current.whatsapp.isNotEmpty ? current.whatsapp : "—Not set—"}'),
-          const SizedBox(height: 10),
+          // ── Green header with progress ────────────────────────────
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(8),
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF075E54), Color(0xFF128C7E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
-            child: Text(_buildMessage(),
-                style: const TextStyle(fontSize: 12)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.whatsapp,
+                        color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    const Text('Individual Send',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${currentIndex + 1} of ${widget.students.length}',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: Colors.white.withOpacity(0.25),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
+                    minHeight: 6,
+                  ),
+                ),
+              ],
+            ),
           ),
-          if (current.whatsapp.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text('No WhatsApp — skip ho jayega',
-                  style: TextStyle(color: Colors.orange, fontSize: 12)),
+
+          // ── Student card + message preview ────────────────────────
+          Flexible(
+            child: SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Student info row
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: hasNumber
+                            ? AppTheme.whatsappColor.withOpacity(0.15)
+                            : Colors.grey.shade200,
+                        child: Text(
+                          initials,
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: hasNumber
+                                  ? AppTheme.whatsappColor
+                                  : Colors.grey),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(current.fullName,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 17)),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Icon(Icons.person_outline_rounded,
+                                    size: 13,
+                                    color:
+                                        theme.colorScheme.onSurfaceVariant),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    current.parentName.isNotEmpty
+                                        ? current.parentName
+                                        : '—',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: theme
+                                            .colorScheme.onSurfaceVariant),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Icon(
+                                  hasNumber
+                                      ? Icons.phone_rounded
+                                      : Icons.phone_disabled_rounded,
+                                  size: 13,
+                                  color: hasNumber
+                                      ? AppTheme.whatsappColor
+                                      : Colors.orange,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  hasNumber
+                                      ? current.whatsapp
+                                      : 'Number nahi hai — skip hoga',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: hasNumber
+                                          ? AppTheme.whatsappColor
+                                          : Colors.orange),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Subject chips being sent
+                  if (widget.selectedHomework.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: widget.selectedHomework.map((hw) {
+                        final c = _colorForSubject(hw.subject);
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: c.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: c.withOpacity(0.4), width: 1),
+                          ),
+                          child: Text(hw.subject,
+                              style: TextStyle(
+                                  color: c,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12)),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+
+                  const SizedBox(height: 14),
+
+                  // Message preview
+                  if (hasNumber)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECF5EC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppTheme.whatsappColor.withOpacity(0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.chat_bubble_outline_rounded,
+                                  size: 13, color: AppTheme.whatsappColor),
+                              const SizedBox(width: 5),
+                              Text('Message',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppTheme.whatsappColor
+                                          .withOpacity(0.8))),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(_buildMessage(),
+                              style: const TextStyle(
+                                  fontSize: 12, height: 1.55)),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded,
+                              color: Colors.orange, size: 18),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Is student ka WhatsApp number save nahi hai. Yeh automatically skip ho jayega.',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.orange),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ),
+          ),
+
+          // ── Action buttons ────────────────────────────────────────
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              border: Border(
+                  top: BorderSide(
+                      color: theme.colorScheme.outlineVariant,
+                      width: 1)),
+            ),
+            child: Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                      foregroundColor:
+                          theme.colorScheme.onSurfaceVariant),
+                  child: const Text('Cancel'),
+                ),
+                const Spacer(),
+                OutlinedButton(
+                  onPressed: _advance,
+                  style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                          color: theme.colorScheme.outlineVariant)),
+                  child: Text(isLast ? 'Done' : 'Skip'),
+                ),
+                const SizedBox(width: 10),
+                FilledButton.icon(
+                  onPressed: hasNumber ? _sendAndAdvance : _advance,
+                  style: FilledButton.styleFrom(
+                      backgroundColor: hasNumber
+                          ? AppTheme.whatsappColor
+                          : theme.colorScheme.primary),
+                  icon: Icon(
+                      hasNumber
+                          ? Icons.send_rounded
+                          : Icons.skip_next_rounded,
+                      size: 18),
+                  label: Text(
+                    hasNumber
+                        ? (isLast ? 'Send & Done' : 'Send & Next')
+                        : 'Skip',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel')),
-        TextButton(
-            onPressed: _advance,
-            child: Text(isLast ? 'Skip & Done' : 'Skip')),
-        FilledButton.icon(
-          onPressed:
-              current.whatsapp.isNotEmpty ? _sendAndAdvance : _advance,
-          style:
-              FilledButton.styleFrom(backgroundColor: AppTheme.whatsappColor),
-          icon: const Icon(Icons.message, size: 18),
-          label: Text(current.whatsapp.isEmpty
-              ? 'Skip'
-              : isLast
-                  ? 'Send & Done'
-                  : 'Send & Next'),
-        ),
-      ],
     );
   }
 }
@@ -970,43 +1661,234 @@ class _PendingWhatsAppDialogState
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Pending: ${currentIndex + 1} of ${widget.students.length}'),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      content: Column(
+    final theme = Theme.of(context);
+    final hasNumber = current.whatsapp.isNotEmpty;
+    final progress = (currentIndex + 1) / widget.students.length;
+    final initials = current.fullName.trim().isNotEmpty
+        ? current.fullName.trim().split(' ').take(2).map((w) => w[0]).join()
+        : '?';
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      insetPadding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(current.fullName,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 18)),
-          Text('Parent: ${current.parentName}'),
-          Text(
-              'WhatsApp: ${current.whatsapp.isNotEmpty ? current.whatsapp : "—Not set—"}'),
-          if (current.whatsapp.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text('No number — will skip',
-                  style: TextStyle(color: Colors.orange)),
+          // ── Header ─────────────────────────────────────────────────
+          Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF075E54), Color(0xFF128C7E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.pending_actions_rounded,
+                        color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Text('Pending: ${widget.subject}',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${currentIndex + 1} of ${widget.students.length}',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: Colors.white.withOpacity(0.25),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
+                    minHeight: 6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Student info ────────────────────────────────────────────
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: hasNumber
+                          ? AppTheme.whatsappColor.withOpacity(0.15)
+                          : Colors.grey.shade200,
+                      child: Text(initials,
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: hasNumber
+                                  ? AppTheme.whatsappColor
+                                  : Colors.grey)),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(current.fullName,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 17)),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Icon(Icons.person_outline_rounded,
+                                  size: 13,
+                                  color: theme.colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  current.parentName.isNotEmpty
+                                      ? current.parentName
+                                      : '—',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: theme
+                                          .colorScheme.onSurfaceVariant),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(
+                                hasNumber
+                                    ? Icons.phone_rounded
+                                    : Icons.phone_disabled_rounded,
+                                size: 13,
+                                color: hasNumber
+                                    ? AppTheme.whatsappColor
+                                    : Colors.orange,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                hasNumber
+                                    ? current.whatsapp
+                                    : 'Number nahi — skip hoga',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: hasNumber
+                                        ? AppTheme.whatsappColor
+                                        : Colors.orange),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (!hasNumber) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: Colors.orange, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'WhatsApp number nahi hai — yeh student automatically skip hoga.',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.orange),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // ── Action buttons ──────────────────────────────────────────
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              border: Border(
+                  top: BorderSide(
+                      color: theme.colorScheme.outlineVariant, width: 1)),
+            ),
+            child: Row(
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                      foregroundColor:
+                          theme.colorScheme.onSurfaceVariant),
+                  child: const Text('Cancel'),
+                ),
+                const Spacer(),
+                OutlinedButton(
+                  onPressed: _advance,
+                  style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                          color: theme.colorScheme.outlineVariant)),
+                  child: Text(isLast ? 'Done' : 'Skip'),
+                ),
+                const SizedBox(width: 10),
+                FilledButton.icon(
+                  onPressed: hasNumber ? _sendAndAdvance : null,
+                  style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.whatsappColor),
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: Text(
+                    isLast ? 'Send & Done' : 'Send & Next',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel')),
-        TextButton(
-            onPressed: _advance,
-            child: Text(isLast ? 'Skip & Done' : 'Skip')),
-        FilledButton.icon(
-          onPressed:
-              current.whatsapp.isNotEmpty ? _sendAndAdvance : null,
-          style:
-              FilledButton.styleFrom(backgroundColor: AppTheme.whatsappColor),
-          icon: const Icon(Icons.message, size: 18),
-          label: Text(isLast ? 'Send & Done' : 'Send & Next'),
-        ),
-      ],
     );
   }
 }
