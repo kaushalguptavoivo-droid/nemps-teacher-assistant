@@ -27,13 +27,14 @@ final studentsProvider =
     StreamProvider.family<List<Student>, String>((ref, classId) {
   final client = Supabase.instance.client;
 
+  // Fix: .eq() on non-primary-key columns is not supported by Supabase Realtime
+  // without REPLICA IDENTITY FULL on the table — filter client-side instead.
   return client
       .from('students')
       .stream(primaryKey: ['id'])
-      .eq('class_id', classId)
       .order('roll_no')
       .map((rows) => rows
-          .where((r) => r['active'] == true)
+          .where((r) => r['active'] == true && r['class_id'] == classId)
           .map((r) => Student.fromMap(r))
           .toList());
 });
@@ -43,12 +44,16 @@ final homeworkProvider =
     StreamProvider.family<List<Homework>, String>((ref, classId) {
   final client = Supabase.instance.client;
 
+  // Fix: filter client-side to avoid Realtime channelError on non-PK column.
   return client
       .from('homework')
       .stream(primaryKey: ['id'])
-      .eq('class_id', classId)
       .order('assigned_date', ascending: false)
-      .map((rows) => rows.take(30).map((r) => Homework.fromMap(r)).toList());
+      .map((rows) => rows
+          .where((r) => r['class_id'] == classId)
+          .take(30)
+          .map((r) => Homework.fromMap(r))
+          .toList());
 });
 
 /// Notices for a class — updates when admin sends a new notice.
@@ -128,10 +133,11 @@ final currentUserRoleProvider = FutureProvider<UserRole>(
 /// Real-time stream of all attendance rows for [classId] (all dates).
 final _rawAttendanceStreamProvider =
     StreamProvider.family<List<Map<String, dynamic>>, String>((ref, classId) {
+  // Fix: filter client-side to avoid Realtime channelError on non-PK column.
   return Supabase.instance.client
       .from('attendance')
       .stream(primaryKey: ['id'])
-      .eq('class_id', classId);
+      .map((rows) => rows.where((r) => r['class_id'] == classId).toList());
 });
 
 /// Whether today's attendance has been started for [classId].
@@ -179,12 +185,12 @@ final presentStudentsProvider =
 
 final homeworkStatusStreamProvider =
     StreamProvider.family<Map<String, String>, String>((ref, homeworkId) {
+  // Fix: filter client-side to avoid Realtime channelError on non-PK column.
   return Supabase.instance.client
       .from('homework_status')
       .stream(primaryKey: ['id'])
-      .eq('homework_id', homeworkId)
       .map((rows) => {
-            for (final r in rows)
+            for (final r in rows.where((r) => r['homework_id'] == homeworkId))
               r['student_id'] as String: r['status'] as String,
           });
 });
