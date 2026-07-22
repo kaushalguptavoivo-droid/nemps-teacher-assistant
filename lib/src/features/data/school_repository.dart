@@ -691,7 +691,6 @@ class SchoolRepository {
       return {};
     }
   }
-}
 
   // ── Attendance Register helpers (Feature 1) ───────────────────────────────
 
@@ -772,3 +771,4 @@ class SchoolRepository {
       return [];
     }
   }
+}
