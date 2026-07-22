@@ -104,7 +104,7 @@ class SchoolRepository {
       'date': date.toIso8601String().substring(0, 10),
       'status': status.name,
       'marked_by': _uid,
-      'marked_at': DateTime.now().toIso8601String(),
+      'marked_at': DateTime.now().toUtc().toIso8601String(),
     };
     try {
       await _client.from('attendance').upsert(row, onConflict: 'id');
@@ -264,7 +264,7 @@ class SchoolRepository {
       'student_id': studentId,
       'status': status,
       'marked_by': _uid,
-      'marked_at': DateTime.now().toIso8601String(),
+      'marked_at': DateTime.now().toUtc().toIso8601String(),
     };
     try {
       await _client.from('homework_status').upsert(
@@ -322,7 +322,7 @@ class SchoolRepository {
         'notification_date': date.toIso8601String().substring(0, 10),
         'notification_type': type,
         'subject': subject,
-        'notified_at': DateTime.now().toIso8601String(),
+        'notified_at': DateTime.now().toUtc().toIso8601String(),
         'notified_by': _uid,
       }, onConflict: 'student_id,notification_date,notification_type,subject');
       await _logActivity('whatsapp_sent', classId, {'type': type});
@@ -374,7 +374,7 @@ class SchoolRepository {
         'class_id': classId,
         'group_link': groupLink.trim(),
         'updated_by': _uid,
-        'updated_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
       }, onConflict: 'class_id');
     } catch (e) {
       rethrow;
@@ -395,7 +395,7 @@ class SchoolRepository {
       'audience_class_id': audienceClassId,
       'audience_student_id': audienceStudentId,
       'created_by': _uid,
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
     };
     try {
       await _client.from('notices').insert(row);

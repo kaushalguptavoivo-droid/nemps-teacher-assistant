@@ -380,11 +380,12 @@ class _NoticeCard extends StatelessWidget {
   }
 
   String _formatTime(DateTime dt) {
+    final local = dt.toLocal();
     final now = DateTime.now();
-    final diff = now.difference(dt);
+    final diff = now.difference(local);
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return DateFormat('dd MMM').format(dt);
+    return DateFormat('dd MMM').format(local);
   }
 }
 

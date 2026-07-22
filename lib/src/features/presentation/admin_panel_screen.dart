@@ -92,7 +92,9 @@ class _NoticeTabState extends ConsumerState<_NoticeTab> {
     if (confirmed != true || !mounted) return;
     try {
       await ref.read(repoProvider).deleteNotice(notice.id);
+      // Refresh both admin list and teacher dashboard notices banner
       ref.invalidate(adminNoticesProvider);
+      ref.invalidate(allNoticesProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Notice delete ho gaya ✓')),

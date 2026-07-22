@@ -264,7 +264,7 @@ class ExamRepository {
       'is_absent': isAbsent,
       if (remarks != null) 'remarks': remarks,
       'entered_by': _uid,
-      'entered_at': DateTime.now().toIso8601String(),
+      'entered_at': DateTime.now().toUtc().toIso8601String(),
     };
 
     final data = await _client
