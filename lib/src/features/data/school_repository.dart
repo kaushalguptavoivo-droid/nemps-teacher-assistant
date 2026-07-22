@@ -692,3 +692,83 @@ class SchoolRepository {
     }
   }
 }
+
+  // ── Attendance Register helpers (Feature 1) ───────────────────────────────
+
+  /// Returns {studentId → {dayOfMonth → 'P'/'A'/'H'}} for the given month.
+  Future<Map<String, Map<int, String>>> getAttendanceForMonth(
+      String classId, int year, int month) async {
+    try {
+      final start = '$year-${month.toString().padLeft(2, '0')}-01';
+      final lastDay =
+          DateTime(year, month + 1, 0).day; // last day of month
+      final end =
+          '$year-${month.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')}';
+      final data = await _client
+          .from('attendance')
+          .select('student_id, date, status')
+          .eq('class_id', classId)
+          .gte('date', start)
+          .lte('date', end);
+      final Map<String, Map<int, String>> result = {};
+      for (final row in data) {
+        final sid = row['student_id'] as String;
+        final dateStr = row['date'] as String;
+        final day = int.parse(dateStr.substring(8, 10));
+        final status = row['status'] as String;
+        result.putIfAbsent(sid, () => {});
+        result[sid]![day] = status == 'present'
+            ? 'P'
+            : status == 'absent'
+                ? 'A'
+                : 'H';
+      }
+      return result;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Returns {studentId → all-time present count} for a class.
+  Future<Map<String, int>> getAllTimePresentCounts(String classId) async {
+    try {
+      final data = await _client
+          .from('attendance')
+          .select('student_id, status')
+          .eq('class_id', classId)
+          .eq('status', 'present');
+      final Map<String, int> result = {};
+      for (final row in data) {
+        final sid = row['student_id'] as String;
+        result[sid] = (result[sid] ?? 0) + 1;
+      }
+      return result;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  // ── Search helpers (Feature 3) ────────────────────────────────────────────
+
+  /// Search students by name or roll-no within optional [classIds].
+  /// If [classIds] is null/empty and user is admin, searches all classes.
+  Future<List<Student>> searchStudents(
+      String query, {List<String>? classIds}) async {
+    try {
+      if (query.trim().isEmpty) return [];
+      var q = _client.from('students').select('*, classes(name, section)').eq('active', true);
+      if (classIds != null && classIds.isNotEmpty) {
+        q = q.inFilter('class_id', classIds);
+      }
+      final data = await q;
+      final lower = query.toLowerCase();
+      return data
+          .map<Student>((r) => Student.fromMap(r))
+          .where((s) =>
+              s.fullName.toLowerCase().contains(lower) ||
+              s.rollNo.toLowerCase().contains(lower))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }

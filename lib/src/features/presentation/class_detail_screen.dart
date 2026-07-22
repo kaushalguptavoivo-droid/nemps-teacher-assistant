@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
+// Feature 1 & 2: new independent modules — no existing code modified
+import 'student_details_modal.dart';
 
 enum _SortBy { rollNo, name }
 
@@ -143,6 +145,15 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     color: const Color(0xFF0D9488), // teal
                     onTap: () => context.go('/results/$classId'),
                   ),
+                  // ── Feature 1: Attendance Register (new standalone module) ─
+                  _ActionTile(
+                    icon: Icons.table_chart_rounded,
+                    label: 'Att. Register',
+                    subtitle: 'Monthly matrix view',
+                    color: const Color(0xFF6366F1), // indigo
+                    onTap: () =>
+                        context.go('/attendance-register/$classId'),
+                  ),
                 ],
               ),
 
@@ -268,8 +279,15 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 color: Theme.of(context).colorScheme.primary,
                                 fontWeight: FontWeight.bold)),
                       ),
-                      title: Text(student.fullName,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      // Feature 2: tap student name to open profile modal
+                      title: GestureDetector(
+                        onTap: () => showStudentDetailsModal(context, student),
+                        child: Text(student.fullName,
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.primary,
+                                decoration: TextDecoration.underline)),
+                      ),
                       subtitle: Text(
                           student.parentName.isNotEmpty
                               ? student.parentName

@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
+// Feature 2 & 3: student details modal + role-based search
+import 'student_details_modal.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -93,6 +95,10 @@ class DashboardScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // ── Feature 3: Role-Based Dashboard Search ─────────────────────────
+          _DashboardSearch(isAdmin: isAdmin),
           const SizedBox(height: 16),
 
           // ── Notices Section ─────────────────────────────────────────────────
@@ -524,6 +530,145 @@ class _QuickActionCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Feature 3: Role-Based Dashboard Search ────────────────────────────────────
+// New independent widget — zero modification to existing dashboard widgets.
+
+class _DashboardSearch extends ConsumerStatefulWidget {
+  const _DashboardSearch({required this.isAdmin});
+  final bool isAdmin;
+
+  @override
+  ConsumerState<_DashboardSearch> createState() => _DashboardSearchState();
+}
+
+class _DashboardSearchState extends ConsumerState<_DashboardSearch> {
+  final _ctrl = TextEditingController();
+  bool _expanded = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final query = ref.watch(dashboardSearchQueryProvider);
+    final resultsAsync = ref.watch(dashboardSearchResultsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Search field
+        TextField(
+          controller: _ctrl,
+          decoration: InputDecoration(
+            hintText: widget.isAdmin
+                ? 'Search all students (name or roll no)...'
+                : 'Search students in your class...',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: query.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear_rounded),
+                    onPressed: () {
+                      _ctrl.clear();
+                      ref
+                          .read(dashboardSearchQueryProvider.notifier)
+                          .state = '';
+                      setState(() => _expanded = false);
+                    },
+                  )
+                : null,
+            filled: true,
+            fillColor: cs.surfaceVariant.withOpacity(0.5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          onChanged: (v) {
+            ref.read(dashboardSearchQueryProvider.notifier).state =
+                v.trim();
+            setState(() => _expanded = v.trim().isNotEmpty);
+          },
+        ),
+
+        // Results dropdown
+        if (_expanded) ...[
+          const SizedBox(height: 4),
+          resultsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+            error: (_, __) => Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text('Search error',
+                  style: TextStyle(color: cs.error)),
+            ),
+            data: (students) {
+              if (students.isEmpty && query.isNotEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text('No students found for "$query"',
+                      style:
+                          TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
+                );
+              }
+              return Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  children: [
+                    ...students.take(8).map((s) => ListTile(
+                          dense: true,
+                          leading: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: cs.primaryContainer,
+                            child: Text(s.rollNo,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                          title: Text(s.fullName,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600)),
+                          subtitle: Text(
+                              '${s.classLabel} · ${s.parentName.isNotEmpty ? s.parentName : "—"}',
+                              style: const TextStyle(fontSize: 11)),
+                          trailing: const Icon(Icons.info_outline_rounded,
+                              size: 18),
+                          onTap: () {
+                            // Feature 2: open student details from search result
+                            showStudentDetailsModal(context, s);
+                          },
+                        )),
+                    if (students.length > 8)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          '+ ${students.length - 8} more results. Refine your search.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 12, color: cs.onSurfaceVariant),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ],
     );
   }
 }

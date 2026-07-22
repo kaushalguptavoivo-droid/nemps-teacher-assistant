@@ -12,6 +12,8 @@ import 'features/examination/presentation/report_card_screen.dart';
 import 'features/examination/presentation/bulk_print_screen.dart';
 import 'features/examination/presentation/promotion_screen.dart';
 import 'features/examination/presentation/analytics_screen.dart';
+// Feature 1: Attendance Register (new independent module)
+import 'features/presentation/attendance_register_screen.dart';
 
 /// Notifier that GoRouter listens to for auth state changes.
 /// This ensures the router re-evaluates redirects when Supabase restores
@@ -137,6 +139,13 @@ class NempsApp extends ConsumerWidget {
           path: '/analytics',
           builder: (_, __) =>
               const ShellScreen(child: AnalyticsScreen()),
+        ),
+        // ── Feature 1: Attendance Register ───────────────────────────────
+        GoRoute(
+          path: '/attendance-register/:id',
+          builder: (_, s) => ShellScreen(
+              child: AttendanceRegisterScreen(
+                  classId: s.pathParameters['id']!)),
         ),
       ],
     );

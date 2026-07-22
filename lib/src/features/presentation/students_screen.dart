@@ -7,6 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import '../../core/models/models.dart';
 import '../data/providers.dart';
 import '../../core/theme/app_theme.dart';
+// Feature 2: student details modal
+import 'student_details_modal.dart';
 
 class StudentsScreen extends ConsumerStatefulWidget {
   const StudentsScreen({super.key, required this.classId});
@@ -279,8 +281,16 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                                 color: Theme.of(context).colorScheme.primary,
                                 fontWeight: FontWeight.bold)),
                       ),
-                      title: Text(s.fullName,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
+                      // Feature 2: tapping name opens student details modal
+                      title: GestureDetector(
+                        onTap: () =>
+                            showStudentDetailsModal(context, s),
+                        child: Text(s.fullName,
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.primary,
+                                decoration: TextDecoration.underline)),
+                      ),
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

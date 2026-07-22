@@ -388,3 +388,30 @@ final allStudentsProvider = StreamProvider<List<Student>>((ref) {
             .toList()),
   );
 });
+
+// ── Feature 1: Attendance Register provider ───────────────────────────────────
+// Holds {studentId → {day → 'P'/'A'/'H'}} + all-time counts lazily.
+// Not a StreamProvider — register data is loaded on demand by the screen itself.
+
+// ── Feature 3: Role-based dashboard search ────────────────────────────────────
+
+/// Provider for a live search query string on the dashboard.
+final dashboardSearchQueryProvider = StateProvider<String>((_) => '');
+
+/// Filtered students based on the dashboard search query.
+/// Teachers see only their classes; admins see all students.
+final dashboardSearchResultsProvider =
+    FutureProvider.autoDispose<List<Student>>((ref) async {
+  final query = ref.watch(dashboardSearchQueryProvider);
+  if (query.trim().isEmpty) return [];
+  final repo = ref.read(repoProvider);
+  final role = await repo.getCurrentUserRole();
+  if (role == UserRole.admin) {
+    return repo.searchStudents(query);
+  } else {
+    // Teacher: get their class IDs first
+    final classes = await repo.myClasses();
+    final classIds = classes.map((c) => c.id).toList();
+    return repo.searchStudents(query, classIds: classIds);
+  }
+});

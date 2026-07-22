@@ -10,3 +10,6 @@ export 'absent_notify_screen.dart';
 export 'students_screen.dart';
 export 'admin_panel_screen.dart';
 export 'reports_screen.dart';
+// Feature 1 & 2 & 3 & 4: New independent modules
+export 'attendance_register_screen.dart';
+export 'student_details_modal.dart';
