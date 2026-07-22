@@ -2,6 +2,7 @@
 // Class-level result overview: ranked list, summary stats, pass/fail filter.
 // All totals/percentages/ranks computed dynamically by the Result Engine (Phase 2).
 // Tap any student → navigates to ReportCardScreen.
+// Phase 6 — Bulk Print button added to AppBar.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +11,7 @@ import '../data/exam_providers.dart';
 import '../models/exam_models.dart';
 import '../../data/providers.dart';
 
-// ── Public args object (passed via GoRouter extra) ────────────────────────────
+// ── Public args objects (passed via GoRouter extra) ───────────────────────────
 
 class ReportCardArgs {
   const ReportCardArgs({
@@ -27,6 +28,27 @@ class ReportCardArgs {
   final List<ClassSubject> subjects;
   final List<GradeConfig> gradeConfigs;
   final StudentResult studentResult;
+  final String academicYear;
+}
+
+/// Phase 6: Passed via GoRouter extra to BulkPrintScreen.
+/// Holds the precomputed full class result so BulkPrintScreen never
+/// re-fetches marks from Supabase.
+class BulkPrintArgs {
+  const BulkPrintArgs({
+    required this.config,
+    required this.terms,
+    required this.subjects,
+    required this.gradeConfigs,
+    required this.allResults,
+    required this.academicYear,
+  });
+
+  final ExamConfig config;
+  final List<ExamTerm> terms;
+  final List<ClassSubject> subjects;
+  final List<GradeConfig> gradeConfigs;
+  final List<StudentResult> allResults;
   final String academicYear;
 }
 
@@ -47,6 +69,13 @@ class ResultScreen extends ConsumerStatefulWidget {
 class _ResultScreenState extends ConsumerState<ResultScreen> {
   _Filter _filter = _Filter.all;
 
+  // Set by _ResultsView once results are loaded; enables the Bulk Print button.
+  BulkPrintArgs? _bulkArgs;
+
+  void _onBulkArgsReady(BulkPrintArgs args) {
+    if (mounted) setState(() => _bulkArgs = args);
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeSession = ref.watch(activeSessionProvider);
@@ -55,6 +84,16 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       appBar: AppBar(
         title: const Text('Class Results'),
         actions: [
+          // Phase 6: Bulk Print — only shown once results are loaded
+          if (_bulkArgs != null)
+            IconButton(
+              tooltip: 'Bulk Print (PDF)',
+              icon: const Icon(Icons.print_rounded),
+              onPressed: () => context.push(
+                '/bulk-print/${widget.classId}',
+                extra: _bulkArgs,
+              ),
+            ),
           PopupMenuButton<_Filter>(
             icon: const Icon(Icons.filter_list_rounded),
             tooltip: 'Filter',
@@ -81,6 +120,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
             classId: widget.classId,
             academicYear: session.label,
             filter: _filter,
+            onBulkArgsReady: _onBulkArgsReady,
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -97,11 +137,13 @@ class _ResultLoader extends ConsumerWidget {
     required this.classId,
     required this.academicYear,
     required this.filter,
+    required this.onBulkArgsReady,
   });
 
   final String classId;
   final String academicYear;
   final _Filter filter;
+  final void Function(BulkPrintArgs) onBulkArgsReady;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -123,6 +165,7 @@ class _ResultLoader extends ConsumerWidget {
           academicYear: academicYear,
           config: config,
           filter: filter,
+          onBulkArgsReady: onBulkArgsReady,
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -137,12 +180,14 @@ class _DependencyLoader extends ConsumerWidget {
     required this.academicYear,
     required this.config,
     required this.filter,
+    required this.onBulkArgsReady,
   });
 
   final String classId;
   final String academicYear;
   final ExamConfig config;
   final _Filter filter;
+  final void Function(BulkPrintArgs) onBulkArgsReady;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -181,6 +226,7 @@ class _DependencyLoader extends ConsumerWidget {
       gradeConfigs: gradeConfigs,
       students: students,
       filter: filter,
+      onBulkArgsReady: onBulkArgsReady,
     );
   }
 }
@@ -197,6 +243,7 @@ class _ResultsView extends ConsumerWidget {
     required this.gradeConfigs,
     required this.students,
     required this.filter,
+    required this.onBulkArgsReady,
   });
 
   final String classId;
@@ -207,6 +254,7 @@ class _ResultsView extends ConsumerWidget {
   final List<GradeConfig> gradeConfigs;
   final List<Map<String, dynamic>> students;
   final _Filter filter;
+  final void Function(BulkPrintArgs) onBulkArgsReady;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -222,6 +270,18 @@ class _ResultsView extends ConsumerWidget {
 
     return resultsAsync.when(
       data: (results) {
+        // Notify parent so the Bulk Print AppBar button becomes visible.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          onBulkArgsReady(BulkPrintArgs(
+            config: config,
+            terms: terms,
+            subjects: subjects,
+            gradeConfigs: gradeConfigs,
+            allResults: results,
+            academicYear: academicYear,
+          ));
+        });
+
         // Sort by rank; students with no marks (rank==0) go to bottom
         final sorted = [...results]..sort((a, b) {
             if (a.rank == 0 && b.rank == 0) return 0;

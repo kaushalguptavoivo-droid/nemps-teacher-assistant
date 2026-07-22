@@ -1927,7 +1927,23 @@ PDF Engine
 
 Status
 
-Pending
+COMPLETE — 22 July 2026
+
+Files Created
+
+lib/src/features/examination/presentation/bulk_print_screen.dart
+
+Files Modified
+
+lib/src/features/examination/presentation/result_screen.dart
+
+lib/src/app.dart
+
+Summary
+
+bulk_print_screen.dart: Three print modes — All Students (whole class), Selected Students (checkbox list with Select All / None), Roll Number Range (from/to fields). Paper size picker: A4, Legal, A5. Generates one PDF with one page per student using pdf.addPage() — guaranteed page break between students. Same layout as individual report card (Phase 5): school header, student info, subject table, grand total box, signatures. LinearProgressIndicator shows X/Y progress during generation. Share button appears after PDF is ready via share_plus.
+result_screen.dart: Added BulkPrintArgs class (holds precomputed allResults so BulkPrintScreen never re-fetches from Supabase). Added onBulkArgsReady callback chain through _ResultLoader → _DependencyLoader → _ResultsView. _ResultsView notifies parent via addPostFrameCallback once results load. Bulk Print AppBar icon (print_rounded) visible only after results are loaded.
+app.dart: Added /bulk-print/:classId route → BulkPrintScreen. Import added.
 
 Phase 7
 

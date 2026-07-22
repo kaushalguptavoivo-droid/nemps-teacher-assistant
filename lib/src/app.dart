@@ -9,6 +9,7 @@ import 'features/presentation/screens.dart';
 import 'features/examination/presentation/marks_entry_screen.dart';
 import 'features/examination/presentation/result_screen.dart';
 import 'features/examination/presentation/report_card_screen.dart';
+import 'features/examination/presentation/bulk_print_screen.dart';
 
 /// Notifier that GoRouter listens to for auth state changes.
 /// This ensures the router re-evaluates redirects when Supabase restores
@@ -105,6 +106,19 @@ class NempsApp extends ConsumerWidget {
               child: ReportCardScreen(
                 classId: s.pathParameters['classId']!,
                 studentId: s.pathParameters['studentId']!,
+                args: args,
+              ),
+            );
+          },
+        ),
+        // ── Phase 6: Bulk PDF Print ───────────────────────────────────────
+        GoRoute(
+          path: '/bulk-print/:classId',
+          builder: (_, s) {
+            final args = s.extra as BulkPrintArgs;
+            return ShellScreen(
+              child: BulkPrintScreen(
+                classId: s.pathParameters['classId']!,
                 args: args,
               ),
             );
