@@ -7,10 +7,9 @@
 // Uses the same per-student PDF layout as ReportCardScreen (Phase 5).
 // Never re-fetches marks from Supabase — reuses precomputed StudentResult list.
 
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -54,7 +53,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
   bool _generating = false;
   int _progress = 0;
   int _progressTotal = 0;
-  File? _generatedFile;
+  Uint8List? _generatedBytes;
 
   @override
   void initState() {
@@ -110,7 +109,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
       appBar: AppBar(
         title: const Text('Bulk Print'),
         actions: [
-          if (_generatedFile != null)
+          if (_generatedBytes != null)
             IconButton(
               tooltip: 'Share PDF',
               icon: const Icon(Icons.share_rounded),
@@ -137,7 +136,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
                     icon: Icons.groups_rounded,
                     onChanged: (v) => setState(() {
                       _mode = v!;
-                      _generatedFile = null;
+                      _generatedBytes = null;
                     }),
                   ),
                   _ModeTile(
@@ -148,7 +147,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
                     icon: Icons.checklist_rounded,
                     onChanged: (v) => setState(() {
                       _mode = v!;
-                      _generatedFile = null;
+                      _generatedBytes = null;
                     }),
                   ),
                   _ModeTile(
@@ -159,7 +158,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
                     icon: Icons.format_list_numbered_rounded,
                     onChanged: (v) => setState(() {
                       _mode = v!;
-                      _generatedFile = null;
+                      _generatedBytes = null;
                     }),
                   ),
                 ],
@@ -181,18 +180,18 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
                     } else {
                       _selectedIds.remove(id);
                     }
-                    _generatedFile = null;
+                    _generatedBytes = null;
                   });
                 },
                 onSelectAll: () => setState(() {
                   _selectedIds
                     ..clear()
                     ..addAll(widget.args.allResults.map((r) => r.studentId));
-                  _generatedFile = null;
+                  _generatedBytes = null;
                 }),
                 onClearAll: () => setState(() {
                   _selectedIds.clear();
-                  _generatedFile = null;
+                  _generatedBytes = null;
                 }),
               ),
               const SizedBox(height: 16),
@@ -213,7 +212,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
                             labelText: 'From (Roll No)',
                             prefixIcon: Icon(Icons.looks_one_rounded),
                           ),
-                          onChanged: (_) => setState(() => _generatedFile = null),
+                          onChanged: (_) => setState(() => _generatedBytes = null),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -225,7 +224,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
                             labelText: 'To (Roll No)',
                             prefixIcon: Icon(Icons.last_page_rounded),
                           ),
-                          onChanged: (_) => setState(() => _generatedFile = null),
+                          onChanged: (_) => setState(() => _generatedBytes = null),
                         ),
                       ),
                     ],
@@ -266,7 +265,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
                                   : v == 'Legal'
                                       ? PdfPageFormat.legal
                                       : PdfPageFormat.a5;
-                              _generatedFile = null;
+                              _generatedBytes = null;
                             });
                           },
                         ),
@@ -335,7 +334,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
                     (_generating || filtered.isEmpty) ? null : _generate,
               ),
             ),
-            if (_generatedFile != null) ...[
+            if (_generatedBytes != null) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -363,17 +362,17 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
       _generating = true;
       _progress = 0;
       _progressTotal = students.length;
-      _generatedFile = null;
+      _generatedBytes = null;
     });
 
     try {
       final templateAsync =
           await ref.read(defaultTemplateProvider(widget.args.academicYear).future);
-      final file = await _buildBulkPdf(students, templateAsync);
+      final bytes = await _buildBulkPdf(students, templateAsync);
       if (mounted) {
         setState(() {
           _generating = false;
-          _generatedFile = file;
+          _generatedBytes = bytes;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -399,7 +398,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
     }
   }
 
-  Future<File> _buildBulkPdf(
+  Future<Uint8List> _buildBulkPdf(
       List<StudentResult> students, ReportTemplate? template) async {
     final terms = _finalTerms;
     final schoolName = template?.schoolName ?? 'School';
@@ -431,12 +430,7 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
       if (mounted) setState(() => _progress = i + 1);
     }
 
-    final dir = await getTemporaryDirectory();
-    final safeYear = widget.args.academicYear.replaceAll('/', '-');
-    final file = File(
-        '${dir.path}/bulk_report_${widget.classId}_$safeYear.pdf');
-    await file.writeAsBytes(await pdf.save());
-    return file;
+    return await pdf.save();
   }
 
   pw.Widget _buildStudentPage({
@@ -645,10 +639,13 @@ class _BulkPrintScreenState extends ConsumerState<BulkPrintScreen> {
   // ── Share ────────────────────────────────────────────────────────────────────
 
   Future<void> _share() async {
-    final f = _generatedFile;
-    if (f == null) return;
+    final bytes = _generatedBytes;
+    if (bytes == null) return;
+    final safeYear = widget.args.academicYear.replaceAll('/', '-');
     await Share.shareXFiles(
-      [XFile(f.path, mimeType: 'application/pdf')],
+      [XFile.fromData(bytes,
+          mimeType: 'application/pdf',
+          name: 'bulk_report_${widget.classId}_$safeYear.pdf')],
       subject:
           'Report Cards — ${widget.args.academicYear} (${_filteredResults.length} students)',
     );

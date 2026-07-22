@@ -3,10 +3,9 @@
 // Uses pdf package (already in pubspec). Layout driven by ReportTemplate fields.
 // Never stores totals/percentage/rank — always computed by Result Engine (Phase 2).
 
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -107,9 +106,14 @@ class _ReportCardScreenState extends ConsumerState<ReportCardScreen> {
   Future<void> _generateAndShare(ReportTemplate? template) async {
     setState(() => _generating = true);
     try {
-      final pdfFile = await _buildPdf(template);
+      final pdfBytes = await _buildPdf(template);
+      final safeName = widget.args.studentResult.studentName
+          .replaceAll(RegExp(r'[^\w ]'), '_')
+          .replaceAll(' ', '_');
       await Share.shareXFiles(
-        [XFile(pdfFile.path, mimeType: 'application/pdf')],
+        [XFile.fromData(pdfBytes,
+            mimeType: 'application/pdf',
+            name: 'report_${safeName}_${widget.args.academicYear}.pdf')],
         subject:
             'Report Card — ${widget.args.studentResult.studentName} (${widget.args.academicYear})',
       );
@@ -124,7 +128,7 @@ class _ReportCardScreenState extends ConsumerState<ReportCardScreen> {
     }
   }
 
-  Future<File> _buildPdf(ReportTemplate? template) async {
+  Future<Uint8List> _buildPdf(ReportTemplate? template) async {
     final r = widget.args.studentResult;
     final terms = _sortedFinalTerms(widget.args.terms);
 
@@ -307,14 +311,7 @@ class _ReportCardScreenState extends ConsumerState<ReportCardScreen> {
       ),
     );
 
-    final dir = await getTemporaryDirectory();
-    final safeName = r.studentName
-        .replaceAll(RegExp(r'[^\w ]'), '_')
-        .replaceAll(' ', '_');
-    final file = File(
-        '${dir.path}/report_${safeName}_${widget.args.academicYear}.pdf');
-    await file.writeAsBytes(await pdf.save());
-    return file;
+    return await pdf.save();
   }
 
   Map<int, pw.TableColumnWidth> _pdfColumnWidths(int termCount) {

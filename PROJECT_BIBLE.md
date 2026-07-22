@@ -28,7 +28,7 @@ Version: 1.0
 
 Status: APPROVED
 
-Last Updated: 22 July 2026 — Vercel build fix applied
+Last Updated: 22 July 2026 — Vercel build fix + web PDF compatibility
 
 ---
 
@@ -2034,6 +2034,31 @@ Summary
 
 result_engine_test.dart: 20 unit tests — covers GradeConfig.resolveGrade (boundary values, empty config), ClassAnalyticsSummary.fromResults (pass count, fail count, topper, highest/lowest%, average%, subject stats sorting, grade subjects excluded), PromotionRecord fromMap/toUpsertMap round-trip (null optional fields omitted), ExamTerm.toInsertMap, SubjectAnalyticsStat.passPercent (0/50/100%).
 promotion_screen.dart bug fix: changed classesProvider (teacher-assigned only) to allClassesProvider (all classes — admin needs full list); AsyncValue type corrected from List<dynamic> to List<ClassRoom>; class name now uses ClassRoom.label ('name-section') instead of nonexistent .className field.
+
+Phase 10
+
+Web Build Compatibility
+
+Status
+
+COMPLETE — 22 July 2026
+
+Files Modified
+
+lib/src/features/examination/presentation/report_card_screen.dart
+
+lib/src/features/examination/presentation/bulk_print_screen.dart
+
+Summary
+
+Removed dart:io and path_provider imports from report_card_screen and bulk_print_screen.
+Added dart:typed_data import. Changed _buildPdf and _buildBulkPdf return types from File
+to Uint8List. PDF bytes returned directly from pdf.save(). XFile.fromData(bytes) used
+instead of file-path-based XFile. This makes PDF generation and sharing work on all
+platforms including Flutter Web (dart2js). No functional change on mobile/desktop.
+Fixed wrong import paths in marks_entry_screen, promotion_screen, exam_config_screen:
+changed '../../core/' to '../../../core/' (3 levels up to lib/src/core/).
+All 10 phases now complete. Vercel build should pass.
 
 Whenever a phase completes
 
