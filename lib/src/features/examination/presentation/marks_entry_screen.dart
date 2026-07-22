@@ -33,9 +33,18 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen>
   }
 
   void _initTabs(List<ExamTerm> terms) {
-    if (terms.length == _terms.length) return;
+    // Compare by term IDs, not just length — so tabs update correctly
+    // if admin renames or replaces terms while this screen is open.
+    final newKey = terms.map((t) => t.id).join(',');
+    final oldKey = _terms.map((t) => t.id).join(',');
+    if (newKey == oldKey) return;
     _tabCtrl?.dispose();
     _terms = terms;
+    if (terms.isEmpty) {
+      _tabCtrl = null;
+      setState(() => _ready = false);
+      return;
+    }
     _tabCtrl = TabController(length: terms.length, vsync: this);
     setState(() => _ready = true);
   }

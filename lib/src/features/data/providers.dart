@@ -181,6 +181,15 @@ final allNoticesProvider = StreamProvider<List<Notice>>((ref) {
   );
 });
 
+// ── Admin: all notices (future, invalidated after send/delete) ───────────────
+
+/// Fetches all notices for the admin notice tab — invalidated manually
+/// after a notice is sent or deleted so the list refreshes.
+final adminNoticesProvider = FutureProvider<List<Notice>>((ref) {
+  return ref.read(repoProvider).getAllNotices();
+});
+
+
 // ── Theme ─────────────────────────────────────────────────────────────────────
 
 final themeProvider = StateProvider<ThemeMode>((_) => ThemeMode.system);

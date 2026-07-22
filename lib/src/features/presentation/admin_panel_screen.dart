@@ -70,13 +70,55 @@ class _NoticeTabState extends ConsumerState<_NoticeTab> {
     super.dispose();
   }
 
+  Future<void> _deleteNotice(BuildContext context, Notice notice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Notice Delete Karein?'),
+        content: Text('"${notice.title}" ko permanently delete kar dein?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref.read(repoProvider).deleteNotice(notice.id);
+      ref.invalidate(adminNoticesProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Notice delete ho gaya ✓')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final noticesAsync = ref.watch(adminNoticesProvider);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Send new notice ──────────────────────────────────────────────
           Text('Notice Bhejein',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
@@ -134,6 +176,8 @@ class _NoticeTabState extends ConsumerState<_NoticeTab> {
                             selectedClassId = null;
                             sending = false;
                           });
+                          // Refresh the past-notices list
+                          ref.invalidate(adminNoticesProvider);
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                                 content: Text('Notice bhej diya! ✓'),
@@ -147,6 +191,90 @@ class _NoticeTabState extends ConsumerState<_NoticeTab> {
               icon: const Icon(Icons.send_rounded),
               label: Text(sending ? 'Sending...' : 'Send Notice'),
             ),
+          ),
+
+          // ── Past notices list ────────────────────────────────────────────
+          const SizedBox(height: 28),
+          const Divider(),
+          const SizedBox(height: 8),
+          Text('Bheje Gaye Notices',
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          noticesAsync.when(
+            loading: () => const Center(
+                child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(),
+            )),
+            error: (e, _) => Text('Error: $e',
+                style: const TextStyle(color: Colors.red)),
+            data: (notices) {
+              if (notices.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                      child: Text('Koi notice nahi bheja abhi tak')),
+                );
+              }
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: notices.length,
+                itemBuilder: (context, index) {
+                  final n = notices[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.infoColor.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                            Icons.notifications_rounded,
+                            color: AppTheme.infoColor,
+                            size: 20),
+                      ),
+                      title: Text(n.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (n.body.isNotEmpty)
+                            Text(n.body,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall),
+                          const SizedBox(height: 2),
+                          Text(
+                            DateFormat('dd MMM yyyy, h:mm a')
+                                .format(n.createdAt.toLocal()),
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      isThreeLine: true,
+                      trailing: IconButton(
+                        tooltip: 'Delete notice',
+                        icon: const Icon(Icons.delete_outline_rounded,
+                            color: Colors.red),
+                        onPressed: () => _deleteNotice(context, n),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
           ),
         ],
       ),

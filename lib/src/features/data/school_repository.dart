@@ -419,6 +419,25 @@ class SchoolRepository {
     }
   }
 
+  /// Fetch all notices (admin view — no class filter, newest first).
+  Future<List<Notice>> getAllNotices({int limit = 50}) async {
+    try {
+      final data = await _client
+          .from('notices')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(limit);
+      return data.map<Notice>((e) => Notice.fromMap(e)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Permanently delete a notice by its ID.
+  Future<void> deleteNotice(String noticeId) async {
+    await _client.from('notices').delete().eq('id', noticeId);
+  }
+
   // ── Activity ──────────────────────────────────────────────────────────────
 
   Future<void> _logActivity(

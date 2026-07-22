@@ -445,10 +445,6 @@ class ExamRepository {
 
     final finalTerms =
         terms.where((t) => t.includeInFinalResult).toList();
-    final double configMaxTotal = finalTerms.fold(
-      0.0,
-      (sum, t) => sum + t.maximumMarks * subjects.length,
-    );
 
     final List<StudentResult> results = [];
 
@@ -496,8 +492,12 @@ class ExamRepository {
           isPassed: subjectPassed,
         ));
 
-        studentTotal += subjectTotal;
-        studentMaxTotal += subjectMax;
+        // Grade subjects have no numeric marks — exclude from denominator
+        // so overall percentage is not artificially deflated.
+        if (!subject.isGradeSubject) {
+          studentTotal += subjectTotal;
+          studentMaxTotal += subjectMax;
+        }
       }
 
       final overallPct =
@@ -521,9 +521,10 @@ class ExamRepository {
       ));
     }
 
-    // Assign ranks dynamically (highest total → rank 1)
+    // Assign ranks dynamically (highest percentage → rank 1)
+    // Percentage ensures fair comparison across classes with different subject counts.
     final sorted = List<StudentResult>.from(results)
-      ..sort((a, b) => b.totalObtained.compareTo(a.totalObtained));
+      ..sort((a, b) => b.percentage.compareTo(a.percentage));
     final Map<String, int> rankMap = {};
     for (int i = 0; i < sorted.length; i++) {
       rankMap[sorted[i].studentId] = i + 1;

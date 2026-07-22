@@ -34,12 +34,20 @@ class _AuthNotifier extends ValueNotifier<User?> {
 
 final _authNotifier = _AuthNotifier();
 
-class NempsApp extends ConsumerWidget {
+class NempsApp extends ConsumerStatefulWidget {
   const NempsApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = GoRouter(
+  ConsumerState<NempsApp> createState() => _NempsAppState();
+}
+
+class _NempsAppState extends ConsumerState<NempsApp> {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _router = GoRouter(
       initialLocation: '/dashboard',
       refreshListenable: _authNotifier,
       redirect: (context, state) {
@@ -149,14 +157,17 @@ class NempsApp extends ConsumerWidget {
         ),
       ],
     );
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'NEMPS Teacher Assistant',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: ref.watch(themeProvider),
-      routerConfig: router,
+      routerConfig: _router,
     );
   }
 }
