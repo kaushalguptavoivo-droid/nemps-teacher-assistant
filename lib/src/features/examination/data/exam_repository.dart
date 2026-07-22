@@ -545,6 +545,29 @@ class ExamRepository {
         .toList();
   }
 
+  // ── Analytics ─────────────────────────────────────────────────────────────
+
+  /// Fetches all exam configs for a year joined with their class name.
+  /// Uses Supabase nested select: classes(name).
+  Future<List<ExamConfigWithClass>> getExamConfigsWithClassNames(
+      String academicYear) async {
+    final data = await _client
+        .from('exam_configs')
+        .select('*, classes(name)')
+        .eq('academic_year', academicYear)
+        .order('created_at');
+
+    return (data as List).map((row) {
+      final classRow = row['classes'] as Map<String, dynamic>?;
+      final className = classRow?['name'] as String? ?? row['class_id'] as String;
+      return ExamConfigWithClass(
+        config: ExamConfig.fromMap(Map<String, dynamic>.from(row)
+          ..remove('classes')),
+        className: className,
+      );
+    }).toList();
+  }
+
   // ── Promotion Records ─────────────────────────────────────────────────────
 
   Future<List<PromotionRecord>> getPromotionRecords(

@@ -140,6 +140,14 @@ final classResultsProvider = FutureProvider.family<
       );
 });
 
+// ── Analytics ─────────────────────────────────────────────────────────────────
+
+/// All exam configs for a year, joined with their class name.
+final examConfigsWithClassProvider = FutureProvider.family<
+    List<ExamConfigWithClass>, String>((ref, academicYear) async {
+  return ref.read(examRepoProvider).getExamConfigsWithClassNames(academicYear);
+});
+
 // ── Promotion Records ─────────────────────────────────────────────────────────
 
 /// Promotion records for a class in a given academic year.

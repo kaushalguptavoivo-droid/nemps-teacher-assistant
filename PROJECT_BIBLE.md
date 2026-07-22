@@ -1987,7 +1987,32 @@ Analytics
 
 Status
 
-Pending
+COMPLETE — 22 July 2026
+
+Files Created
+
+lib/src/features/examination/presentation/analytics_screen.dart
+
+Files Modified
+
+lib/src/features/examination/models/exam_models.dart
+
+lib/src/features/examination/data/exam_repository.dart
+
+lib/src/features/examination/data/exam_providers.dart
+
+lib/src/features/examination/presentation/admin_exam_tab.dart
+
+lib/src/app.dart
+
+Summary
+
+analytics_screen.dart: Four sections — (1) Overall stats grid cards (Total Classes, Students, Overall Pass%, Average%); (2) Class-wise performance with color-coded LinearProgressIndicator bars (green ≥75%, amber ≥50%, red <50%), pass count/total, avg/highest/lowest%; (3) Subject weakness table sorted by lowest average% across all classes — warning icon for <50% subjects; (4) Class Toppers list with gold trophy icon. No new packages; uses only Material widgets. Loads all class results in parallel via Riverpod family providers.
+exam_models.dart: ClassAnalyticsSummary (with static fromResults factory), SubjectAnalyticsStat, ExamConfigWithClass models added.
+exam_repository.dart: getExamConfigsWithClassNames uses Supabase nested select (classes(name)) to fetch configs joined with class names in a single query.
+exam_providers.dart: examConfigsWithClassProvider (FutureProvider.family by year).
+admin_exam_tab.dart: "Result Analytics" tile (purple, analytics icon) → /analytics.
+app.dart: /analytics route added.
 
 Phase 9
 

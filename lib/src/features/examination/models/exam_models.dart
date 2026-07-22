@@ -472,6 +472,140 @@ class StudentResult {
   final int rank;           // 0 = not yet ranked
 }
 
+// ─── Analytics Models ─────────────────────────────────────────────────────────
+
+/// Aggregate stats for one class — computed from StudentResult list.
+/// Never stored in DB; always calculated dynamically.
+class ClassAnalyticsSummary {
+  const ClassAnalyticsSummary({
+    required this.classId,
+    required this.className,
+    required this.totalStudents,
+    required this.passCount,
+    required this.passPercent,
+    required this.averagePercent,
+    required this.highestPercent,
+    required this.lowestPercent,
+    required this.topperName,
+    required this.topperRollNo,
+    required this.subjectStats,
+  });
+
+  final String classId;
+  final String className;
+  final int totalStudents;
+  final int passCount;
+  final double passPercent;
+  final double averagePercent;
+  final double highestPercent;
+  final double lowestPercent;
+  final String topperName;
+  final String topperRollNo;
+  final List<SubjectAnalyticsStat> subjectStats;
+
+  int get failCount => totalStudents - passCount;
+
+  /// Compute summary from a pre-calculated results list.
+  static ClassAnalyticsSummary fromResults({
+    required String classId,
+    required String className,
+    required List<StudentResult> results,
+  }) {
+    if (results.isEmpty) {
+      return ClassAnalyticsSummary(
+        classId: classId,
+        className: className,
+        totalStudents: 0,
+        passCount: 0,
+        passPercent: 0,
+        averagePercent: 0,
+        highestPercent: 0,
+        lowestPercent: 0,
+        topperName: '-',
+        topperRollNo: '-',
+        subjectStats: [],
+      );
+    }
+
+    final ranked = [...results]
+      ..sort((a, b) => b.percentage.compareTo(a.percentage));
+
+    final passCount = results.where((r) => r.isPassed).length;
+    final avgPct = results.fold(0.0, (s, r) => s + r.percentage) / results.length;
+    final topper = ranked.first;
+
+    // Per-subject stats
+    final subjectMap = <String, _SubjectAccum>{};
+    for (final r in results) {
+      for (final sub in r.subjectResults) {
+        if (sub.isGradeSubject) continue;
+        subjectMap.putIfAbsent(sub.subjectName, () => _SubjectAccum());
+        final acc = subjectMap[sub.subjectName]!;
+        acc.totalCount++;
+        acc.totalPercent += sub.percentage;
+        if (sub.isPassed) acc.passCount++;
+      }
+    }
+    final subjectStats = subjectMap.entries.map((e) {
+      final acc = e.value;
+      return SubjectAnalyticsStat(
+        subjectName: e.key,
+        averagePercent: acc.totalCount > 0 ? acc.totalPercent / acc.totalCount : 0,
+        passCount: acc.passCount,
+        totalCount: acc.totalCount,
+      );
+    }).toList()
+      ..sort((a, b) => a.averagePercent.compareTo(b.averagePercent));
+
+    return ClassAnalyticsSummary(
+      classId: classId,
+      className: className,
+      totalStudents: results.length,
+      passCount: passCount,
+      passPercent: passCount / results.length * 100,
+      averagePercent: avgPct,
+      highestPercent: ranked.first.percentage,
+      lowestPercent: ranked.last.percentage,
+      topperName: topper.studentName,
+      topperRollNo: topper.rollNo,
+      subjectStats: subjectStats,
+    );
+  }
+}
+
+class _SubjectAccum {
+  int totalCount = 0;
+  int passCount = 0;
+  double totalPercent = 0;
+}
+
+class SubjectAnalyticsStat {
+  const SubjectAnalyticsStat({
+    required this.subjectName,
+    required this.averagePercent,
+    required this.passCount,
+    required this.totalCount,
+  });
+
+  final String subjectName;
+  final double averagePercent;
+  final int passCount;
+  final int totalCount;
+
+  double get passPercent =>
+      totalCount > 0 ? passCount / totalCount * 100 : 0;
+}
+
+/// ExamConfig with its class name — loaded via Supabase join.
+class ExamConfigWithClass {
+  const ExamConfigWithClass({
+    required this.config,
+    required this.className,
+  });
+  final ExamConfig config;
+  final String className;
+}
+
 class SubjectResult {
   const SubjectResult({
     required this.subjectId,

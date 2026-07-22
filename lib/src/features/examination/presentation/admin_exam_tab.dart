@@ -50,6 +50,15 @@ class AdminExamTab extends StatelessWidget {
       useRouter: true,
       route: '/promotion',
     ),
+    // ── Phase 8: Analytics ───────────────────────────────────────────────────
+    _Section(
+      icon: Icons.analytics_rounded,
+      color: Color(0xFF7C3AED),
+      title: 'Result Analytics',
+      subtitle: 'Class-wise pass%, subject weakness, toppers — ek jagah',
+      useRouter: true,
+      route: '/analytics',
+    ),
   ];
 
   @override
