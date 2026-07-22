@@ -16,15 +16,36 @@ final examRepoProvider = Provider<ExamRepository>(
 
 // ── Academic Sessions ─────────────────────────────────────────────────────────
 
-/// All academic sessions — updated in real-time.
+// Resilience helper: immediate snapshot + real-time overlay.
+// If Supabase Realtime subscription fails, stream ends silently after snapshot.
+Stream<T> _resilient<T>(
+  Future<T> Function() fetch,
+  Stream<T> Function() rt,
+) async* {
+  try {
+    yield await fetch();
+  } catch (_) {}
+  try {
+    await for (final v in rt()) {
+      yield v;
+    }
+  } catch (_) {}
+}
+
+/// All academic sessions — updated in real-time with fallback initial fetch.
 final academicSessionsProvider = StreamProvider<List<AcademicSession>>((ref) {
   final client = Supabase.instance.client;
-  return client
-      .from('academic_sessions')
-      .stream(primaryKey: ['id'])
-      .order('label', ascending: false)
-      .map((rows) =>
-          rows.map<AcademicSession>((r) => AcademicSession.fromMap(r)).toList());
+  final repo = ref.read(examRepoProvider);
+  return _resilient(
+    () => repo.getSessions(),
+    () => client
+        .from('academic_sessions')
+        .stream(primaryKey: ['id'])
+        .order('label', ascending: false)
+        .map((rows) => rows
+            .map<AcademicSession>((r) => AcademicSession.fromMap(r))
+            .toList()),
+  );
 });
 
 /// The currently active session (null if none).

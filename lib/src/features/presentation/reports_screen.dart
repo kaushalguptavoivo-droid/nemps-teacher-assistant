@@ -62,6 +62,24 @@ class ReportsScreen extends ConsumerWidget {
             color: AppTheme.whatsappColor,
             onTap: () => _openSheet(context, const _WhatsAppReportSheet()),
           ),
+          const SizedBox(height: 8),
+          _ReportTile(
+            icon: Icons.date_range_rounded,
+            title: 'Attendance Range Report',
+            subtitle: 'Weekly, Monthly, Half-Yearly, Yearly attendance',
+            color: AppTheme.attendanceColor,
+            onTap: () =>
+                _openSheet(context, const _AttendanceRangeReportSheet()),
+          ),
+          const SizedBox(height: 8),
+          _ReportTile(
+            icon: Icons.timeline_rounded,
+            title: 'WhatsApp Range Report',
+            subtitle: 'Weekly, Monthly, Half-Yearly, Yearly WhatsApp stats',
+            color: AppTheme.whatsappColor,
+            onTap: () =>
+                _openSheet(context, const _WhatsAppRangeReportSheet()),
+          ),
         ],
       ),
     );
@@ -808,6 +826,614 @@ class _ReportTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Period enum (shared by range sheets) ─────────────────────────────────────
+
+enum _ReportPeriod { weekly, monthly, halfYearly, yearly, custom }
+
+// ── Attendance Range Report Sheet ─────────────────────────────────────────────
+
+class _AttendanceRangeReportSheet extends ConsumerStatefulWidget {
+  const _AttendanceRangeReportSheet();
+
+  @override
+  ConsumerState<_AttendanceRangeReportSheet> createState() =>
+      _AttendanceRangeReportSheetState();
+}
+
+class _AttendanceRangeReportSheetState
+    extends ConsumerState<_AttendanceRangeReportSheet> {
+  _ReportPeriod _period = _ReportPeriod.monthly;
+  DateTime? _customStart;
+  DateTime? _customEnd;
+  Map<ClassRoom, _AttendRangeData> _rangeData = {};
+  bool _loading = false;
+
+  (DateTime, DateTime) get _dateRange {
+    final now = DateTime.now();
+    switch (_period) {
+      case _ReportPeriod.weekly:
+        final s = now.subtract(Duration(days: now.weekday - 1));
+        return (DateTime(s.year, s.month, s.day), now);
+      case _ReportPeriod.monthly:
+        return (DateTime(now.year, now.month, 1), now);
+      case _ReportPeriod.halfYearly:
+        if (now.month >= 4 && now.month <= 9) {
+          return (DateTime(now.year, 4, 1), now);
+        } else if (now.month >= 10) {
+          return (DateTime(now.year, 10, 1), now);
+        } else {
+          return (DateTime(now.year - 1, 10, 1), now);
+        }
+      case _ReportPeriod.yearly:
+        if (now.month >= 4) {
+          return (DateTime(now.year, 4, 1), now);
+        } else {
+          return (DateTime(now.year - 1, 4, 1), now);
+        }
+      case _ReportPeriod.custom:
+        final n = DateTime.now();
+        return (
+          _customStart ?? DateTime(n.year, n.month, 1),
+          _customEnd ?? n,
+        );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final repo = ref.read(repoProvider);
+    final (start, end) = _dateRange;
+    final classes = await repo.myClasses();
+    final Map<ClassRoom, _AttendRangeData> result = {};
+    for (final cls in classes) {
+      final summary =
+          await repo.getAttendanceSummaryForRange(cls.id, start, end);
+      final students = await repo.students(cls.id);
+      int tp = 0, ta = 0, th = 0;
+      for (final m in summary.values) {
+        tp += m['present'] ?? 0;
+        ta += m['absent'] ?? 0;
+        th += m['holiday'] ?? 0;
+      }
+      result[cls] = _AttendRangeData(
+        students: students,
+        summary: summary,
+        totalPresent: tp,
+        totalAbsent: ta,
+        totalHoliday: th,
+      );
+    }
+    if (mounted) setState(() { _rangeData = result; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (start, end) = _dateRange;
+    final fmt = DateFormat('dd MMM');
+    final rangeLabel = '${fmt.format(start)} – ${fmt.format(end)}';
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.8,
+      maxChildSize: 0.95,
+      builder: (_, controller) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: AppTheme.attendanceColor.withOpacity(0.15),
+                      shape: BoxShape.circle),
+                  child: const Icon(Icons.date_range_rounded,
+                      color: AppTheme.attendanceColor),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Attendance Range Report',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold)),
+                      Text(rangeLabel,
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.outline)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: _load,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // Period chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final entry in [
+                    (_ReportPeriod.weekly, 'Weekly'),
+                    (_ReportPeriod.monthly, 'Monthly'),
+                    (_ReportPeriod.halfYearly, 'Half-Yearly'),
+                    (_ReportPeriod.yearly, 'Yearly'),
+                    (_ReportPeriod.custom, 'Custom Date'),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text(entry.$2,
+                            style: const TextStyle(fontSize: 12)),
+                        selected: _period == entry.$1,
+                        selectedColor:
+                            AppTheme.attendanceColor.withOpacity(0.2),
+                        onSelected: (_) async {
+                          if (entry.$1 == _ReportPeriod.custom) {
+                            await _pickCustomRange(context);
+                          } else {
+                            setState(() => _period = entry.$1);
+                            _load();
+                          }
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Divider(height: 8),
+            if (_loading)
+              const Expanded(
+                  child: Center(child: CircularProgressIndicator()))
+            else if (_rangeData.isEmpty)
+              const Expanded(
+                  child: Center(child: Text('Koi data nahi mila.')))
+            else
+              Expanded(
+                child: ListView(
+                  controller: controller,
+                  children: _rangeData.entries.map((e) {
+                    final cls = e.key;
+                    final d = e.value;
+                    final total = d.totalPresent + d.totalAbsent + d.totalHoliday;
+                    final pct =
+                        total > 0 ? (d.totalPresent / total * 100).round() : 0;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text('Class ${cls.label}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15)),
+                                const Spacer(),
+                                _RangePill(
+                                    '$pct% avg',
+                                    pct >= 75
+                                        ? AppTheme.attendanceColor
+                                        : pct >= 50
+                                            ? Colors.orange
+                                            : AppTheme.absentColor),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              children: [
+                                _RangePill('${d.totalPresent} P',
+                                    AppTheme.attendanceColor),
+                                _RangePill(
+                                    '${d.totalAbsent} A', AppTheme.absentColor),
+                                _RangePill('${d.totalHoliday} H', Colors.orange),
+                              ],
+                            ),
+                            if (d.students.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              const Divider(height: 4),
+                              const SizedBox(height: 6),
+                              Text(
+                                  'Student-wise (${d.students.length} students):',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline)),
+                              const SizedBox(height: 6),
+                              ...d.students.map((s) {
+                                final sm = d.summary[s.id] ?? {};
+                                final sp = sm['present'] ?? 0;
+                                final sa = sm['absent'] ?? 0;
+                                final sh = sm['holiday'] ?? 0;
+                                final st = sp + sa + sh;
+                                final spct =
+                                    st > 0 ? (sp / st * 100).round() : 0;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 3),
+                                  child: Row(
+                                    children: [
+                                      Text('${s.rollNo}.',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .outline)),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                          child: Text(s.fullName,
+                                              style:
+                                                  const TextStyle(fontSize: 12),
+                                              overflow:
+                                                  TextOverflow.ellipsis)),
+                                      Text('$sp P / $sa A',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .outline)),
+                                      const SizedBox(width: 8),
+                                      Text('$spct%',
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: spct >= 75
+                                                  ? AppTheme.attendanceColor
+                                                  : spct >= 50
+                                                      ? Colors.orange
+                                                      : AppTheme.absentColor)),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickCustomRange(BuildContext context) async {
+    final now = DateTime.now();
+    final start = await showDatePicker(
+      context: context,
+      helpText: 'Start Date chunein',
+      initialDate: _customStart ?? DateTime(now.year, now.month, 1),
+      firstDate: DateTime(2024),
+      lastDate: now,
+    );
+    if (start == null || !mounted) return;
+    final end = await showDatePicker(
+      context: context,
+      helpText: 'End Date chunein',
+      initialDate: _customEnd ?? now,
+      firstDate: start,
+      lastDate: now,
+    );
+    if (end == null || !mounted) return;
+    setState(() {
+      _customStart = start;
+      _customEnd = end;
+      _period = _ReportPeriod.custom;
+    });
+    _load();
+  }
+}
+
+class _AttendRangeData {
+  final List<Student> students;
+  final Map<String, Map<String, int>> summary;
+  final int totalPresent, totalAbsent, totalHoliday;
+  const _AttendRangeData({
+    required this.students,
+    required this.summary,
+    required this.totalPresent,
+    required this.totalAbsent,
+    required this.totalHoliday,
+  });
+}
+
+// ── WhatsApp Range Report Sheet ───────────────────────────────────────────────
+
+class _WhatsAppRangeReportSheet extends ConsumerStatefulWidget {
+  const _WhatsAppRangeReportSheet();
+
+  @override
+  ConsumerState<_WhatsAppRangeReportSheet> createState() =>
+      _WhatsAppRangeReportSheetState();
+}
+
+class _WhatsAppRangeReportSheetState
+    extends ConsumerState<_WhatsAppRangeReportSheet> {
+  _ReportPeriod _period = _ReportPeriod.monthly;
+  DateTime? _customStart;
+  DateTime? _customEnd;
+  Map<ClassRoom, Map<String, int>> _rangeData = {};
+  bool _loading = false;
+
+  (DateTime, DateTime) get _dateRange {
+    final now = DateTime.now();
+    switch (_period) {
+      case _ReportPeriod.weekly:
+        final s = now.subtract(Duration(days: now.weekday - 1));
+        return (DateTime(s.year, s.month, s.day), now);
+      case _ReportPeriod.monthly:
+        return (DateTime(now.year, now.month, 1), now);
+      case _ReportPeriod.halfYearly:
+        if (now.month >= 4 && now.month <= 9) {
+          return (DateTime(now.year, 4, 1), now);
+        } else if (now.month >= 10) {
+          return (DateTime(now.year, 10, 1), now);
+        } else {
+          return (DateTime(now.year - 1, 10, 1), now);
+        }
+      case _ReportPeriod.yearly:
+        if (now.month >= 4) {
+          return (DateTime(now.year, 4, 1), now);
+        } else {
+          return (DateTime(now.year - 1, 4, 1), now);
+        }
+      case _ReportPeriod.custom:
+        final n = DateTime.now();
+        return (
+          _customStart ?? DateTime(n.year, n.month, 1),
+          _customEnd ?? n,
+        );
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final repo = ref.read(repoProvider);
+    final (start, end) = _dateRange;
+    final classes = await repo.myClasses();
+    final Map<ClassRoom, Map<String, int>> result = {};
+    for (final cls in classes) {
+      result[cls] =
+          await repo.getWhatsAppCountForRange(cls.id, start, end);
+    }
+    if (mounted) setState(() { _rangeData = result; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (start, end) = _dateRange;
+    final fmt = DateFormat('dd MMM');
+    final rangeLabel = '${fmt.format(start)} – ${fmt.format(end)}';
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      maxChildSize: 0.9,
+      builder: (_, controller) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: AppTheme.whatsappColor.withOpacity(0.15),
+                      shape: BoxShape.circle),
+                  child: const Icon(Icons.timeline_rounded,
+                      color: AppTheme.whatsappColor),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('WhatsApp Range Report',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold)),
+                      Text(rangeLabel,
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.outline)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: _load,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // Period chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final entry in [
+                    (_ReportPeriod.weekly, 'Weekly'),
+                    (_ReportPeriod.monthly, 'Monthly'),
+                    (_ReportPeriod.halfYearly, 'Half-Yearly'),
+                    (_ReportPeriod.yearly, 'Yearly'),
+                    (_ReportPeriod.custom, 'Custom Date'),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text(entry.$2,
+                            style: const TextStyle(fontSize: 12)),
+                        selected: _period == entry.$1,
+                        selectedColor:
+                            AppTheme.whatsappColor.withOpacity(0.2),
+                        onSelected: (_) async {
+                          if (entry.$1 == _ReportPeriod.custom) {
+                            await _pickCustomRange(context);
+                          } else {
+                            setState(() => _period = entry.$1);
+                            _load();
+                          }
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Divider(height: 8),
+            if (_loading)
+              const Expanded(
+                  child: Center(child: CircularProgressIndicator()))
+            else if (_rangeData.isEmpty)
+              const Expanded(
+                  child: Center(child: Text('Koi data nahi mila.')))
+            else
+              Expanded(
+                child: ListView(
+                  controller: controller,
+                  children: _rangeData.entries.map((e) {
+                    final cls = e.key;
+                    final dateMap = e.value;
+                    final total =
+                        dateMap.values.fold(0, (s, v) => s + v);
+                    final sortedDates = dateMap.entries.toList()
+                      ..sort((a, b) => b.key.compareTo(a.key));
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text('Class ${cls.label}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15)),
+                                const Spacer(),
+                                _RangePill('$total Messages sent',
+                                    AppTheme.whatsappColor),
+                              ],
+                            ),
+                            if (sortedDates.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              const Divider(height: 4),
+                              const SizedBox(height: 6),
+                              Text('Date-wise breakdown:',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline)),
+                              const SizedBox(height: 6),
+                              ...sortedDates.map((de) => Padding(
+                                    padding:
+                                        const EdgeInsets.only(bottom: 3),
+                                    child: Row(
+                                      children: [
+                                        Text(de.key,
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface)),
+                                        const Spacer(),
+                                        _RangePill('${de.value} msgs',
+                                            AppTheme.whatsappColor),
+                                      ],
+                                    ),
+                                  )),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickCustomRange(BuildContext context) async {
+    final now = DateTime.now();
+    final start = await showDatePicker(
+      context: context,
+      helpText: 'Start Date chunein',
+      initialDate: _customStart ?? DateTime(now.year, now.month, 1),
+      firstDate: DateTime(2024),
+      lastDate: now,
+    );
+    if (start == null || !mounted) return;
+    final end = await showDatePicker(
+      context: context,
+      helpText: 'End Date chunein',
+      initialDate: _customEnd ?? now,
+      firstDate: start,
+      lastDate: now,
+    );
+    if (end == null || !mounted) return;
+    setState(() {
+      _customStart = start;
+      _customEnd = end;
+      _period = _ReportPeriod.custom;
+    });
+    _load();
+  }
+}
+
+// ── Shared pill widget for range reports ──────────────────────────────────────
+
+class _RangePill extends StatelessWidget {
+  const _RangePill(this.label, this.color);
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8)),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 11, color: color, fontWeight: FontWeight.w600)),
     );
   }
 }

@@ -21,8 +21,12 @@ class DashboardScreen extends ConsumerWidget {
         : hour < 17
             ? '☀️ Good Afternoon'
             : '🌙 Good Evening';
-    final userName =
-        Supabase.instance.client.auth.currentUser?.email?.split('@').first ??
+    // Show full name from profile; fall back to email prefix if not loaded yet.
+    final profileAsync = ref.watch(currentUserProfileProvider);
+    final profileName = profileAsync.valueOrNull?.fullName.trim() ?? '';
+    final userName = profileName.isNotEmpty
+        ? profileName
+        : Supabase.instance.client.auth.currentUser?.email?.split('@').first ??
             'Teacher';
 
     return RefreshIndicator(
@@ -264,7 +268,17 @@ class _NoticesBanner extends ConsumerWidget {
     final notices = ref.watch(allNoticesProvider);
 
     return notices.when(
-      data: (items) {
+      data: (allItems) {
+        // 12 PM filter: after noon, only show notices created today.
+        // Before noon, also show yesterday's notices so teachers don't miss them.
+        final now = DateTime.now();
+        final cutoff = now.hour >= 12
+            ? DateTime(now.year, now.month, now.day) // from midnight today
+            : DateTime(now.year, now.month, now.day)
+                .subtract(const Duration(days: 1)); // from midnight yesterday
+        final items =
+            allItems.where((n) => n.createdAt.isAfter(cutoff)).toList();
+
         if (items.isEmpty) return const SizedBox.shrink();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

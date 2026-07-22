@@ -642,4 +642,53 @@ class SchoolRepository {
   }
 
   Future<void> sync() => _outbox.flush();
+
+  // ── Range Reports ─────────────────────────────────────────────────────────
+
+  /// Returns per-student attendance summary for a date range.
+  /// {studentId → {'present': N, 'absent': N, 'holiday': N}}
+  Future<Map<String, Map<String, int>>> getAttendanceSummaryForRange(
+      String classId, DateTime startDate, DateTime endDate) async {
+    try {
+      final data = await _client
+          .from('attendance')
+          .select('student_id, status')
+          .eq('class_id', classId)
+          .gte('date', startDate.toIso8601String().substring(0, 10))
+          .lte('date', endDate.toIso8601String().substring(0, 10));
+      final Map<String, Map<String, int>> result = {};
+      for (final row in data) {
+        final sid = row['student_id'] as String;
+        final status = row['status'] as String;
+        result.putIfAbsent(
+            sid, () => {'present': 0, 'absent': 0, 'holiday': 0});
+        result[sid]![status] = (result[sid]![status] ?? 0) + 1;
+      }
+      return result;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Returns WhatsApp notification count per date for [classId] in the range.
+  /// {dateString → count} e.g. {'2026-07-22': 5}
+  Future<Map<String, int>> getWhatsAppCountForRange(
+      String classId, DateTime startDate, DateTime endDate) async {
+    try {
+      final data = await _client
+          .from('whatsapp_notifications')
+          .select('notification_date')
+          .eq('class_id', classId)
+          .gte('notification_date', startDate.toIso8601String().substring(0, 10))
+          .lte('notification_date', endDate.toIso8601String().substring(0, 10));
+      final Map<String, int> result = {};
+      for (final row in data) {
+        final date = row['notification_date'] as String;
+        result[date] = (result[date] ?? 0) + 1;
+      }
+      return result;
+    } catch (_) {
+      return {};
+    }
+  }
 }

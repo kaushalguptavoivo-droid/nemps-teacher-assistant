@@ -8,35 +8,61 @@ import 'school_repository.dart';
 final repoProvider =
     Provider((_) => SchoolRepository(Supabase.instance.client));
 
+// ── Resilience helper ─────────────────────────────────────────────────────────
+// Emits an immediate snapshot via a direct query, then overlays real-time
+// updates. If the Supabase Realtime subscription fails the stream silently
+// completes after the initial snapshot — no error is surfaced to the UI.
+// This fixes RealtimeSubscribeException (channelError) without losing data.
+Stream<T> _resilient<T>(
+  Future<T> Function() fetch,
+  Stream<T> Function() rt,
+) async* {
+  try {
+    yield await fetch();
+  } catch (_) {}
+  try {
+    await for (final v in rt()) {
+      yield v;
+    }
+  } catch (_) {}
+}
+
 // ── Real-time StreamProviders ─────────────────────────────────────────────────
 
 /// Teacher's assigned classes — updates instantly when admin adds/removes a class.
 final classesProvider = StreamProvider<List<ClassRoom>>((ref) {
   final client = Supabase.instance.client;
   final uid = client.auth.currentUser?.id ?? '';
+  final repo = ref.read(repoProvider);
 
-  return client
-      .from('teacher_classes')
-      .stream(primaryKey: ['teacher_id', 'class_id'])
-      .eq('teacher_id', uid)
-      .asyncMap((_) => ref.read(repoProvider).myClasses());
+  return _resilient(
+    () => repo.myClasses(),
+    () => client
+        .from('teacher_classes')
+        .stream(primaryKey: ['teacher_id', 'class_id'])
+        .eq('teacher_id', uid)
+        .asyncMap((_) => repo.myClasses()),
+  );
 });
 
 /// Students in a class — updates instantly when admin adds/moves/removes a student.
 final studentsProvider =
     StreamProvider.family<List<Student>, String>((ref, classId) {
   final client = Supabase.instance.client;
+  final repo = ref.read(repoProvider);
 
-  // Fix: .eq() on non-primary-key columns is not supported by Supabase Realtime
-  // without REPLICA IDENTITY FULL on the table — filter client-side instead.
-  return client
-      .from('students')
-      .stream(primaryKey: ['id'])
-      .order('roll_no')
-      .map((rows) => rows
-          .where((r) => r['active'] == true && r['class_id'] == classId)
-          .map((r) => Student.fromMap(r))
-          .toList());
+  return _resilient(
+    () => repo.students(classId),
+    // Fix: filter client-side to avoid Realtime channelError on non-PK column.
+    () => client
+        .from('students')
+        .stream(primaryKey: ['id'])
+        .order('roll_no')
+        .map((rows) => rows
+            .where((r) => r['active'] == true && r['class_id'] == classId)
+            .map((r) => Student.fromMap(r))
+            .toList()),
+  );
 });
 
 /// Homework for a class — updates when any teacher adds new homework.
@@ -44,16 +70,27 @@ final homeworkProvider =
     StreamProvider.family<List<Homework>, String>((ref, classId) {
   final client = Supabase.instance.client;
 
-  // Fix: filter client-side to avoid Realtime channelError on non-PK column.
-  return client
-      .from('homework')
-      .stream(primaryKey: ['id'])
-      .order('assigned_date', ascending: false)
-      .map((rows) => rows
-          .where((r) => r['class_id'] == classId)
-          .take(30)
-          .map((r) => Homework.fromMap(r))
-          .toList());
+  return _resilient(
+    () async {
+      final data = await client
+          .from('homework')
+          .select()
+          .eq('class_id', classId)
+          .order('assigned_date', ascending: false)
+          .limit(30);
+      return data.map((r) => Homework.fromMap(r)).toList();
+    },
+    // Fix: filter client-side to avoid Realtime channelError on non-PK column.
+    () => client
+        .from('homework')
+        .stream(primaryKey: ['id'])
+        .order('assigned_date', ascending: false)
+        .map((rows) => rows
+            .where((r) => r['class_id'] == classId)
+            .take(30)
+            .map((r) => Homework.fromMap(r))
+            .toList()),
+  );
 });
 
 /// Notices for a class — updates when admin sends a new notice.
@@ -61,36 +98,50 @@ final homeworkProvider =
 final noticesProvider =
     StreamProvider.family<List<Notice>, String>((ref, classId) {
   final client = Supabase.instance.client;
-
   String? lastNoticeId;
 
-  return client
-      .from('notices')
-      .stream(primaryKey: ['id'])
-      .order('created_at', ascending: false)
-      .map((rows) {
-        final filtered = rows
-            .where((r) =>
-                r['audience_class_id'] == classId ||
-                r['audience_class_id'] == null)
-            .take(20)
-            .map((r) => Notice.fromMap(r))
-            .toList();
+  return _resilient(
+    () async {
+      final data = await client
+          .from('notices')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(20);
+      return data
+          .where((r) =>
+              r['audience_class_id'] == classId ||
+              r['audience_class_id'] == null)
+          .map((r) => Notice.fromMap(r))
+          .toList();
+    },
+    () => client
+        .from('notices')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .map((rows) {
+          final filtered = rows
+              .where((r) =>
+                  r['audience_class_id'] == classId ||
+                  r['audience_class_id'] == null)
+              .take(20)
+              .map((r) => Notice.fromMap(r))
+              .toList();
 
-        // Show push notification for the newest notice if it's new
-        if (filtered.isNotEmpty) {
-          final newest = filtered.first;
-          if (lastNoticeId != null && lastNoticeId != newest.id) {
-            // A new notice arrived — push a notification
-            NotificationService.showNotice(newest.title, newest.body);
+          // Show push notification for the newest notice if it's new
+          if (filtered.isNotEmpty) {
+            final newest = filtered.first;
+            if (lastNoticeId != null && lastNoticeId != newest.id) {
+              // A new notice arrived — push a notification
+              NotificationService.showNotice(newest.title, newest.body);
+            }
+            lastNoticeId = newest.id;
+          } else {
+            lastNoticeId = null;
           }
-          lastNoticeId = newest.id;
-        } else {
-          lastNoticeId = null;
-        }
 
-        return filtered;
-      });
+          return filtered;
+        }),
+  );
 });
 
 /// Global notices stream (no class filter) — used on dashboard for teachers.
@@ -98,46 +149,85 @@ final allNoticesProvider = StreamProvider<List<Notice>>((ref) {
   final client = Supabase.instance.client;
   String? lastNoticeId;
 
-  return client
-      .from('notices')
-      .stream(primaryKey: ['id'])
-      .order('created_at', ascending: false)
-      .map((rows) {
-        final notices = rows.take(10).map((r) => Notice.fromMap(r)).toList();
+  return _resilient(
+    () async {
+      final data = await client
+          .from('notices')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(10);
+      return data.map((r) => Notice.fromMap(r)).toList();
+    },
+    () => client
+        .from('notices')
+        .stream(primaryKey: ['id'])
+        .order('created_at', ascending: false)
+        .map((rows) {
+          final notices =
+              rows.take(10).map((r) => Notice.fromMap(r)).toList();
 
-        // Show push notification for new notices
-        if (notices.isNotEmpty) {
-          final newest = notices.first;
-          if (lastNoticeId != null && lastNoticeId != newest.id) {
-            NotificationService.showNotice(newest.title, newest.body);
+          // Show push notification for new notices
+          if (notices.isNotEmpty) {
+            final newest = notices.first;
+            if (lastNoticeId != null && lastNoticeId != newest.id) {
+              NotificationService.showNotice(newest.title, newest.body);
+            }
+            lastNoticeId = newest.id;
+          } else {
+            lastNoticeId = null;
           }
-          lastNoticeId = newest.id;
-        } else {
-          lastNoticeId = null;
-        }
-        return notices;
-      });
+          return notices;
+        }),
+  );
 });
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 
 final themeProvider = StateProvider<ThemeMode>((_) => ThemeMode.system);
 
-// ── Role (one-time fetch, changes rarely) ────────────────────────────────────
+// ── Role (one-time fetch, changes rarely) ─────────────────────────────────────
 
 final currentUserRoleProvider = FutureProvider<UserRole>(
     (ref) => ref.watch(repoProvider).getCurrentUserRole());
+
+/// Full profile of the logged-in user — used for dashboard greeting card.
+final currentUserProfileProvider = FutureProvider<TeacherProfile?>((ref) async {
+  final client = Supabase.instance.client;
+  final uid = client.auth.currentUser?.id;
+  if (uid == null) return null;
+  try {
+    final data = await client
+        .from('profiles')
+        .select()
+        .eq('id', uid)
+        .maybeSingle();
+    return data != null ? TeacherProfile.fromMap(data) : null;
+  } catch (_) {
+    return null;
+  }
+});
 
 // ── Attendance — REAL-TIME StreamProviders ────────────────────────────────────
 
 /// Real-time stream of all attendance rows for [classId] (all dates).
 final _rawAttendanceStreamProvider =
     StreamProvider.family<List<Map<String, dynamic>>, String>((ref, classId) {
-  // Fix: filter client-side to avoid Realtime channelError on non-PK column.
-  return Supabase.instance.client
-      .from('attendance')
-      .stream(primaryKey: ['id'])
-      .map((rows) => rows.where((r) => r['class_id'] == classId).toList());
+  final client = Supabase.instance.client;
+
+  return _resilient(
+    () async {
+      final data = await client
+          .from('attendance')
+          .select()
+          .eq('class_id', classId);
+      return List<Map<String, dynamic>>.from(data);
+    },
+    // Fix: filter client-side to avoid Realtime channelError on non-PK column.
+    () => client
+        .from('attendance')
+        .stream(primaryKey: ['id'])
+        .map((rows) => rows.where((r) => r['class_id'] == classId).toList()),
+  );
 });
 
 /// Whether today's attendance has been started for [classId].
@@ -185,14 +275,28 @@ final presentStudentsProvider =
 
 final homeworkStatusStreamProvider =
     StreamProvider.family<Map<String, String>, String>((ref, homeworkId) {
-  // Fix: filter client-side to avoid Realtime channelError on non-PK column.
-  return Supabase.instance.client
-      .from('homework_status')
-      .stream(primaryKey: ['id'])
-      .map((rows) => {
-            for (final r in rows.where((r) => r['homework_id'] == homeworkId))
-              r['student_id'] as String: r['status'] as String,
-          });
+  final client = Supabase.instance.client;
+
+  return _resilient(
+    () async {
+      final data = await client
+          .from('homework_status')
+          .select()
+          .eq('homework_id', homeworkId);
+      return {
+        for (final r in data)
+          r['student_id'] as String: r['status'] as String,
+      };
+    },
+    // Fix: filter client-side to avoid Realtime channelError on non-PK column.
+    () => client
+        .from('homework_status')
+        .stream(primaryKey: ['id'])
+        .map((rows) => {
+              for (final r in rows.where((r) => r['homework_id'] == homeworkId))
+                r['student_id'] as String: r['status'] as String,
+            }),
+  );
 });
 
 final homeworkStatusProvider =
@@ -229,20 +333,33 @@ final whatsappSentStudentsProvider =
 
 final allClassesProvider = StreamProvider<List<ClassRoom>>((ref) {
   final client = Supabase.instance.client;
-  return client
-      .from('classes')
-      .stream(primaryKey: ['id'])
-      .order('name')
-      .map((rows) => rows.map((r) => ClassRoom.fromMap(r)).toList());
+  return _resilient(
+    () async {
+      final data = await client.from('classes').select().order('name');
+      return data.map((r) => ClassRoom.fromMap(r)).toList();
+    },
+    () => client
+        .from('classes')
+        .stream(primaryKey: ['id'])
+        .order('name')
+        .map((rows) => rows.map((r) => ClassRoom.fromMap(r)).toList()),
+  );
 });
 
 final allTeachersProvider = StreamProvider<List<TeacherProfile>>((ref) {
   final client = Supabase.instance.client;
-  return client
-      .from('profiles')
-      .stream(primaryKey: ['id'])
-      .order('full_name')
-      .map((rows) => rows.map((r) => TeacherProfile.fromMap(r)).toList());
+  return _resilient(
+    () async {
+      final data =
+          await client.from('profiles').select().order('full_name');
+      return data.map((r) => TeacherProfile.fromMap(r)).toList();
+    },
+    () => client
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .order('full_name')
+        .map((rows) => rows.map((r) => TeacherProfile.fromMap(r)).toList()),
+  );
 });
 
 final teacherAssignedClassesProvider =
@@ -252,12 +369,22 @@ final teacherAssignedClassesProvider =
 
 final allStudentsProvider = StreamProvider<List<Student>>((ref) {
   final client = Supabase.instance.client;
-  return client
-      .from('students')
-      .stream(primaryKey: ['id'])
-      .order('full_name')
-      .map((rows) => rows
-          .where((r) => r['active'] == true)
-          .map((r) => Student.fromMap(r))
-          .toList());
+  return _resilient(
+    () async {
+      final data = await client
+          .from('students')
+          .select('*, classes(name, section)')
+          .eq('active', true)
+          .order('full_name');
+      return data.map((r) => Student.fromMap(r)).toList();
+    },
+    () => client
+        .from('students')
+        .stream(primaryKey: ['id'])
+        .order('full_name')
+        .map((rows) => rows
+            .where((r) => r['active'] == true)
+            .map((r) => Student.fromMap(r))
+            .toList()),
+  );
 });
