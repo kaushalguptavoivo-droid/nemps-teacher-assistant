@@ -169,6 +169,74 @@ final examConfigsWithClassProvider = FutureProvider.family<
   return ref.read(examRepoProvider).getExamConfigsWithClassNames(academicYear);
 });
 
+/// Per-class analytics summary using stable primitive-only family key.
+///
+/// Fixes the infinite-rebuild loop in the old _ResultsAggregator: it called
+/// classResultsProvider with ExamConfig / List<ExamTerm> / etc. as family keys.
+/// Those model classes have no == override, so every rebuild created a brand-new
+/// key → brand-new provider instance → loading state → rebuild again → loop.
+///
+/// This provider does all loading internally and only needs two plain strings
+/// (classId + academicYear) as its key — always equal across rebuilds.
+final classAnalyticsSummaryProvider = FutureProvider.autoDispose.family<
+    ClassAnalyticsSummary?,
+    ({String classId, String className, String academicYear})>(
+  (ref, args) async {
+    final repo = ref.read(examRepoProvider);
+    final client = Supabase.instance.client;
+
+    final config = await repo.getExamConfig(args.classId, args.academicYear);
+    if (config == null) return null;
+
+    // Load all deps in parallel
+    final futures = await Future.wait([
+      repo.getTerms(config.id),
+      repo.getSubjects(args.classId, args.academicYear),
+      repo.getGradeConfigs(args.academicYear),
+      client
+          .from('students')
+          .select('id, full_name, roll_no')
+          .eq('class_id', args.classId)
+          .eq('active', true)
+          .order('roll_no'),
+    ]);
+
+    final allTerms = futures[0] as List<ExamTerm>;
+    final terms = allTerms.where((t) => t.includeInFinalResult).toList();
+    final subjects = futures[1] as List<ClassSubject>;
+    final grades = futures[2] as List<GradeConfig>;
+    final rawStudents = futures[3] as List<dynamic>;
+
+    if (subjects.isEmpty || rawStudents.isEmpty) return null;
+
+    final studentMaps = rawStudents
+        .map((r) => {
+              'id': r['id'] as String,
+              'full_name': r['full_name'] as String,
+              'roll_no': r['roll_no'] as String,
+            })
+        .toList();
+
+    final studentResults = await repo.calculateResults(
+      classId: args.classId,
+      academicYear: args.academicYear,
+      config: config,
+      terms: terms,
+      subjects: subjects,
+      gradeConfigs: grades,
+      students: studentMaps,
+    );
+
+    if (studentResults.isEmpty) return null;
+
+    return ClassAnalyticsSummary.fromResults(
+      classId: args.classId,
+      className: args.className,
+      results: studentResults,
+    );
+  },
+);
+
 // ── Promotion Records ─────────────────────────────────────────────────────────
 
 /// Promotion records for a class in a given academic year.

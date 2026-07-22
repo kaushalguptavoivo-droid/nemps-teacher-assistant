@@ -2,10 +2,15 @@
 // Spreadsheet-style grid: Students (rows) × Subjects (columns)
 // One tab per term. Auto-save with offline fallback. Lock-aware.
 
+import 'dart:typed_data';
+import 'dart:convert' show utf8;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:csv/csv.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/services/offline_queue.dart';
 import '../../../core/models/models.dart';
 import '../../data/providers.dart';
@@ -270,6 +275,17 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
   String _key(String studentId, String subjectId) =>
       '${studentId}__$subjectId';
 
+  /// Students sorted numerically by roll number (e.g. 1, 2, 10, not 1, 10, 2).
+  List<Student> get _sortedStudents {
+    final list = [...widget.students];
+    list.sort((a, b) {
+      final ai = int.tryParse(a.rollNo) ?? 999999;
+      final bi = int.tryParse(b.rollNo) ?? 999999;
+      return ai != bi ? ai.compareTo(bi) : a.rollNo.compareTo(b.rollNo);
+    });
+    return list;
+  }
+
   Future<void> _loadMarks() async {
     setState(() => _loadingMarks = true);
     try {
@@ -413,6 +429,41 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
           ),
         ),
 
+        // Import / Export CSV toolbar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (!widget.isLocked) ...[
+                OutlinedButton.icon(
+                  onPressed: _importCsv,
+                  icon: const Icon(Icons.upload_file_rounded, size: 15),
+                  label: const Text('CSV Import'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    textStyle: const TextStyle(fontSize: 12),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              OutlinedButton.icon(
+                onPressed: _exportCsv,
+                icon: const Icon(Icons.download_rounded, size: 15),
+                label: const Text('CSV Export'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  textStyle: const TextStyle(fontSize: 12),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Spreadsheet
         Expanded(
           child: SingleChildScrollView(
@@ -451,7 +502,7 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
                     ),
                   ),
                 ],
-                rows: widget.students.map((student) {
+                rows: _sortedStudents.map((student) {
                   return DataRow(
                     cells: [
                       // Student name cell
@@ -628,7 +679,154 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
       if (mounted) setState(() => _saving = false);
     }
   }
-}
+
+  // ── CSV Export ──────────────────────────────────────────────────────────────
+
+  Future<void> _exportCsv() async {
+    final rows = <List<dynamic>>[];
+    // Header row
+    rows.add([
+      'Roll No',
+      'Student Name',
+      ...widget.subjects.map((s) => s.subjectName),
+    ]);
+    // One row per student (sorted by roll no)
+    for (final student in _sortedStudents) {
+      final row = <dynamic>[student.rollNo, student.fullName];
+      for (final subject in widget.subjects) {
+        final k = _key(student.id, subject.id);
+        if (_absent[k] == true) {
+          row.add('Ab');
+        } else {
+          row.add(_draft[k] ?? '');
+        }
+      }
+      rows.add(row);
+    }
+
+    final csvStr = const ListToCsvConverter().convert(rows);
+    final filename =
+        'marks_${widget.term.termName.replaceAll(' ', '_')}.csv';
+
+    try {
+      await Share.shareXFiles(
+        [
+          XFile.fromData(
+            Uint8List.fromList(utf8.encode(csvStr)),
+            mimeType: 'text/csv',
+            name: filename,
+          )
+        ],
+        subject: 'Marks Export — ${widget.term.termName}',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // ── CSV Import ──────────────────────────────────────────────────────────────
+
+  Future<void> _importCsv() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final bytes = result.files.first.bytes;
+      if (bytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File read nahi ho saka.')),
+          );
+        }
+        return;
+      }
+
+      final csvStr = utf8.decode(bytes);
+      final tableRows = const CsvToListConverter(eol: '\n').convert(csvStr);
+      if (tableRows.length < 2) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('CSV empty ya invalid hai.')),
+          );
+        }
+        return;
+      }
+
+      // Map column index → ClassSubject from header row
+      final header = tableRows[0].map((e) => e.toString()).toList();
+      final subjectCols = <int, ClassSubject>{};
+      for (int i = 2; i < header.length; i++) {
+        final match = widget.subjects
+            .where((s) =>
+                s.subjectName.trim().toLowerCase() ==
+                header[i].trim().toLowerCase())
+            .firstOrNull;
+        if (match != null) subjectCols[i] = match;
+      }
+
+      int imported = 0;
+      setState(() {
+        for (int ri = 1; ri < tableRows.length; ri++) {
+          final row = tableRows[ri];
+          if (row.isEmpty) continue;
+          final rollNo = row[0].toString().trim();
+          final student = widget.students
+              .where((s) => s.rollNo.trim() == rollNo)
+              .firstOrNull;
+          if (student == null) continue;
+
+          for (final entry in subjectCols.entries) {
+            if (entry.key >= row.length) continue;
+            final val = row[entry.key].toString().trim();
+            final k = _key(student.id, entry.value.id);
+            if (val.toLowerCase() == 'ab' ||
+                val.toLowerCase() == 'absent') {
+              _absent[k] = true;
+              _draft[k] = null;
+            } else if (val.isNotEmpty) {
+              _absent[k] = false;
+              _draft[k] = val;
+              imported++;
+            }
+          }
+        }
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$imported marks import ho gaye! '
+              'Ab "Saari Marks Save Karein" dabayein.',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Import error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+} // end _MarksGridState
 
 // ── Mark cell widget ──────────────────────────────────────────────────────────
 
@@ -740,8 +938,19 @@ class _MarkCellState extends State<_MarkCell> {
                         enabled: !widget.isLocked,
                         keyboardType: TextInputType.number,
                         inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d{0,3}(\.\d{0,2})?$')),
+                          // Custom whole-string validator fixes the "only 1 digit
+                          // allowed" bug: FilteringTextInputFormatter.allow with
+                          // an anchored regex ^...$ matched character-by-character
+                          // and rejected multi-digit input. This version validates
+                          // the entire new value instead.
+                          TextInputFormatter.withFunction(
+                            (oldValue, newValue) {
+                              if (newValue.text.isEmpty) return newValue;
+                              final ok = RegExp(r'^\d{0,3}(\.\d{0,2})?$')
+                                  .hasMatch(newValue.text);
+                              return ok ? newValue : oldValue;
+                            },
+                          ),
                         ],
                         decoration: InputDecoration(
                           isDense: true,

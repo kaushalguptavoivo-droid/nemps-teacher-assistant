@@ -434,8 +434,17 @@ class SchoolRepository {
   }
 
   /// Permanently delete a notice by its ID.
+  /// Throws if RLS blocks the delete (returns empty list = not deleted).
   Future<void> deleteNotice(String noticeId) async {
-    await _client.from('notices').delete().eq('id', noticeId);
+    final deleted = await _client
+        .from('notices')
+        .delete()
+        .eq('id', noticeId)
+        .select('id');
+    if ((deleted as List).isEmpty) {
+      throw Exception(
+          'Notice delete nahi ho paya. Permission check karein (Admin role chahiye).');
+    }
   }
 
   // ── Activity ──────────────────────────────────────────────────────────────

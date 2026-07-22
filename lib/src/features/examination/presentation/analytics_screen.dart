@@ -15,7 +15,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/exam_providers.dart';
 import '../models/exam_models.dart';
-import '../../data/providers.dart';
+// providers.dart import removed — studentsProvider no longer used here
+// (classAnalyticsSummaryProvider loads students internally)
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -27,15 +28,34 @@ class AnalyticsScreen extends ConsumerWidget {
     final activeSession = ref.watch(activeSessionProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Result Analytics')),
+      appBar: AppBar(
+        title: const Text('Result Analytics'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
+            onPressed: () {
+              // Re-fetch session, configs, and all per-class summaries
+              ref.invalidate(activeSessionProvider);
+              ref.invalidate(examConfigsWithClassProvider);
+              // classAnalyticsSummaryProvider is autoDispose — it will
+              // rebuild automatically when the loaders above rebuild.
+            },
+          ),
+        ],
+      ),
       body: activeSession.when(
         data: (session) {
           if (session == null) {
             return const Center(
-              child: Text(
-                'Koi active session nahi.\n'
-                'Admin → Exam Mgmt → Academic Session mein activate karein.',
-                textAlign: TextAlign.center,
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Koi active session nahi.\n'
+                  'Admin → Exam Mgmt → Academic Session mein activate karein.\n\n'
+                  'Session activate karne ke baad ↻ Refresh karein.',
+                  textAlign: TextAlign.center,
+                ),
               ),
             );
           }
@@ -90,7 +110,10 @@ class _AnalyticsLoader extends ConsumerWidget {
   }
 }
 
-// ── Body: loads results per class, then renders sections ──────────────────────
+// ── Body: fires one classAnalyticsSummaryProvider per class ──────────────────
+// Uses stable string-only keys so the provider is never accidentally recreated
+// mid-build (old approach passed full model objects as keys — they lack ==
+// so every rebuild was treated as a brand-new key → infinite loading loop).
 
 class _AnalyticsBody extends ConsumerWidget {
   const _AnalyticsBody({
@@ -103,109 +126,48 @@ class _AnalyticsBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Load deps for every class — all in parallel via Riverpod
-    final allDeps = configs.map((cc) {
-      final terms = ref.watch(examTermsProvider(cc.config.id));
-      final subjects = ref.watch(
-          classSubjectsProvider((classId: cc.config.classId, year: academicYear)));
-      final grades = ref.watch(gradeConfigsProvider(academicYear));
-      final students = ref.watch(studentsProvider(cc.config.classId));
-      return (cc: cc, terms: terms, subjects: subjects, grades: grades, students: students);
-    }).toList();
-
-    final anyLoading = allDeps.any((d) =>
-        d.terms.isLoading ||
-        d.subjects.isLoading ||
-        d.grades.isLoading ||
-        d.students.isLoading);
-
-    if (anyLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // Gather ready deps
-    final readyDeps = allDeps.where((d) =>
-        d.terms.value != null &&
-        d.subjects.value != null &&
-        d.grades.value != null &&
-        d.students.value != null).toList();
-
-    return _ResultsAggregator(
-      academicYear: academicYear,
-      readyDeps: readyDeps,
-    );
-  }
-}
-
-// ── Result aggregator: runs classResultsProvider per class ────────────────────
-
-class _ResultsAggregator extends ConsumerWidget {
-  const _ResultsAggregator({
-    required this.academicYear,
-    required this.readyDeps,
-  });
-
-  final String academicYear;
-  final List<dynamic> readyDeps;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
     final summaries = <ClassAnalyticsSummary>[];
-    bool stillLoading = false;
+    bool anyLoading = false;
 
-    for (final dep in readyDeps) {
-      final terms = (dep.terms.value as List<ExamTerm>)
-          .where((t) => t.includeInFinalResult)
-          .toList();
-      final subjects = dep.subjects.value as List<ClassSubject>;
-      final grades = dep.grades.value as List<GradeConfig>;
-      final rawStudents = dep.students.value as List<dynamic>;
-      final cc = dep.cc as ExamConfigWithClass;
-
-      if (subjects.isEmpty || rawStudents.isEmpty) continue;
-
-      final studentMaps = rawStudents
-          .map((s) => {
-                'id': s.id as String,
-                'full_name': s.fullName as String,
-                'roll_no': s.rollNo as String,
-              })
-          .toList();
-
-      final resultsAsync = ref.watch(classResultsProvider((
-        classId: cc.config.classId,
-        academicYear: academicYear,
-        config: cc.config,
-        terms: terms,
-        subjects: subjects,
-        gradeConfigs: grades,
-        students: studentMaps,
-      )));
-
-      if (resultsAsync.isLoading) {
-        stillLoading = true;
-        continue;
-      }
-
-      final results = resultsAsync.value;
-      if (results == null || results.isEmpty) continue;
-
-      summaries.add(ClassAnalyticsSummary.fromResults(
+    for (final cc in configs) {
+      final summaryAsync = ref.watch(classAnalyticsSummaryProvider((
         classId: cc.config.classId,
         className: cc.className,
-        results: results,
-      ));
+        academicYear: academicYear,
+      )));
+
+      if (summaryAsync.isLoading) {
+        anyLoading = true;
+        continue;
+      }
+      if (summaryAsync.hasError) continue;
+
+      final summary = summaryAsync.value;
+      if (summary != null) summaries.add(summary);
     }
 
-    if (stillLoading && summaries.isEmpty) {
+    if (anyLoading && summaries.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (summaries.isEmpty) {
-      return const Center(
-        child: Text(
-          'Abhi kisi class mein marks nahi daale gaye.',
-          textAlign: TextAlign.center,
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.bar_chart_rounded, size: 64, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(
+                anyLoading
+                    ? 'Data load ho raha hai...'
+                    : 'Abhi kisi class mein marks nahi daale gaye.\nPehle marks entry karein fir yahan dekhein.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
         ),
       );
     }
