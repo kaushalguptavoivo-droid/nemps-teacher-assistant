@@ -17,7 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/exam_providers.dart';
 import '../models/exam_models.dart';
-import '../../data/providers.dart';
+import '../../core/models/models.dart';    // ClassRoom
+import '../../data/providers.dart';        // allClassesProvider, studentsProvider
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,7 @@ class _PromotionScreenState extends ConsumerState<PromotionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final classesAsync = ref.watch(classesProvider);
+    final classesAsync = ref.watch(allClassesProvider);
     final activeSession = ref.watch(activeSessionProvider);
 
     return Scaffold(
@@ -82,7 +83,7 @@ class _PromotionBody extends ConsumerWidget {
   final String academicYear;
   final String? selectedClassId;
   final String? selectedClassName;
-  final AsyncValue<List<dynamic>> classesAsync;
+  final AsyncValue<List<ClassRoom>> classesAsync;
   final void Function(String id, String name) onClassSelected;
 
   @override
@@ -102,16 +103,14 @@ class _PromotionBody extends ConsumerWidget {
                     isExpanded: true,
                     hint: const Text('Class chunein...'),
                     value: selectedClassId,
-                    items: classes.map((c) {
-                      final id = c.id as String;
-                      final name = c.name as String? ?? c.className as String? ?? id;
-                      return DropdownMenuItem(value: id, child: Text(name));
-                    }).toList(),
+                    items: classes.map((c) => DropdownMenuItem(
+                          value: c.id,
+                          child: Text(c.label),   // ClassRoom.label = '$name-$section'
+                        )).toList(),
                     onChanged: (id) {
                       if (id == null) return;
                       final cls = classes.firstWhere((c) => c.id == id);
-                      final name = cls.name as String? ?? cls.className as String? ?? id;
-                      onClassSelected(id, name);
+                      onClassSelected(cls.id, cls.label);
                     },
                   ),
                 ),

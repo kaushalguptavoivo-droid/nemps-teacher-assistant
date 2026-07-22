@@ -2020,7 +2020,20 @@ Testing
 
 Status
 
-Pending
+COMPLETE — 22 July 2026
+
+Files Created
+
+test/examination/result_engine_test.dart
+
+Files Modified
+
+lib/src/features/examination/presentation/promotion_screen.dart
+
+Summary
+
+result_engine_test.dart: 20 unit tests — covers GradeConfig.resolveGrade (boundary values, empty config), ClassAnalyticsSummary.fromResults (pass count, fail count, topper, highest/lowest%, average%, subject stats sorting, grade subjects excluded), PromotionRecord fromMap/toUpsertMap round-trip (null optional fields omitted), ExamTerm.toInsertMap, SubjectAnalyticsStat.passPercent (0/50/100%).
+promotion_screen.dart bug fix: changed classesProvider (teacher-assigned only) to allClassesProvider (all classes — admin needs full list); AsyncValue type corrected from List<dynamic> to List<ClassRoom>; class name now uses ClassRoom.label ('name-section') instead of nonexistent .className field.
 
 Whenever a phase completes
 
