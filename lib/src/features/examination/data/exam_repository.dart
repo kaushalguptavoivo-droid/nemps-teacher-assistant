@@ -545,6 +545,75 @@ class ExamRepository {
         .toList();
   }
 
+  // ── Promotion Records ─────────────────────────────────────────────────────
+
+  Future<List<PromotionRecord>> getPromotionRecords(
+      String classId, String academicYear) async {
+    final data = await _client
+        .from('promotion_records')
+        .select()
+        .eq('class_id', classId)
+        .eq('academic_year', academicYear)
+        .order('created_at');
+    return data.map<PromotionRecord>((r) => PromotionRecord.fromMap(r)).toList();
+  }
+
+  /// Auto-generates promotion records from computed StudentResults.
+  /// PASS → promoted, FAIL → not_promoted.
+  /// Skips rows that already have is_manual_override=true.
+  Future<void> generatePromotions({
+    required String classId,
+    required String academicYear,
+    required List<StudentResult> results,
+  }) async {
+    // Fetch existing records to preserve manual overrides
+    final existing = await getPromotionRecords(classId, academicYear);
+    final overriddenIds = existing
+        .where((r) => r.isManualOverride)
+        .map((r) => r.studentId)
+        .toSet();
+
+    final rows = results
+        .where((r) => !overriddenIds.contains(r.studentId))
+        .map((r) => {
+              'student_id': r.studentId,
+              'class_id': classId,
+              'academic_year': academicYear,
+              'result_status': r.isPassed ? 'pass' : 'fail',
+              'promotion_status': r.isPassed ? 'promoted' : 'not_promoted',
+              'is_manual_override': false,
+            })
+        .toList();
+
+    if (rows.isEmpty) return;
+
+    await _client
+        .from('promotion_records')
+        .upsert(rows, onConflict: 'student_id,class_id,academic_year');
+  }
+
+  /// Admin override: sets promotion_status + marks is_manual_override=true.
+  Future<void> overridePromotion({
+    required String studentId,
+    required String classId,
+    required String academicYear,
+    required String promotionStatus,
+    String? overrideReason,
+  }) async {
+    await _client.from('promotion_records').upsert(
+      {
+        'student_id': studentId,
+        'class_id': classId,
+        'academic_year': academicYear,
+        'promotion_status': promotionStatus,
+        'is_manual_override': true,
+        if (overrideReason != null) 'override_reason': overrideReason,
+        'overridden_by': _uid,
+      },
+      onConflict: 'student_id,class_id,academic_year',
+    );
+  }
+
   // ── Private Helpers ───────────────────────────────────────────────────────
 
   /// Returns the default term list for a given pattern.

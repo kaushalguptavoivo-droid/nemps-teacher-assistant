@@ -10,6 +10,7 @@ import 'features/examination/presentation/marks_entry_screen.dart';
 import 'features/examination/presentation/result_screen.dart';
 import 'features/examination/presentation/report_card_screen.dart';
 import 'features/examination/presentation/bulk_print_screen.dart';
+import 'features/examination/presentation/promotion_screen.dart';
 
 /// Notifier that GoRouter listens to for auth state changes.
 /// This ensures the router re-evaluates redirects when Supabase restores
@@ -123,6 +124,12 @@ class NempsApp extends ConsumerWidget {
               ),
             );
           },
+        ),
+        // ── Phase 7: Promotion Engine ─────────────────────────────────────
+        GoRoute(
+          path: '/promotion',
+          builder: (_, __) =>
+              const ShellScreen(child: PromotionScreen()),
         ),
       ],
     );

@@ -140,6 +140,17 @@ final classResultsProvider = FutureProvider.family<
       );
 });
 
+// ── Promotion Records ─────────────────────────────────────────────────────────
+
+/// Promotion records for a class in a given academic year.
+/// Invalidated after generate or override operations.
+final promotionRecordsProvider = FutureProvider.family<List<PromotionRecord>,
+    ({String classId, String year})>((ref, args) async {
+  return ref
+      .read(examRepoProvider)
+      .getPromotionRecords(args.classId, args.year);
+});
+
 // ── Marks Entry State ─────────────────────────────────────────────────────────
 
 /// Holds in-progress (unsaved) marks keyed by "subjectId_termId_studentId".

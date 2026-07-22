@@ -380,6 +380,68 @@ class StudentRemark {
       };
 }
 
+// ─── PromotionRecord ──────────────────────────────────────────────────────────
+
+/// One promotion decision per student per class per academic year.
+/// result_status is auto-set from the Result Engine (pass/fail).
+/// promotion_status can be overridden by Admin.
+class PromotionRecord {
+  const PromotionRecord({
+    required this.id,
+    required this.studentId,
+    required this.classId,
+    required this.academicYear,
+    required this.resultStatus,      // 'pass'|'fail'|'compartment'|'pending'
+    required this.promotionStatus,   // 'promoted'|'not_promoted'|'pending'
+    this.promotedToClassId,
+    required this.isManualOverride,
+    this.overrideReason,
+    this.overriddenBy,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String studentId;
+  final String classId;
+  final String academicYear;
+  final String resultStatus;
+  final String promotionStatus;
+  final String? promotedToClassId;
+  final bool isManualOverride;
+  final String? overrideReason;
+  final String? overriddenBy;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  factory PromotionRecord.fromMap(Map<String, dynamic> m) => PromotionRecord(
+        id: m['id'] as String,
+        studentId: m['student_id'] as String,
+        classId: m['class_id'] as String,
+        academicYear: m['academic_year'] as String,
+        resultStatus: m['result_status'] as String? ?? 'pending',
+        promotionStatus: m['promotion_status'] as String? ?? 'pending',
+        promotedToClassId: m['promoted_to_class_id'] as String?,
+        isManualOverride: m['is_manual_override'] as bool? ?? false,
+        overrideReason: m['override_reason'] as String?,
+        overriddenBy: m['overridden_by'] as String?,
+        createdAt: DateTime.parse(m['created_at'] as String),
+        updatedAt: DateTime.parse(m['updated_at'] as String),
+      );
+
+  Map<String, dynamic> toUpsertMap() => {
+        'student_id': studentId,
+        'class_id': classId,
+        'academic_year': academicYear,
+        'result_status': resultStatus,
+        'promotion_status': promotionStatus,
+        if (promotedToClassId != null) 'promoted_to_class_id': promotedToClassId,
+        'is_manual_override': isManualOverride,
+        if (overrideReason != null) 'override_reason': overrideReason,
+        if (overriddenBy != null) 'overridden_by': overriddenBy,
+      };
+}
+
 // ─── Result Calculation Helpers ───────────────────────────────────────────────
 
 /// Computed result for one student across all terms in a config.

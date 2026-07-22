@@ -1951,7 +1951,35 @@ Promotion Engine
 
 Status
 
-Pending
+COMPLETE — 22 July 2026
+
+Files Created
+
+supabase/migrations/20260722_promotion_records.sql
+
+lib/src/features/examination/presentation/promotion_screen.dart
+
+Files Modified
+
+lib/src/features/examination/models/exam_models.dart
+
+lib/src/features/examination/data/exam_repository.dart
+
+lib/src/features/examination/data/exam_providers.dart
+
+lib/src/features/examination/presentation/admin_exam_tab.dart
+
+lib/src/app.dart
+
+Summary
+
+promotion_records migration: UUID PK, unique(student_id, class_id, academic_year), result_status (pass/fail/compartment/pending), promotion_status (promoted/not_promoted/pending), is_manual_override bool, override_reason text, overridden_by FK. RLS: Admin full access, Teacher read-only for assigned classes. Updated-at trigger. Previous years never overwritten — academic_year scopes every row.
+exam_models.dart: PromotionRecord class with fromMap + toUpsertMap added before Result Calculation Helpers.
+exam_repository.dart: getPromotionRecords, generatePromotions (auto-populates from StudentResult list, skips manually-overridden rows), overridePromotion (upserts with is_manual_override=true).
+exam_providers.dart: promotionRecordsProvider (FutureProvider.family by classId+year, invalidated after generate/override).
+promotion_screen.dart: Admin picks class from dropdown → loads config + results → promotion table. Banner shows Total/Pass/Promoted/NotPromoted/Pending counts. "Auto-Generate" button calls generatePromotions, skips manual overrides. Per-student tile shows roll, name, PASS/FAIL chip, promotion status chip, override icon button. Override dialog: SegmentedButton (Promoted/Not Promoted) + optional reason field.
+admin_exam_tab.dart: "Promotion Engine" tile added (teal, school icon), navigates via GoRouter push to /promotion.
+app.dart: /promotion route → PromotionScreen added.
 
 Phase 8
 
