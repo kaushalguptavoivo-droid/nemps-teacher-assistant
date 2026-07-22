@@ -309,6 +309,18 @@ class _SubjectListState extends ConsumerState<_SubjectList> {
     }
   }
 
+  /// Opens the per-term max-marks configuration dialog for [subject].
+  Future<void> _configureTermMarks(ClassSubject subject) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => _TermMarksConfigDialog(
+        subject: subject,
+        classId: widget.classId,
+        academicYear: widget.academicYear,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final subjectsAsync = ref.watch(classSubjectsProvider((
@@ -368,8 +380,22 @@ class _SubjectListState extends ConsumerState<_SubjectList> {
                           if (v == 'rename') _renameSubject(s);
                           if (v == 'toggle_grade') _toggleGrade(s);
                           if (v == 'disable') _disableSubject(s);
+                          if (v == 'term_marks') _configureTermMarks(s);
                         },
                         itemBuilder: (_) => [
+                          if (!s.isGradeSubject)
+                            const PopupMenuItem(
+                              value: 'term_marks',
+                              child: ListTile(
+                                leading: Icon(Icons.tune_rounded,
+                                    color: Colors.teal),
+                                title: Text('Term-wise Marks'),
+                                subtitle: Text(
+                                    'Har term ka max marks set karein',
+                                    style: TextStyle(fontSize: 11)),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
                           const PopupMenuItem(
                             value: 'rename',
                             child: ListTile(
@@ -421,6 +447,271 @@ class _SubjectListState extends ConsumerState<_SubjectList> {
       loading: () =>
           const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
+    );
+  }
+}
+
+// ── Term Marks Config Dialog ───────────────────────────────────────────────────
+// Shows all terms for this class's exam config and lets admin set per-subject
+// max marks + whether the term applies to this subject at all.
+
+class _TermMarksConfigDialog extends ConsumerStatefulWidget {
+  const _TermMarksConfigDialog({
+    required this.subject,
+    required this.classId,
+    required this.academicYear,
+  });
+  final ClassSubject subject;
+  final String classId;
+  final String academicYear;
+
+  @override
+  ConsumerState<_TermMarksConfigDialog> createState() =>
+      _TermMarksConfigDialogState();
+}
+
+class _TermMarksConfigDialogState
+    extends ConsumerState<_TermMarksConfigDialog> {
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+
+  List<ExamTerm> _terms = [];
+  // termId → {isIncluded, maxMarks controller}
+  final Map<String, bool> _included = {};
+  final Map<String, TextEditingController> _maxCtrl = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _maxCtrl.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final repo = ref.read(examRepoProvider);
+
+      // 1. Get exam config for this class
+      final config =
+          await repo.getExamConfig(widget.classId, widget.academicYear);
+      if (config == null) {
+        if (mounted) {
+          setState(() {
+            _error =
+                'Is class ka exam configuration nahi bana.\nPehle Exam Config banayein.';
+            _loading = false;
+          });
+        }
+        return;
+      }
+
+      // 2. Get all terms for this config
+      final terms = await repo.getTerms(config.id);
+
+      // 3. Get existing SubjectTermConfigs for this subject
+      final stcs = await repo.getSubjectTermConfigs(
+          terms.map((t) => t.id).toList());
+      final subjectStcs =
+          stcs.where((c) => c.subjectId == widget.subject.id).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _terms = terms;
+        for (final term in terms) {
+          final existing = subjectStcs
+              .where((c) => c.termId == term.id)
+              .firstOrNull;
+          _included[term.id] = existing?.isIncluded ?? true;
+          _maxCtrl[term.id] = TextEditingController(
+            text: (existing?.maxMarks ?? term.maximumMarks)
+                .toStringAsFixed(0),
+          );
+        }
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _error = 'Error: $e'; _loading = false; });
+    }
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final configs = <SubjectTermConfig>[];
+      for (final term in _terms) {
+        final isIncluded = _included[term.id] ?? true;
+        final raw = _maxCtrl[term.id]?.text.trim() ?? '';
+        final maxMarks = double.tryParse(raw) ?? term.maximumMarks;
+        configs.add(SubjectTermConfig(
+          id: '',
+          subjectId: widget.subject.id,
+          termId: term.id,
+          maxMarks: isIncluded ? maxMarks : 0,
+          isIncluded: isIncluded,
+        ));
+      }
+      await ref.read(examRepoProvider).saveSubjectTermConfigs(configs);
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Term marks save ho gaye! ✓'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Term-wise Marks Configuration'),
+          Text(
+            widget.subject.subjectName,
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      content: _loading
+          ? const SizedBox(
+              height: 80,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : _error != null
+              ? Text(_error!, style: const TextStyle(color: Colors.red))
+              : _terms.isEmpty
+                  ? const Text(
+                      'Koi term nahi mila.\nPehle Exam Configuration banayein.')
+                  : SizedBox(
+                      width: double.maxFinite,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Har term ke liye:\n'
+                            '• "Lagta hai" — yeh term is subject pe apply hoti hai\n'
+                            '• "Max Marks" — is term mein kitne marks ka paper hai',
+                            style:
+                                TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 12),
+                          ..._terms.map((term) {
+                            final isIncluded =
+                                _included[term.id] ?? true;
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            term.termName,
+                                            style: const TextStyle(
+                                                fontWeight:
+                                                    FontWeight.bold),
+                                          ),
+                                        ),
+                                        Switch(
+                                          value: isIncluded,
+                                          onChanged: (v) => setState(
+                                              () => _included[term.id] =
+                                                  v),
+                                        ),
+                                        Text(
+                                          isIncluded
+                                              ? 'Lagta hai'
+                                              : 'Nahi lagta',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isIncluded
+                                                ? Colors.green
+                                                : Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (isIncluded) ...[
+                                      const SizedBox(height: 6),
+                                      TextField(
+                                        controller: _maxCtrl[term.id],
+                                        decoration: InputDecoration(
+                                          labelText: 'Max Marks',
+                                          hintText: term.maximumMarks
+                                              .toStringAsFixed(0),
+                                          prefixIcon: const Icon(
+                                              Icons.numbers_rounded,
+                                              size: 18),
+                                          isDense: true,
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 10),
+                                        ),
+                                        keyboardType: const TextInputType
+                                            .numberWithOptions(
+                                                decimal: false),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        if (!_loading && _error == null)
+          FilledButton(
+            onPressed: _saving ? null : _save,
+            child: _saving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Text('Save'),
+          ),
+      ],
     );
   }
 }

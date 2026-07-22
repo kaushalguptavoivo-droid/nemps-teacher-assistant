@@ -232,8 +232,15 @@ class _DependencyLoader extends ConsumerWidget {
 }
 
 // ── Results View ──────────────────────────────────────────────────────────────
+// FIX: Converted from ConsumerWidget to ConsumerStatefulWidget.
+// The old ConsumerWidget passed ExamConfig / List<ExamTerm> / etc. as Riverpod
+// family keys. Those model classes have no == override, so every rebuild
+// created a brand-new provider key → new provider instance → loading state →
+// rebuild again → infinite blink loop.
+// Fix: load results once in initState via ref.read (not ref.watch), store in
+// local state. Filter changes are handled locally — no provider re-watch needed.
 
-class _ResultsView extends ConsumerWidget {
+class _ResultsView extends ConsumerStatefulWidget {
   const _ResultsView({
     required this.classId,
     required this.academicYear,
@@ -257,115 +264,145 @@ class _ResultsView extends ConsumerWidget {
   final void Function(BulkPrintArgs) onBulkArgsReady;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final resultsAsync = ref.watch(classResultsProvider((
-      classId: classId,
-      academicYear: academicYear,
-      config: config,
-      terms: terms,
-      subjects: subjects,
-      gradeConfigs: gradeConfigs,
-      students: students,
-    )));
+  ConsumerState<_ResultsView> createState() => _ResultsViewState();
+}
 
-    return resultsAsync.when(
-      data: (results) {
-        // Notify parent so the Bulk Print AppBar button becomes visible.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          onBulkArgsReady(BulkPrintArgs(
-            config: config,
-            terms: terms,
-            subjects: subjects,
-            gradeConfigs: gradeConfigs,
-            allResults: results,
-            academicYear: academicYear,
-          ));
-        });
+class _ResultsViewState extends ConsumerState<_ResultsView> {
+  List<StudentResult>? _results;
+  Object? _error;
+  bool _loading = true;
 
-        // Sort by rank; students with no marks (rank==0) go to bottom
-        final sorted = [...results]..sort((a, b) {
-            if (a.rank == 0 && b.rank == 0) return 0;
-            if (a.rank == 0) return 1;
-            if (b.rank == 0) return -1;
-            return a.rank.compareTo(b.rank);
-          });
+  @override
+  void initState() {
+    super.initState();
+    _loadResults();
+  }
 
-        final filtered = sorted.where((r) {
-          switch (filter) {
-            case _Filter.pass:
-              return r.isPassed;
-            case _Filter.fail:
-              return !r.isPassed;
-            case _Filter.all:
-              return true;
-          }
-        }).toList();
+  Future<void> _loadResults() async {
+    try {
+      final repo = ref.read(examRepoProvider);
+      // Fetch per-subject term configs for accurate per-subject max marks
+      final termIds = widget.terms.map((t) => t.id).toList();
+      final stcs = await repo.getSubjectTermConfigs(termIds);
 
-        final passCount = results.where((r) => r.isPassed).length;
-        final totalCount = results.length;
-        final passPct =
-            totalCount > 0 ? passCount / totalCount * 100 : 0.0;
+      final results = await repo.calculateResults(
+        classId: widget.classId,
+        academicYear: widget.academicYear,
+        config: widget.config,
+        terms: widget.terms,
+        subjects: widget.subjects,
+        gradeConfigs: widget.gradeConfigs,
+        students: widget.students,
+        subjectTermConfigs: stcs,
+      );
 
-        final rankedStudents =
-            sorted.where((r) => r.rank > 0).toList();
-        final topper =
-            rankedStudents.isNotEmpty ? rankedStudents.first : null;
+      if (!mounted) return;
+      setState(() {
+        _results = results;
+        _loading = false;
+      });
 
-        return Column(
-          children: [
-            _SummaryBanner(
-              totalCount: totalCount,
-              passCount: passCount,
-              passPct: passPct,
-              topper: topper,
-            ),
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  Text(
-                    '${filtered.length} student${filtered.length == 1 ? '' : 's'}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant),
-                  ),
-                ],
+      // Notify parent so Bulk Print AppBar button becomes visible
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.onBulkArgsReady(BulkPrintArgs(
+          config: widget.config,
+          terms: widget.terms,
+          subjects: widget.subjects,
+          gradeConfigs: widget.gradeConfigs,
+          allResults: results,
+          academicYear: widget.academicYear,
+        ));
+      });
+    } catch (e) {
+      if (mounted) setState(() { _error = e; _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(child: Text('Result error: $_error'));
+    }
+
+    final results = _results ?? [];
+
+    // Sort by rank; students with no marks (rank==0) go to bottom
+    final sorted = [...results]..sort((a, b) {
+        if (a.rank == 0 && b.rank == 0) return 0;
+        if (a.rank == 0) return 1;
+        if (b.rank == 0) return -1;
+        return a.rank.compareTo(b.rank);
+      });
+
+    final filtered = sorted.where((r) {
+      switch (widget.filter) {
+        case _Filter.pass:
+          return r.isPassed;
+        case _Filter.fail:
+          return !r.isPassed;
+        case _Filter.all:
+          return true;
+      }
+    }).toList();
+
+    final passCount = results.where((r) => r.isPassed).length;
+    final totalCount = results.length;
+    final passPct = totalCount > 0 ? passCount / totalCount * 100 : 0.0;
+
+    final rankedStudents = sorted.where((r) => r.rank > 0).toList();
+    final topper = rankedStudents.isNotEmpty ? rankedStudents.first : null;
+
+    return Column(
+      children: [
+        _SummaryBanner(
+          totalCount: totalCount,
+          passCount: passCount,
+          passPct: passPct,
+          topper: topper,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              Text(
+                '${filtered.length} student${filtered.length == 1 ? '' : 's'}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
-            ),
-            Expanded(
-              child: filtered.isEmpty
-                  ? const Center(
-                      child: Text('Koi result nahi is filter mein.'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, i) {
-                        final r = filtered[i];
-                        return _StudentResultTile(
-                          result: r,
-                          onTap: () => context.push(
-                            '/report-card/$classId/${r.studentId}',
-                            extra: ReportCardArgs(
-                              config: config,
-                              terms: terms,
-                              subjects: subjects,
-                              gradeConfigs: gradeConfigs,
-                              studentResult: r,
-                              academicYear: academicYear,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Result error: $e')),
+            ],
+          ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? const Center(child: Text('Koi result nahi is filter mein.'))
+              : ListView.builder(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, i) {
+                    final r = filtered[i];
+                    return _StudentResultTile(
+                      result: r,
+                      onTap: () => context.push(
+                        '/report-card/${widget.classId}/${r.studentId}',
+                        extra: ReportCardArgs(
+                          config: widget.config,
+                          terms: widget.terms,
+                          subjects: widget.subjects,
+                          gradeConfigs: widget.gradeConfigs,
+                          studentResult: r,
+                          academicYear: widget.academicYear,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

@@ -442,6 +442,42 @@ class PromotionRecord {
       };
 }
 
+// ─── SubjectTermConfig ────────────────────────────────────────────────────────
+
+/// Per-subject per-term max marks + inclusion flag.
+/// If no row exists for a subject+term, use term's default maximumMarks.
+class SubjectTermConfig {
+  const SubjectTermConfig({
+    required this.id,
+    required this.subjectId,
+    required this.termId,
+    required this.maxMarks,
+    required this.isIncluded,
+  });
+
+  final String id;
+  final String subjectId;
+  final String termId;
+  final double maxMarks;
+  final bool isIncluded; // false = this term does not apply to this subject
+
+  factory SubjectTermConfig.fromMap(Map<String, dynamic> m) =>
+      SubjectTermConfig(
+        id: m['id'] as String,
+        subjectId: m['subject_id'] as String,
+        termId: m['term_id'] as String,
+        maxMarks: (m['max_marks'] as num).toDouble(),
+        isIncluded: m['is_included'] as bool? ?? true,
+      );
+
+  Map<String, dynamic> toUpsertMap() => {
+        'subject_id': subjectId,
+        'term_id': termId,
+        'max_marks': maxMarks,
+        'is_included': isIncluded,
+      };
+}
+
 // ─── Result Calculation Helpers ───────────────────────────────────────────────
 
 /// Computed result for one student across all terms in a config.

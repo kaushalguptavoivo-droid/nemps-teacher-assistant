@@ -263,6 +263,30 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
   Map<String, ExamMark> _loaded = {};
   bool _loadingMarks = true;
   bool _saving = false;
+  // Per-subject term configs (max marks + inclusion) for this term
+  List<SubjectTermConfig> _subjectTermConfigs = [];
+
+  // ── Per-subject max marks helpers ─────────────────────────────────────────
+
+  /// Max marks for [subject] in this term.
+  /// Falls back to term's default maximumMarks if no override configured.
+  double _getSubjectMax(ClassSubject subject) {
+    final stc = _subjectTermConfigs
+        .where((c) => c.subjectId == subject.id)
+        .firstOrNull;
+    if (stc == null) return widget.term.maximumMarks;
+    if (!stc.isIncluded) return 0.0;
+    return stc.maxMarks;
+  }
+
+  /// Whether this term applies to [subject].
+  /// Defaults to true when no override configured.
+  bool _isSubjectIncluded(ClassSubject subject) {
+    final stc = _subjectTermConfigs
+        .where((c) => c.subjectId == subject.id)
+        .firstOrNull;
+    return stc?.isIncluded ?? true;
+  }
 
   final _outbox = OfflineQueue(Supabase.instance.client);
 
@@ -289,9 +313,18 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
   Future<void> _loadMarks() async {
     setState(() => _loadingMarks = true);
     try {
-      final marks = await ref
-          .read(examRepoProvider)
-          .getMarksForTerm(widget.classId, widget.term.id);
+      // Load marks + per-subject term configs in parallel
+      final results = await Future.wait([
+        ref
+            .read(examRepoProvider)
+            .getMarksForTerm(widget.classId, widget.term.id),
+        ref
+            .read(examRepoProvider)
+            .getSubjectTermConfigs([widget.term.id]),
+      ]);
+      final marks = results[0] as List<ExamMark>;
+      final stcs = results[1] as List<SubjectTermConfig>;
+
       final map = <String, ExamMark>{};
       for (final m in marks) {
         map[_key(m.studentId, m.subjectId)] = m;
@@ -299,6 +332,7 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
       if (mounted) {
         setState(() {
           _loaded = map;
+          _subjectTermConfigs = stcs;
           // Pre-fill draft with loaded values
           for (final entry in map.entries) {
             final m = entry.value;
@@ -339,14 +373,15 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
         if (raw != null && raw.isNotEmpty) {
           marks = double.tryParse(raw);
           if (marks == null) return;
-          if (marks < 0 || marks > widget.term.maximumMarks) {
+          final subjectMax = _getSubjectMax(subject);
+          if (marks < 0 || marks > subjectMax) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
                     marks < 0
                         ? 'Marks negative nahi ho sakti!'
-                        : 'Max marks: ${widget.term.maximumMarks.toStringAsFixed(0)}',
+                        : 'Max marks: ${subjectMax.toStringAsFixed(0)}',
                   ),
                   backgroundColor: Colors.red,
                 ),
@@ -496,7 +531,20 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
                             const Text('(Grade)',
                                 style: TextStyle(
                                     fontSize: 9,
-                                    color: Colors.purple)),
+                                    color: Colors.purple))
+                          else if (!_isSubjectIncluded(s))
+                            const Text('N/A',
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.grey))
+                          else
+                            Text(
+                              '/${_getSubjectMax(s).toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.teal,
+                                  fontWeight: FontWeight.w600),
+                            ),
                         ],
                       ),
                     ),
@@ -538,13 +586,28 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
                       ...widget.subjects.map((subject) {
                         final k = _key(student.id, subject.id);
                         final isAbsent = _absent[k] ?? false;
+                        // If term is not applicable for this subject, show N/A
+                        if (!_isSubjectIncluded(subject)) {
+                          return DataCell(
+                            Container(
+                              width: 60,
+                              alignment: Alignment.center,
+                              child: const Text(
+                                'N/A',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey),
+                              ),
+                            ),
+                          );
+                        }
                         return DataCell(
                           _MarkCell(
                             key: ValueKey(k),
                             value: _draft[k],
                             isAbsent: isAbsent,
                             isGradeSubject: subject.isGradeSubject,
-                            maxMarks: widget.term.maximumMarks,
+                            maxMarks: _getSubjectMax(subject),
                             isLocked: widget.isLocked,
                             onChanged: (val) {
                               setState(() => _draft[k] = val);
@@ -606,6 +669,9 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
 
       for (final student in widget.students) {
         for (final subject in widget.subjects) {
+          // Skip subjects where this term is not applicable
+          if (!_isSubjectIncluded(subject)) continue;
+
           final k = _key(student.id, subject.id);
           final isAbsent = _absent[k] ?? false;
           final raw = _draft[k];
@@ -617,8 +683,9 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
               grade = raw;
             } else {
               marks = double.tryParse(raw);
+              final subjectMax = _getSubjectMax(subject);
               if (marks != null &&
-                  (marks < 0 || marks > widget.term.maximumMarks)) {
+                  (marks < 0 || marks > subjectMax)) {
                 continue; // Skip invalid
               }
             }

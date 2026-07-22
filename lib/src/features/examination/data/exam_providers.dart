@@ -237,6 +237,20 @@ final classAnalyticsSummaryProvider = FutureProvider.autoDispose.family<
   },
 );
 
+// ── Subject Term Configs ──────────────────────────────────────────────────────
+
+/// Per-subject per-term max marks for a set of terms.
+/// Key = comma-joined term IDs (e.g. "uuid1,uuid2").
+/// Returns empty list when no overrides are configured (callers fall back to
+/// each term's default maximumMarks).
+final subjectTermConfigsProvider =
+    FutureProvider.family<List<SubjectTermConfig>, String>(
+        (ref, termIdsJoined) async {
+  final ids =
+      termIdsJoined.isEmpty ? <String>[] : termIdsJoined.split(',');
+  return ref.read(examRepoProvider).getSubjectTermConfigs(ids);
+});
+
 // ── Promotion Records ─────────────────────────────────────────────────────────
 
 /// Promotion records for a class in a given academic year.

@@ -17,6 +17,8 @@ const _subjectColors = {
   'Computer': Color(0xFF7C3AED),
   'Drawing': Color(0xFFEC4899),
   'EVS': Color(0xFF16A34A),
+  'GK': Color(0xFF0891B2),
+  'Sanskrit': Color(0xFFB45309),
 };
 
 Color _colorForSubject(String s) =>
@@ -24,7 +26,7 @@ Color _colorForSubject(String s) =>
 
 const _subjects = [
   'Math', 'English', 'Hindi', 'Science', 'Social Studies',
-  'Computer', 'Drawing', 'EVS',
+  'Computer', 'Drawing', 'EVS', 'GK', 'Sanskrit',
 ];
 
 class HomeworkScreen extends ConsumerStatefulWidget {
@@ -972,6 +974,10 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
         return '🎨';
       case 'EVS':
         return '🌱';
+      case 'GK':
+        return '🌐';
+      case 'Sanskrit':
+        return '🕉️';
       default:
         return '📝';
     }
@@ -1259,7 +1265,7 @@ class _CombinedBulkDialogState extends ConsumerState<_CombinedBulkDialog> {
     const map = {
       'Math': '📐', 'English': '📖', 'Hindi': '🔤',
       'Science': '🔬', 'Social Studies': '🌍', 'Computer': '💻',
-      'Drawing': '🎨', 'EVS': '🌱',
+      'Drawing': '🎨', 'EVS': '🌱', 'GK': '🌐', 'Sanskrit': '🕉️',
     };
     return map[subject] ?? '📝';
   }

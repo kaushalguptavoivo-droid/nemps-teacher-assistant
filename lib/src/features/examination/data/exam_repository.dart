@@ -208,6 +208,35 @@ class ExamRepository {
         .eq('id', subjectId);
   }
 
+  // ── Subject Term Configs ──────────────────────────────────────────────────
+
+  /// Fetch per-subject max marks + inclusion flag for the given term IDs.
+  /// If no row exists for a subject+term, callers should fall back to
+  /// the term's default maximumMarks.
+  Future<List<SubjectTermConfig>> getSubjectTermConfigs(
+      List<String> termIds) async {
+    if (termIds.isEmpty) return [];
+    final data = await _client
+        .from('subject_term_configs')
+        .select()
+        .inFilter('term_id', termIds);
+    return data
+        .map<SubjectTermConfig>((r) => SubjectTermConfig.fromMap(r))
+        .toList();
+  }
+
+  /// Upsert one or more SubjectTermConfig rows.
+  Future<void> saveSubjectTermConfigs(
+      List<SubjectTermConfig> configs) async {
+    if (configs.isEmpty) return;
+    await _client
+        .from('subject_term_configs')
+        .upsert(
+          configs.map((c) => c.toUpsertMap()).toList(),
+          onConflict: 'subject_id,term_id',
+        );
+  }
+
   // ── Exam Marks ────────────────────────────────────────────────────────────
 
   /// Fetch all marks for a class in a given term.
@@ -418,6 +447,8 @@ class ExamRepository {
 
   /// Dynamically calculates results for all students in a class.
   /// Never reads from a stored total/percentage — always recomputes.
+  /// [subjectTermConfigs] — optional per-subject per-term max marks.
+  ///   If empty, falls back to each term's default maximumMarks for every subject.
   Future<List<StudentResult>> calculateResults({
     required String classId,
     required String academicYear,
@@ -426,6 +457,7 @@ class ExamRepository {
     required List<ClassSubject> subjects,
     required List<GradeConfig> gradeConfigs,
     required List<Map<String, dynamic>> students, // [{id, full_name, roll_no}]
+    List<SubjectTermConfig> subjectTermConfigs = const [],
   }) async {
     // Fetch all marks for this class
     final allMarksData = await _client
@@ -463,8 +495,20 @@ class ExamRepository {
         final Map<String, double?> termMarks = {};
 
         for (final term in finalTerms) {
+          // Per-subject per-term config lookup
+          final stc = subjectTermConfigs
+              .where((c) =>
+                  c.subjectId == subject.id && c.termId == term.id)
+              .firstOrNull;
+          final isIncluded = stc?.isIncluded ?? true;
+          if (!isIncluded) {
+            // Term not applicable for this subject — skip entirely
+            continue;
+          }
+          final termMaxMarks = stc?.maxMarks ?? term.maximumMarks;
+
           final mark = subjectMarks[term.id];
-          subjectMax += term.maximumMarks;
+          subjectMax += termMaxMarks;
           if (mark != null && !mark.isAbsent && mark.obtainedMarks != null) {
             subjectTotal += mark.obtainedMarks!;
             termMarks[term.id] = mark.obtainedMarks;
