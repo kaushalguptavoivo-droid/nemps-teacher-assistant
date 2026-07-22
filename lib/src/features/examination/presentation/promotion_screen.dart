@@ -17,7 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/exam_providers.dart';
 import '../models/exam_models.dart';
-import '../../core/models/models.dart';    // ClassRoom
+import '../../../core/models/models.dart';    // ClassRoom
 import '../../data/providers.dart';        // allClassesProvider, studentsProvider
 
 // ── Screen ────────────────────────────────────────────────────────────────────

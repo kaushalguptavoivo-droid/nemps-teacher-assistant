@@ -5,7 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/models.dart';
+import '../../../core/models/models.dart';
 import '../../data/providers.dart';
 import '../data/exam_providers.dart';
 import '../models/exam_models.dart';

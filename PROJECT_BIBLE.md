@@ -28,7 +28,7 @@ Version: 1.0
 
 Status: APPROVED
 
-Last Updated: 22 July 2026
+Last Updated: 22 July 2026 — Vercel build fix applied
 
 ---
 
