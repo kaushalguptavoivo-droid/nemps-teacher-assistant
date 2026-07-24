@@ -416,3 +416,109 @@ class FeeRefund {
         'refund_date': refundDate.toIso8601String().substring(0, 10),
       };
 }
+
+// Fee Summary (for class/school level)
+class FeeSummary {
+  FeeSummary({
+    required this.totalStudents,
+    required this.totalExpected,
+    required this.totalCollected,
+    required this.totalPending,
+    required this.totalConcession,
+    required this.totalLateFee,
+  });
+
+  final int totalStudents;
+  final double totalExpected;
+  final double totalCollected;
+  final double totalPending;
+  final double totalConcession;
+  final double totalLateFee;
+}
+
+// Legacy StudentFee for backward compatibility
+class StudentFee {
+  StudentFee({
+    required this.id,
+    required this.studentId,
+    required this.feeTypeId,
+    required this.classId,
+    required this.academicYear,
+    required this.amount,
+    this.paidAmount = 0,
+    this.status = 'due',
+    required this.dueDate,
+    this.paidDate,
+    this.concession = 0,
+    this.lateFeeApplied = 0,
+    this.remarks,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String studentId;
+  final String feeTypeId;
+  final String classId;
+  final String academicYear;
+  final double amount;
+  final double paidAmount;
+  final String status;
+  final DateTime dueDate;
+  final DateTime? paidDate;
+  final double concession;
+  final double lateFeeApplied;
+  final String? remarks;
+  final DateTime createdAt;
+
+  String? studentName;
+  String? studentRollNo;
+  String? feeTypeName;
+  String? className;
+
+  double get pendingAmount => amount - paidAmount + lateFeeApplied - concession;
+  bool get isPaid => status == 'paid';
+  bool get isOverdue => !isPaid && dueDate.isBefore(DateTime.now());
+
+  factory StudentFee.fromMap(Map<String, dynamic> m) => StudentFee(
+        id: m['id'] as String,
+        studentId: m['student_id'] as String,
+        feeTypeId: m['fee_type_id'] as String,
+        classId: m['class_id'] as String,
+        academicYear: m['academic_year'] as String,
+        amount: (m['amount'] as num).toDouble(),
+        paidAmount: (m['paid_amount'] as num?)?.toDouble() ?? 0,
+        status: m['status'] as String? ?? 'due',
+        dueDate: DateTime.parse(m['due_date'] as String),
+        paidDate: m['paid_date'] != null
+            ? DateTime.parse(m['paid_date'] as String)
+            : null,
+        concession: (m['concession'] as num?)?.toDouble() ?? 0,
+        lateFeeApplied: (m['late_fee_applied'] as num?)?.toDouble() ?? 0,
+        remarks: m['remarks'] as String?,
+        createdAt: DateTime.parse(m['created_at'] as String),
+      );
+
+  Map<String, dynamic> toInsertMap() => {
+        'student_id': studentId,
+        'fee_type_id': feeTypeId,
+        'class_id': classId,
+        'academic_year': academicYear,
+        'amount': amount,
+        'paid_amount': paidAmount,
+        'status': status,
+        'due_date': dueDate.toIso8601String().substring(0, 10),
+        'paid_date': paidDate?.toIso8601String().substring(0, 10),
+        'concession': concession,
+        'late_fee_applied': lateFeeApplied,
+        'remarks': remarks,
+      };
+
+  Map<String, dynamic> toUpdateMap() => {
+        'paid_amount': paidAmount,
+        'status': status,
+        'paid_date': paidDate?.toIso8601String().substring(0, 10),
+        'concession': concession,
+        'late_fee_applied': lateFeeApplied,
+        'remarks': remarks,
+      };
+}
