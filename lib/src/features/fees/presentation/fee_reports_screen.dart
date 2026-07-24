@@ -10,8 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../data/providers.dart';
 import '../data/fee_providers.dart';
+import '../../examination/data/exam_providers.dart';
 import '../models/fee_models.dart';
-import '../../core/theme/app_theme.dart';
 import '../../../core/models/models.dart';
 
 class FeeReportsScreen extends ConsumerStatefulWidget {
@@ -350,7 +350,7 @@ class _DailyCollectionTabState extends ConsumerState<_DailyCollectionTab> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    color: const Color(0xFF4F46E5).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -646,7 +646,7 @@ class _ExportTabState extends ConsumerState<_ExportTab> {
                   label: Text(_isExporting ? 'Exporting...' : 'Export to CSV'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.all(16),
-                    backgroundColor: AppTheme.primaryColor,
+                    backgroundColor: const Color(0xFF4F46E5),
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -746,13 +746,14 @@ class _ExportTabState extends ConsumerState<_ExportTab> {
         ];
 
         for (final student in students) {
-          final summary = await ref.read(feeRepoProvider).getStudentFeeSummary(student.id, academicYear);
+          final studentId = student['id'] as String;
+          final summary = await ref.read(feeRepoProvider).getStudentFeeSummary(studentId, academicYear);
           csvData.add([
-            student.rollNo ?? '',
-            student.fullName,
-            student.className,
-            student.section,
-            student.parentName,
+            student['roll_no'] ?? '',
+            student['full_name'] ?? '',
+            student["class_name"] ?? "",
+            student["section"] ?? "",
+            student['father_name'] ?? '',
             summary.totalDue,
             summary.totalPaid,
             summary.totalPending,
@@ -811,8 +812,8 @@ class _ExportTypeChip extends StatelessWidget {
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
-      selectedColor: AppTheme.primaryColor.withOpacity(0.2),
-      checkmarkColor: AppTheme.primaryColor,
+      selectedColor: const Color(0xFF4F46E5).withOpacity(0.2),
+      checkmarkColor: const Color(0xFF4F46E5),
     );
   }
 }

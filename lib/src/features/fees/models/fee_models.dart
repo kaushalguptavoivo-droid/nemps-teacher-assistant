@@ -339,6 +339,7 @@ class StudentFeeSummary {
 
 class DueStudent {
   DueStudent({
+    required this.id,
     required this.studentId,
     required this.studentName,
     required this.rollNo,
@@ -349,6 +350,7 @@ class DueStudent {
     this.lastPaidDate,
   });
 
+  final String id;
   final String studentId;
   final String studentName;
   final String rollNo;

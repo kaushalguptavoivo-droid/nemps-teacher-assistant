@@ -10,8 +10,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../../data/providers.dart';
 import '../data/fee_providers.dart';
+import '../../examination/data/exam_providers.dart';
 import '../models/fee_models.dart';
-import '../../core/theme/app_theme.dart';
 import '../../../core/models/models.dart';
 
 class FeeCollectionScreen extends ConsumerStatefulWidget {
@@ -137,10 +137,10 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                       final student = _searchResults[index];
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                          backgroundColor: const Color(0xFF4F46E5).withOpacity(0.1),
                           child: Text(
                             student.fullName.substring(0, 1).toUpperCase(),
-                            style: TextStyle(color: AppTheme.primaryColor),
+                            style: TextStyle(color: const Color(0xFF4F46E5)),
                           ),
                         ),
                         title: Text(student.fullName),
@@ -542,7 +542,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
           children: [
             Row(
               children: [
-                Icon(icon, color: AppTheme.primaryColor),
+                Icon(icon, color: const Color(0xFF4F46E5)),
                 const SizedBox(width: 8),
                 Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ],
@@ -568,7 +568,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundColor: AppTheme.primaryColor,
+                  backgroundColor: const Color(0xFF4F46E5),
                   child: Text(
                     student.fullName.substring(0, 1).toUpperCase(),
                     style: const TextStyle(fontSize: 24, color: Colors.white),

@@ -45,8 +45,8 @@ class DataImportExport {
     for (var i = 0; i < data.length; i++) {
       final row = data[i];
       for (var j = 0; j < row.length; j++) {
-        final cell = CellValue.fromRawValue(row[j]?.toString() ?? '');
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: j, rowIndex: i)).value = cell;
+        final cellValue = row[j]?.toString() ?? '';
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: j, rowIndex: i)).value = TextCellValue(cellValue.toString());
       }
     }
 

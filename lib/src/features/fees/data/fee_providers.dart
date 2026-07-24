@@ -95,3 +95,15 @@ final studentPaymentsProvider = FutureProvider.family<List<FeePayment>, ({
 })>((ref, args) async {
   return ref.read(feeRepoProvider).getStudentPayments(args.studentId, args.academicYear);
 });
+
+// ── Due Students Provider ───────────────────────────────────────────────────
+
+final dueStudentsProvider = FutureProvider.family<List<DueStudent>, String>((ref, academicYear) async {
+  return ref.read(feeRepoProvider).getDueStudents(academicYear);
+});
+
+// ── Daily Collection Provider ───────────────────────────────────────────────
+
+final dailyCollectionProvider = FutureProvider.family<DailyCollection, DateTime>((ref, date) async {
+  return ref.read(feeRepoProvider).getDailyCollection(date);
+});

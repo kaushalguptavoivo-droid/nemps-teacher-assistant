@@ -418,6 +418,7 @@ class FeeRepository {
 
         if (monthsPending.isNotEmpty) {
           dueStudents.add(DueStudent(
+            id: student['id'],
             studentId: student['id'],
             studentName: student['full_name'] ?? '',
             rollNo: student['roll_no'] ?? '',

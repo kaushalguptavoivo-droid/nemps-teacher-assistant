@@ -1732,7 +1732,7 @@ class _FeeReportsContentState extends ConsumerState<_FeeReportsContent>
 
   Widget _buildCollectionTab() {
     final dateStr = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
-    final collectionAsync = ref.watch(dailyCollectionProvider(dateStr));
+    final collectionAsync = ref.watch(dailyCollectionProvider(_selectedDate));
 
     return Column(
       children: [
