@@ -12,6 +12,7 @@ import '../../data/providers.dart';
 import '../data/fee_providers.dart';
 import '../models/fee_models.dart';
 import '../../core/theme/app_theme.dart';
+import '../../../core/models/models.dart';
 
 class FeeCollectionScreen extends ConsumerStatefulWidget {
   const FeeCollectionScreen({super.key});
@@ -23,10 +24,12 @@ class FeeCollectionScreen extends ConsumerStatefulWidget {
 class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
   String? _selectedClassId;
   String? _selectedStudentId;
+  Student? _selectedStudent;
   final Set<String> _selectedMonths = {};
   double _totalAmount = 0;
   double _concession = 0;
   String _paymentMethod = 'cash';
+  String? _selectedAcademicYear;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +40,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
         if (session == null) {
           return const Center(child: Text('No active session'));
         }
+        _selectedAcademicYear = session.label;
         return _buildContent(session.label);
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -46,7 +50,9 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
 
   Widget _buildContent(String academicYear) {
     final classesAsync = ref.watch(allClassesProvider);
-    final studentsAsync = ref.watch(classStudentsProvider(_selectedClassId ?? ''));
+    final studentsAsync = _selectedClassId != null 
+        ? ref.watch(studentsProvider(_selectedClassId!))
+        : const AsyncValue<List<Student>>.data([]);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -72,6 +78,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                   setState(() {
                     _selectedClassId = v;
                     _selectedStudentId = null;
+                    _selectedStudent = null;
                     _selectedMonths.clear();
                     _totalAmount = 0;
                   });
@@ -102,11 +109,13 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                     ),
                     items: students.map((s) => DropdownMenuItem(
                       value: s.id,
-                      child: Text('${s.name} (Roll: ${s.rollNo ?? "N/A"})'),
+                      child: Text('${s.fullName} (Roll: ${s.rollNo ?? "N/A"})'),
                     )).toList(),
                     onChanged: (v) {
+                      final student = students.firstWhere((s) => s.id == v);
                       setState(() {
                         _selectedStudentId = v;
+                        _selectedStudent = student;
                         _selectedMonths.clear();
                         _totalAmount = 0;
                       });
@@ -119,7 +128,12 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             ),
           ],
 
-          if (_selectedStudentId != null) ...[
+          if (_selectedStudent != null) ...[
+            const SizedBox(height: 16),
+            
+            // Student Info Card
+            _buildStudentInfoCard(),
+            
             const SizedBox(height: 16),
             
             // Step 3: Student Fee Summary
@@ -157,6 +171,68 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             ),
             const SizedBox(height: 12),
             child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStudentInfoCard() {
+    final student = _selectedStudent!;
+    return Card(
+      color: Colors.blue[50],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: AppTheme.primaryColor,
+                  child: Text(
+                    student.fullName.substring(0, 1).toUpperCase(),
+                    style: const TextStyle(fontSize: 24, color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        student.fullName,
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Class: ${student.className} - ${student.section}  |  Roll No: ${student.rollNo ?? "N/A"}',
+                        style: TextStyle(color: Colors.grey[700]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.person_outline, size: 18, color: Colors.grey),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Father: ${student.parentName.isNotEmpty ? student.parentName : "N/A"}')),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.woman, size: 18, color: Colors.pink),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Mother: ${student.motherName.isNotEmpty ? student.motherName : "N/A"}')),
+              ],
+            ),
           ],
         ),
       ),
@@ -367,20 +443,18 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
   }
 
   void _calculateTotal(String academicYear) {
-    // This would calculate based on class fee config
-    // For now, using placeholder
+    // TODO: Calculate based on class fee config
     _totalAmount = _selectedMonths.length * 1000; // Placeholder
   }
 
   Future<void> _generateFeesForStudent(String academicYear) async {
-    // Generate fees for all months
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Fees generate ho rahe hain...')),
     );
   }
 
   Future<void> _collectFees(String academicYear) async {
-    if (_selectedMonths.isEmpty) return;
+    if (_selectedMonths.isEmpty || _selectedStudent == null) return;
 
     try {
       final receiptNo = await ref.read(feeRepoProvider).generateReceiptNo();
@@ -401,12 +475,8 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
 
       await ref.read(feeRepoProvider).createFeePayment(payment);
 
-      // Get student details
-      final students = await ref.read(classStudentsProvider(_selectedClassId!).future);
-      final student = students.firstWhere((s) => s.id == _selectedStudentId);
-
-      // Show receipt
-      await _printReceipt(payment, student.name, student.rollNo ?? 'N/A');
+      // Show receipt with full student details
+      await _printReceipt(payment, _selectedStudent!);
 
       // Clear selection
       setState(() {
@@ -438,7 +508,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     }
   }
 
-  Future<void> _printReceipt(FeePayment payment, String studentName, String rollNo) async {
+  Future<void> _printReceipt(FeePayment payment, Student student) async {
     final pdf = pw.Document();
     
     final dateFormat = DateFormat('dd MMM yyyy');
@@ -459,24 +529,67 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
               ),
             ),
             pw.SizedBox(height: 10),
-            pw.Divider(),
+            pw.Divider(thickness: 2),
             pw.SizedBox(height: 10),
             
             // Receipt Details
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('Receipt No: ${payment.receiptNo}'),
-                pw.Text('Date: ${dateFormat.format(payment.paymentDate)}'),
-              ],
+            pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(5),
+              ),
+              child: pw.Column(
+                children: [
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Receipt No: ${payment.receiptNo}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Date: ${dateFormat.format(payment.paymentDate)}'),
+                    ],
+                  ),
+                  pw.SizedBox(height: 5),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Student: ${student.fullName}'),
+                      pw.Text('Roll No: ${student.rollNo ?? "N/A"}'),
+                    ],
+                  ),
+                  pw.SizedBox(height: 5),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Class: ${student.className} - ${student.section}'),
+                      pw.Text('Academic Year: ${payment.academicYear}'),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            pw.SizedBox(height: 5),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('Student: $studentName'),
-                pw.Text('Roll No: $rollNo'),
-              ],
+            pw.SizedBox(height: 10),
+            
+            // Parent Details
+            pw.Container(
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey300),
+                borderRadius: pw.BorderRadius.circular(5),
+              ),
+              child: pw.Row(
+                children: [
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Father: ${student.parentName}', style: const pw.TextStyle(fontSize: 10)),
+                        pw.SizedBox(height: 2),
+                        pw.Text('Mother: ${student.motherName}', style: const pw.TextStyle(fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
             pw.SizedBox(height: 10),
             pw.Divider(),
@@ -495,7 +608,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text('Months Paid:'),
-                      pw.Text(payment.remarks ?? ''),
+                      pw.Text(payment.remarks?.replaceFirst('Months: ', '') ?? ''),
                     ],
                   ),
                   pw.SizedBox(height: 5),
@@ -530,8 +643,8 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text('Net Amount:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text('₹${payment.amount.toStringAsFixed(0)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18)),
+                      pw.Text('Net Amount:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                      pw.Text('₹${payment.amount.toStringAsFixed(0)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20)),
                     ],
                   ),
                 ],
@@ -542,14 +655,39 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             
             // Footer
             pw.Divider(),
+            pw.SizedBox(height: 5),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Parent Signature', style: const pw.TextStyle(fontSize: 10)),
-                pw.Text('Receiver Signature', style: const pw.TextStyle(fontSize: 10)),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Parent Signature', style: const pw.TextStyle(fontSize: 10)),
+                    pw.SizedBox(height: 20),
+                    pw.Container(
+                      width: 100,
+                      decoration: const pw.BoxDecoration(
+                        border: pw.Border(bottom: pw.BorderSide()),
+                      ),
+                    ),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('Receiver Signature', style: const pw.TextStyle(fontSize: 10)),
+                    pw.SizedBox(height: 20),
+                    pw.Container(
+                      width: 100,
+                      decoration: const pw.BoxDecoration(
+                        border: pw.Border(bottom: pw.BorderSide()),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            pw.SizedBox(height: 5),
+            pw.SizedBox(height: 10),
             pw.Center(
               child: pw.Text('This is a computer generated receipt', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
             ),
@@ -564,11 +702,3 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     );
   }
 }
-
-// Student Fee Summary Provider
-final studentFeeSummaryProvider = FutureProvider.family<StudentFeeSummary, ({
-  String studentId,
-  String academicYear,
-})>((ref, args) async {
-  return ref.read(feeRepoProvider).getStudentFeeSummary(args.studentId, args.academicYear);
-});
