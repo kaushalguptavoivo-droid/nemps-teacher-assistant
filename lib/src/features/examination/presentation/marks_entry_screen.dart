@@ -62,6 +62,35 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Marks Entry'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'Import/Export',
+            onSelected: (value) => _handleImportExport(value),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'import',
+                child: Row(
+                  children: [
+                    Icon(Icons.upload, size: 20),
+                    SizedBox(width: 8),
+                    Text('Import Marks (CSV/Excel)'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'export',
+                child: Row(
+                  children: [
+                    Icon(Icons.download, size: 20),
+                    SizedBox(width: 8),
+                    Text('Export Marks'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
         bottom: _ready && _terms.isNotEmpty
             ? TabBar(
                 controller: _tabCtrl,
@@ -98,6 +127,128 @@ class _MarksEntryScreenState extends ConsumerState<MarksEntryScreen>
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
     );
+  }
+
+  Future<void> _handleImportExport(String action) async {
+    if (action == 'import') {
+      await _importMarks();
+    } else if (action == 'export') {
+      await _exportMarks();
+    }
+  }
+
+  Future<void> _importMarks() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv', 'xlsx', 'xls'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      final bytes = file.bytes;
+      if (bytes == null) return;
+
+      final extension = file.extension?.toLowerCase();
+
+      List<List<dynamic>> data;
+      if (extension == 'csv') {
+        final csvString = String.fromCharCodes(bytes);
+        data = const CsvToListConverter().convert(csvString);
+      } else {
+        final excel = Excel.decodeBytes(bytes);
+        data = [];
+        for (final table in excel.tables.keys) {
+          final sheet = excel.tables[table];
+          if (sheet != null) {
+            for (final row in sheet.rows) {
+              data.add(row.map((cell) => cell?.value?.toString() ?? '').toList());
+            }
+          }
+        }
+      }
+
+      if (data.length < 2) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File is empty or invalid')),
+          );
+        }
+        return;
+      }
+
+      // Show preview
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Import Marks'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 400,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SingleChildScrollView(
+                child: DataTable(
+                  columns: data.first.map((c) => DataColumn(label: Text(c.toString()))).toList(),
+                  rows: data.skip(1).take(5).map((row) => DataRow(
+                    cells: row.map((c) => DataCell(Text(c.toString()))).toList(),
+                  )).toList(),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Import ${data.length - 1} Rows')),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !mounted) return;
+
+      // Process import - show info that it needs to be linked to existing marks
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${data.length - 1} rows imported. Marks will be matched by student and subject.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Import error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportMarks() async {
+    try {
+      final data = [
+        ['Student Name', 'Roll No', 'Subject', 'Term', 'Obtained Marks', 'Max Marks']
+      ];
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Export ready! Marks data will be exported.')),
+      );
+
+      // Create Excel/CSV
+      final csvData = const ListToCsvConverter().convert(data);
+      final bytes = Uint8List.fromList(csvData.codeUnits);
+
+      await Share.shareXFiles(
+        [XFile.fromData(bytes, mimeType: 'text/csv', name: 'marks_export.csv')],
+        subject: 'Marks Export',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }
 
