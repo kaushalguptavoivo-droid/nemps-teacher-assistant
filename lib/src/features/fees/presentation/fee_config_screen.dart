@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../data/fee_providers.dart';
+import '../../examination/data/exam_providers.dart';
 import '../models/fee_models.dart';
 
 class FeeConfigScreen extends ConsumerStatefulWidget {
@@ -507,24 +508,27 @@ class _ClassFeeConfigListState extends ConsumerState<_ClassFeeConfigList> {
             labelText: 'Class choose karein',
             prefixIcon: Icon(Icons.class_rounded),
           ),
-          items: allClasses.whenData((classes) => classes
+          items: (allClasses.valueOrNull ?? [])
               .map((c) => DropdownMenuItem(
                     value: c.id,
                     child: Text('Class ${c.label}'),
                   ))
-              .toList()),
+              .toList(),
           onChanged: (v) => setState(() => _selectedClassId = v),
         ),
         if (_selectedClassId != null)
-          activeSession.whenData((session) {
-            if (session == null) return const SizedBox.shrink();
-            return Expanded(
-              child: _ClassFeeConfigDetail(
-                classId: _selectedClassId!,
-                academicYear: session.label,
-              ),
-            );
-          }),
+          Builder(
+            builder: (context) {
+              final session = activeSession.valueOrNull;
+              if (session == null) return const SizedBox.shrink();
+              return Expanded(
+                child: _ClassFeeConfigDetail(
+                  classId: _selectedClassId!,
+                  academicYear: session.label,
+                ),
+              );
+            },
+          ),
       ],
     );
   }

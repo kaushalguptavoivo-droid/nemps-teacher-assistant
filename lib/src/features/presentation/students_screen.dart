@@ -280,7 +280,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       // Convert Excel data to CSV-like format
       final rows = <List<dynamic>>[];
       for (final row in table.rows) {
-        rows.add(row.cells.map((c) => c?.value?.toString() ?? '').toList());
+        rows.add(row.map((c) => c?.value?.toString() ?? '').toList());
       }
       
       if (rows.length < 2) {
