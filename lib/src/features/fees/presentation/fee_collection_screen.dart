@@ -287,6 +287,11 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                   
                   const SizedBox(height: 16),
                   
+                  // Receipt History Section
+                  _buildReceiptHistory(academicYear),
+                  
+                  const SizedBox(height: 16),
+                  
                   // Step 3: Student Fee Summary
                   _buildStudentFeeSummary(academicYear),
                 ],
@@ -305,6 +310,183 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildReceiptHistory(String academicYear) {
+    final paymentsAsync = ref.watch(studentPaymentsProvider((
+      studentId: _selectedStudentId!,
+      academicYear: academicYear,
+    )));
+
+    return _buildSectionCard(
+      title: '📋 Receipt History',
+      icon: Icons.history,
+      child: paymentsAsync.when(
+        data: (payments) {
+          if (payments.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.receipt_long, size: 48, color: Colors.grey),
+                    SizedBox(height: 8),
+                    Text('Koi receipt nahi hai', style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: payments.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final payment = payments[index];
+              final dateFormat = DateFormat('dd MMM yyyy');
+              
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.green[50],
+                  child: Icon(Icons.receipt, color: Colors.green[700]),
+                ),
+                title: Row(
+                  children: [
+                    Text(
+                      '₹${payment.amount.toStringAsFixed(0)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '#${payment.receiptNo}',
+                        style: TextStyle(fontSize: 11, color: Colors.blue[700]),
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: Text(
+                  '${dateFormat.format(payment.paymentDate)} • ${payment.paymentMethod.toUpperCase()}',
+                ),
+                trailing: PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'print') {
+                      _printReceipt(payment, _selectedStudent!);
+                    } else if (value == 'delete') {
+                      _confirmDeleteReceipt(payment, academicYear);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'print',
+                      child: Row(
+                        children: [
+                          Icon(Icons.print, size: 20),
+                          SizedBox(width: 8),
+                          Text('Print Again'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Text('Error: $e'),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteReceipt(FeePayment payment, String academicYear) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('Delete Receipt?'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Receipt No: ${payment.receiptNo}'),
+            Text('Amount: ₹${payment.amount.toStringAsFixed(0)}'),
+            Text('Date: ${DateFormat('dd MMM yyyy').format(payment.paymentDate)}'),
+            const SizedBox(height: 12),
+            const Text(
+              '⚠️ Warning: This action cannot be undone!',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _deleteReceipt(payment, academicYear);
+    }
+  }
+
+  Future<void> _deleteReceipt(FeePayment payment, String academicYear) async {
+    try {
+      // Delete from database
+      await ref.read(feeRepoProvider).deletePayment(payment.id);
+      
+      // Refresh the list
+      ref.invalidate(studentPaymentsProvider((
+        studentId: _selectedStudentId!,
+        academicYear: academicYear,
+      )));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Receipt ${payment.receiptNo} deleted'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   void _onSearch(String query, AsyncValue<List<Student>> allStudentsAsync) {

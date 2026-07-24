@@ -257,6 +257,10 @@ class FeeRepository {
     return id;
   }
 
+  Future<void> deletePayment(String paymentId) async {
+    await _client.from('fee_payments').delete().eq('id', paymentId);
+  }
+
   Future<List<FeePayment>> getStudentPayments(String studentId, String academicYear) async {
     try {
       final data = await _client
