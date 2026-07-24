@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEMPS App - UI Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .preview-container {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            flex-wrap: wrap;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background: #000;
+            border-radius: 50px;
+            padding: 12px;
+            box-shadow: 0 50px 100px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .notch {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 30px;
+            background: #000;
+            border-radius: 0 0 20px 20px;
+            z-index: 10;
+        }
+
+        .screen {
+            width: 100%;
+            height: 100%;
+            background: #f8fafc;
+            border-radius: 40px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .status-bar {
+            height: 50px;
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 8px 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: white;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .menu-icon:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.05);
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .school-name {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .header-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: rotate(10deg);
+        }
+
+        .content {
+            padding: 20px;
+            height: calc(100% - 120px);
+            overflow-y: auto;
+        }
+
+        .greeting-card {
+            background: linear-gradient(135deg, #1e40af, #7c3aed);
+            border-radius: 24px;
+            padding: 24px;
+            color: white;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .greeting-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 200px;
+            height: 200px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+        }
+
+        .greeting-card h2 {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 4px;
+        }
+
+        .greeting-card h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .greeting-card p {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .greeting-card .avatar {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .section-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-title h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .section-title span {
+            color: #3b82f6;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-size: 24px;
+        }
+
+        .stat-card:nth-child(1) .stat-icon { background: #dbeafe; }
+        .stat-card:nth-child(2) .stat-icon { background: #dcfce7; }
+        .stat-card:nth-child(3) .stat-icon { background: #fef3c7; }
+
+        .stat-card h4 {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .class-card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .class-card:hover {
+            transform: translateX(10px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .class-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+
+        .class-card:nth-child(1) .class-icon { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+        .class-card:nth-child(2) .class-icon { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+        .class-card:nth-child(3) .class-icon { background: linear-gradient(135deg, #10b981, #059669); }
+
+        .class-info {
+            flex: 1;
+        }
+
+        .class-info h4 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .class-info p {
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .class-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-blue { background: #dbeafe; color: #1d4ed8; }
+        .badge-green { background: #dcfce7; color: #15803d; }
+        .badge-purple { background: #ede9fe; color: #6d28d9; }
+
+        .bottom-nav {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 10px;
+            padding-bottom: 20px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+            border-radius: 0 0 40px 40px;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            color: white;
+        }
+
+        .nav-item.active .nav-icon {
+            background: white;
+            color: #1e40af;
+        }
+
+        .nav-item:not(.active) {
+            color: #94a3b8;
+        }
+
+        .nav-icon {
+            width: 44px;
+            height: 32px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+
+        .nav-item:not(.active) .nav-icon {
+            background: #f1f5f9;
+        }
+
+        .nav-label {
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 300px;
+            background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+            border-radius: 24px;
+            padding: 24px;
+            color: white;
+            height: 812px;
+            box-shadow: 0 50px 100px rgba(0,0,0,0.3);
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .sidebar-logo {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 22px;
+        }
+
+        .sidebar-title h2 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .sidebar-title p {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .menu-section {
+            margin-bottom: 20px;
+        }
+
+        .menu-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.5;
+            margin-bottom: 12px;
+            padding-left: 12px;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 4px;
+        }
+
+        .menu-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .menu-item.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .menu-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            width: 4px;
+            height: 30px;
+            background: #fbbf24;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .menu-icon-wrapper {
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .menu-item span {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .menu-badge {
+            background: #ef4444;
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .title {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .title h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .title p {
+            opacity: 0.7;
+            font-size: 14px;
+        }
+
+        .legend {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+            font-size: 14px;
+        }
+
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 6px;
+        }
+
+        .legend-box.sidebar { background: linear-gradient(135deg, #1e3a8a, #1e40af); }
+        .legend-box.phone { background: #1e40af; border-radius: 20px; }
+        .legend-box.nav { background: white; color: #1e40af; }
+    </style>
+</head>
+<body>
+    <div class="title">
+        <h1>📱 NEMPS App UI Preview</h1>
+        <p>Professional Mobile-First Design with Sidebar Navigation</p>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-box sidebar"></div>
+                <span>Left Sidebar</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box phone"></div>
+                <span>Mobile Screen</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box nav"></div>
+                <span>Bottom Nav</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="preview-container">
+        <!-- Sidebar Preview -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🏫</div>
+                <div class="sidebar-title">
+                    <h2>NEMPS</h2>
+                    <p>Teacher Assistant</p>
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <div class="menu-section-title">Main Menu</div>
+                <div class="menu-item active">
+                    <div class="menu-icon-wrapper">📊</div>
+                    <span>Dashboard</span>
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <div class="menu-section-title">Management</div>
+                <div class="menu-item">
+                    <div class="menu-icon-wrapper">👥</div>
+                    <span>Students</span>
+                    <span class="menu-badge">New</span>
+                </div>
+                <div class="menu-item">
+                    <div class="menu-icon-wrapper">📋</div>
+                    <span>Attendance</span>
+                </div>
+                <div class="menu-item">
+                    <div class="menu-icon-wrapper">📝</div>
+                    <span>Homework</span>
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <div class="menu-section-title">Academic</div>
+                <div class="menu-item">
+                    <div class="menu-icon-wrapper">📚</div>
+                    <span>Examination</span>
+                </div>
+                <div class="menu-item">
+                    <div class="menu-icon-wrapper">📈</div>
+                    <span>Results</span>
+                </div>
+                <div class="menu-item">
+                    <div class="menu-icon-wrapper">💰</div>
+                    <span>Fees</span>
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <div class="menu-section-title">System</div>
+                <div class="menu-item">
+                    <div class="menu-icon-wrapper">⚙️</div>
+                    <span>Settings</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phone 1: Dashboard -->
+        <div class="phone-frame">
+            <div class="notch"></div>
+            <div class="screen">
+                <div class="status-bar">
+                    <span>9:41</span>
+                    <span>📶 📡 🔋</span>
+                </div>
+
+                <div class="header">
+                    <div class="header-left">
+                        <div class="menu-icon">☰</div>
+                        <div class="logo">🏫</div>
+                        <span class="school-name">NEMPS</span>
+                    </div>
+                    <div class="header-actions">
+                        <div class="header-btn">🔔</div>
+                        <div class="header-btn">👤</div>
+                    </div>
+                </div>
+
+                <div class="content">
+                    <div class="greeting-card">
+                        <h2>🌅 Good Morning</h2>
+                        <h1>Hello, Rahul! 👋</h1>
+                        <p>Aaj ka kaam poora karein 💪</p>
+                        <div class="avatar">👨‍🏫</div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">👥</div>
+                            <h4>Students</h4>
+                            <div class="value">245</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📋</div>
+                            <h4>Attendance</h4>
+                            <div class="value">98%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📝</div>
+                            <h4>Homework</h4>
+                            <div class="value">12</div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">
+                        <h3>My Classes</h3>
+                        <span>View All →</span>
+                    </div>
+
+                    <div class="class-card">
+                        <div class="class-icon">1️⃣</div>
+                        <div class="class-info">
+                            <h4>Class 1-A</h4>
+                            <p>32 Students • 8:00 AM</p>
+                        </div>
+                        <span class="class-badge badge-blue">Active</span>
+                    </div>
+
+                    <div class="class-card">
+                        <div class="class-icon">2️⃣</div>
+                        <div class="class-info">
+                            <h4>Class 2-B</h4>
+                            <p>28 Students • 9:00 AM</p>
+                        </div>
+                        <span class="class-badge badge-green">Done</span>
+                    </div>
+
+                    <div class="class-card">
+                        <div class="class-icon">3️⃣</div>
+                        <div class="class-info">
+                            <h4>Class 3-A</h4>
+                            <p>35 Students • 10:00 AM</p>
+                        </div>
+                        <span class="class-badge badge-purple">Pending</span>
+                    </div>
+                </div>
+
+                <div class="bottom-nav">
+                    <div class="nav-item active">
+                        <div class="nav-icon">🏠</div>
+                        <span class="nav-label">Home</span>
+                    </div>
+                    <div class="nav-item">
+                        <div class="nav-icon">👥</div>
+                        <span class="nav-label">Students</span>
+                    </div>
+                    <div class="nav-item">
+                        <div class="nav-icon">📋</div>
+                        <span class="nav-label">Attendance</span>
+                    </div>
+                    <div class="nav-item">
+                        <div class="nav-icon">📝</div>
+                        <span class="nav-label">Homework</span>
+                    </div>
+                    <div class="nav-item">
+                        <div class="nav-icon">⚙️</div>
+                        <span class="nav-label">More</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phone 2: Attendance -->
+        <div class="phone-frame">
+            <div class="notch"></div>
+            <div class="screen">
+                <div class="status-bar">
+                    <span>9:41</span>
+                    <span>📶 📡 🔋</span>
+                </div>
+
+                <div class="header">
+                    <div class="header-left">
+                        <div class="menu-icon">☰</div>
+                        <span class="school-name">Attendance</span>
+                    </div>
+                    <div class="header-actions">
+                        <div class="header-btn">📤</div>
+                        <div class="header-btn">👤</div>
+                    </div>
+                </div>
+
+                <div class="content">
+                    <div class="greeting-card" style="background: linear-gradient(135deg, #10b981, #059669);">
+                        <h2>📅 Today</h2>
+                        <h1>24 July 2026</h1>
+                        <p>Wednesday • Day 3</p>
+                        <div class="avatar">📋</div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">✅</div>
+                            <h4>Present</h4>
+                            <div class="value" style="color: #10b981;">30</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">❌</div>
+                            <h4>Absent</h4>
+                            <div class="value" style="color: #ef4444;">2</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏰</div>
+                            <h4>Late</h4>
+                            <div class="value" style="color: #f59e0b;">0</div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">
+                        <h3>Class 1-A Students</h3>
+                        <span>Sort: Roll No</span>
+                    </div>
+
+                    <div class="class-card">
+                        <div class="class-icon" style="background: linear-gradient(135deg, #10b981, #059669);">✓</div>
+                        <div class="class-info">
+                            <h4>Aarav Sharma</h4>
+                            <p>Roll No: 01</p>
+                        </div>
+                        <span class="class-badge badge-green">Present</span>
+                    </div>
+
+                    <div class="class-card">
+                        <div class="class-icon" style="background: linear-gradient(135deg, #10b981, #059669);">✓</div>
+                        <div class="class-info">
+                            <h4>Aisha Patel</h4>
+                            <p>Roll No: 02</p>
+                        </div>
+                        <span class="class-badge badge-green">Present</span>
+                    </div>
+
+                    <div class="class-card">
+                        <div class="class-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);">✗</div>
+                        <div class="class-info">
+                            <h4>Rahul Verma</h4>
+                            <p>Roll No: 03</p>
+                        </div>
+                        <span class="class-badge" style="background: #fee2e2; color: #dc2626;">Absent</span>
+                    </div>
+                </div>
+
+                <div class="bottom-nav">
+                    <div class="nav-item">
+                        <div class="nav-icon">🏠</div>
+                        <span class="nav-label">Home</span>
+                    </div>
+                    <div class="nav-item">
+                        <div class="nav-icon">👥</div>
+                        <span class="nav-label">Students</span>
+                    </div>
+                    <div class="nav-item active">
+                        <div class="nav-icon">📋</div>
+                        <span class="nav-label">Attendance</span>
+                    </div>
+                    <div class="nav-item">
+                        <div class="nav-icon">📝</div>
+                        <span class="nav-label">Homework</span>
+                    </div>
+                    <div class="nav-item">
+                        <div class="nav-icon">⚙️</div>
+                        <span class="nav-label">More</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+<!-- Additional Screens Preview -->
+<div style="text-align: center; margin-top: 60px; margin-bottom: 30px;">
+    <h1 style="color: white; font-size: 32px;">📱 More Screens Preview</h1>
+    <p style="color: rgba(255,255,255,0.7); font-size: 16px;">Homework, Results, and Settings screens</p>
+</div>
+
+<div class="preview-container">
+    <!-- Phone 3: Homework -->
+    <div class="phone-frame">
+        <div class="notch"></div>
+        <div class="screen">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>📶 📡 🔋</span>
+            </div>
+
+            <div class="header">
+                <div class="header-left">
+                    <div class="menu-icon">☰</div>
+                    <span class="school-name">Homework</span>
+                </div>
+                <div class="header-actions">
+                    <div class="header-btn">➕</div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="greeting-card" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">
+                    <h2>📚 Today's Homework</h2>
+                    <h1>24 July 2026</h1>
+                    <p>Class 1-A • 5 Tasks</p>
+                    <div class="avatar">📖</div>
+                </div>
+
+                <div class="section-title">
+                    <h3>Pending Tasks</h3>
+                    <span>Filter: All</span>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #8b5cf6;">
+                    <div class="class-icon" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">📐</div>
+                    <div class="class-info">
+                        <h4>Mathematics</h4>
+                        <p>Chapter 5, Exercise 3-5</p>
+                    </div>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #3b82f6;">
+                    <div class="class-icon" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);">🌍</div>
+                    <div class="class-info">
+                        <h4>Environmental Studies</h4>
+                        <p>Lesson 4 - Plants</p>
+                    </div>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #10b981;">
+                    <div class="class-icon" style="background: linear-gradient(135deg, #10b981, #059669);">✍️</div>
+                    <div class="class-info">
+                        <h4>Hindi</h4>
+                        <p>Page 25 - Essay Writing</p>
+                    </div>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #f59e0b;">
+                    <div class="class-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">🎨</div>
+                    <div class="class-info">
+                        <h4>Art & Craft</h4>
+                        <p>Draw a Rainy Day Scene</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bottom-nav">
+                <div class="nav-item">
+                    <div class="nav-icon">🏠</div>
+                    <span class="nav-label">Home</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">👥</div>
+                    <span class="nav-label">Students</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">📋</div>
+                    <span class="nav-label">Attendance</span>
+                </div>
+                <div class="nav-item active">
+                    <div class="nav-icon">📝</div>
+                    <span class="nav-label">Homework</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">⚙️</div>
+                    <span class="nav-label">More</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phone 4: Results -->
+    <div class="phone-frame">
+        <div class="notch"></div>
+        <div class="screen">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>📶 📡 🔋</span>
+            </div>
+
+            <div class="header">
+                <div class="header-left">
+                    <div class="menu-icon">☰</div>
+                    <span class="school-name">Results</span>
+                </div>
+                <div class="header-actions">
+                    <div class="header-btn">📊</div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div class="greeting-card" style="background: linear-gradient(135deg, #ec4899, #db2777);">
+                    <h2>📈 Exam Results</h2>
+                    <h1>Half Yearly 2026</h1>
+                    <p>Class 1-A • 32 Students</p>
+                    <div class="avatar">🏆</div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">👑</div>
+                        <h4>Top Score</h4>
+                        <div class="value" style="color: #ec4899;">95%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <h4>Class Avg</h4>
+                        <div class="value">78%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <h4>Pass Rate</h4>
+                        <div class="value" style="color: #10b981;">94%</div>
+                    </div>
+                </div>
+
+                <div class="section-title">
+                    <h3>Top Performers</h3>
+                    <span>View All</span>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #fbbf24;">
+                    <div class="class-icon" style="background: linear-gradient(135deg, #fbbf24, #f59e0b);">🥇</div>
+                    <div class="class-info">
+                        <h4>Aarav Sharma</h4>
+                        <p>95% • Rank #1</p>
+                    </div>
+                    <span class="class-badge badge-blue">A+</span>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #94a3b8;">
+                    <div class="class-icon" style="background: linear-gradient(135deg, #94a3b8, #64748b);">🥈</div>
+                    <div class="class-info">
+                        <h4>Aisha Patel</h4>
+                        <p>92% • Rank #2</p>
+                    </div>
+                    <span class="class-badge badge-blue">A+</span>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #cd7f32;">
+                    <div class="class-icon" style="background: linear-gradient(135deg, #cd7f32, #a0522d);">🥉</div>
+                    <div class="class-info">
+                        <h4>Rahul Verma</h4>
+                        <p>89% • Rank #3</p>
+                    </div>
+                    <span class="class-badge badge-green">A</span>
+                </div>
+            </div>
+
+            <div class="bottom-nav">
+                <div class="nav-item">
+                    <div class="nav-icon">🏠</div>
+                    <span class="nav-label">Home</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">👥</div>
+                    <span class="nav-label">Students</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">📋</div>
+                    <span class="nav-label">Attendance</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">📝</div>
+                    <span class="nav-label">Homework</span>
+                </div>
+                <div class="nav-item active">
+                    <div class="nav-icon">⚙️</div>
+                    <span class="nav-label">More</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phone 5: Settings -->
+    <div class="phone-frame">
+        <div class="notch"></div>
+        <div class="screen">
+            <div class="status-bar">
+                <span>9:41</span>
+                <span>📶 📡 🔋</span>
+            </div>
+
+            <div class="header">
+                <div class="header-left">
+                    <div class="menu-icon">☰</div>
+                    <span class="school-name">Settings</span>
+                </div>
+                <div class="header-actions">
+                    <div class="header-btn">👤</div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div style="text-align: center; margin-bottom: 24px;">
+                    <div style="width: 100px; height: 100px; background: linear-gradient(135deg, #1e40af, #3b82f6); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 48px; box-shadow: 0 10px 30px rgba(30,64,175,0.3);">👨‍🏫</div>
+                    <h3 style="color: #1e293b; font-size: 20px; margin-bottom: 4px;">Rahul Kumar</h3>
+                    <p style="color: #64748b; font-size: 14px;">Class Teacher • Class 1-A</p>
+                </div>
+
+                <div class="section-title">
+                    <h3>Profile Settings</h3>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #3b82f6;">
+                    <div class="class-icon" style="background: #dbeafe;">👤</div>
+                    <div class="class-info">
+                        <h4>Edit Profile</h4>
+                        <p>Name, Phone, Photo</p>
+                    </div>
+                    <span style="color: #94a3b8;">→</span>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #8b5cf6;">
+                    <div class="class-icon" style="background: #ede9fe;">🔔</div>
+                    <div class="class-info">
+                        <h4>Notifications</h4>
+                        <p>Push, Email alerts</p>
+                    </div>
+                    <span style="color: #94a3b8;">→</span>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #f59e0b;">
+                    <div class="class-icon" style="background: #fef3c7;">🎨</div>
+                    <div class="class-info">
+                        <h4>Theme</h4>
+                        <p>Light / Dark / System</p>
+                    </div>
+                    <span style="color: #94a3b8;">→</span>
+                </div>
+
+                <div class="section-title" style="margin-top: 20px;">
+                    <h3>App Settings</h3>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #10b981;">
+                    <div class="class-icon" style="background: #dcfce7;">🌐</div>
+                    <div class="class-info">
+                        <h4>Language</h4>
+                        <p>English, हिंदी</p>
+                    </div>
+                    <span style="color: #94a3b8;">→</span>
+                </div>
+
+                <div class="class-card" style="border-left: 4px solid #ef4444;">
+                    <div class="class-icon" style="background: #fee2e2;">🚪</div>
+                    <div class="class-info">
+                        <h4>Logout</h4>
+                        <p>Sign out from app</p>
+                    </div>
+                    <span style="color: #ef4444;">→</span>
+                </div>
+            </div>
+
+            <div class="bottom-nav">
+                <div class="nav-item">
+                    <div class="nav-icon">🏠</div>
+                    <span class="nav-label">Home</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">👥</div>
+                    <span class="nav-label">Students</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">📋</div>
+                    <span class="nav-label">Attendance</span>
+                </div>
+                <div class="nav-item">
+                    <div class="nav-icon">📝</div>
+                    <span class="nav-label">Homework</span>
+                </div>
+                <div class="nav-item active">
+                    <div class="nav-icon">⚙️</div>
+                    <span class="nav-label">More</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Desktop Sidebar Preview -->
+<div style="text-align: center; margin-top: 60px; margin-bottom: 30px;">
+    <h1 style="color: white; font-size: 32px;">💻 Desktop View - Full Sidebar</h1>
+    <p style="color: rgba(255,255,255,0.7); font-size: 16px;">Professional sidebar navigation for larger screens</p>
+</div>
+
+<div class="preview-container" style="justify-content: center;">
+    <div class="sidebar" style="width: 320px; height: 700px;">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">🏫</div>
+            <div class="sidebar-title">
+                <h2>NEMPS</h2>
+                <p>Teacher Assistant Pro</p>
+            </div>
+        </div>
+
+        <div class="menu-section">
+            <div class="menu-section-title">🚀 Quick Access</div>
+            <div class="menu-item active">
+                <div class="menu-icon-wrapper">📊</div>
+                <span>Dashboard</span>
+            </div>
+        </div>
+
+        <div class="menu-section">
+            <div class="menu-section-title">👥 Student Management</div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">👨‍🎓</div>
+                <span>All Students</span>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">➕</div>
+                <span>Add Student</span>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">📥</div>
+                <span>Import / Export</span>
+                <span class="menu-badge">New</span>
+            </div>
+        </div>
+
+        <div class="menu-section">
+            <div class="menu-section-title">📋 Daily Tasks</div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">✅</div>
+                <span>Mark Attendance</span>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">📝</div>
+                <span>Homework</span>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">📧</div>
+                <span>Send Notification</span>
+            </div>
+        </div>
+
+        <div class="menu-section">
+            <div class="menu-section-title">📚 Academics</div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">📖</div>
+                <span>Marks Entry</span>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">📈</div>
+                <span>Results & Reports</span>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">📋</div>
+                <span>Exam Config</span>
+            </div>
+        </div>
+
+        <div class="menu-section">
+            <div class="menu-section-title">💰 Finance</div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">💵</div>
+                <span>Fee Collection</span>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">📊</div>
+                <span>Fee Reports</span>
+            </div>
+        </div>
+
+        <div class="menu-section">
+            <div class="menu-section-title">⚙️ Administration</div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">🏫</div>
+                <span>Academic Sessions</span>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">📢</div>
+                <span>Notices</span>
+            </div>
+            <div class="menu-item">
+                <div class="menu-icon-wrapper">⚙️</div>
+                <span>Settings</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Desktop Content Area -->
+    <div style="width: 600px; background: white; border-radius: 24px; padding: 24px; box-shadow: 0 50px 100px rgba(0,0,0,0.3);">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid #f1f5f9;">
+            <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #1e40af, #3b82f6); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px;">📊</div>
+            <div>
+                <h2 style="color: #1e293b; margin-bottom: 4px;">Dashboard</h2>
+                <p style="color: #64748b; font-size: 14px;">Welcome back, Rahul! Here's your overview.</p>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+            <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); padding: 20px; border-radius: 16px; color: white; text-align: center;">
+                <div style="font-size: 32px; margin-bottom: 8px;">👥</div>
+                <div style="font-size: 28px; font-weight: bold;">245</div>
+                <div style="font-size: 12px; opacity: 0.8;">Total Students</div>
+            </div>
+            <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 20px; border-radius: 16px; color: white; text-align: center;">
+                <div style="font-size: 32px; margin-bottom: 8px;">✅</div>
+                <div style="font-size: 28px; font-weight: bold;">98%</div>
+                <div style="font-size: 12px; opacity: 0.8;">Attendance</div>
+            </div>
+            <div style="background: linear-gradient(135deg, #8b5cf6, #6d28d9); padding: 20px; border-radius: 16px; color: white; text-align: center;">
+                <div style="font-size: 32px; margin-bottom: 8px;">📝</div>
+                <div style="font-size: 28px; font-weight: bold;">12</div>
+                <div style="font-size: 12px; opacity: 0.8;">Homework</div>
+            </div>
+            <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding: 20px; border-radius: 16px; color: white; text-align: center;">
+                <div style="font-size: 32px; margin-bottom: 8px;">💰</div>
+                <div style="font-size: 28px; font-weight: bold;">94%</div>
+                <div style="font-size: 12px; opacity: 0.8;">Fee Collection</div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+            <div style="background: #f8fafc; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <h4 style="color: #1e293b; margin-bottom: 16px;">📅 Recent Attendance</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b;">Class 1-A</span>
+                    <span style="color: #10b981; font-weight: 600;">32/32 ✓</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b;">Class 2-B</span>
+                    <span style="color: #10b981; font-weight: 600;">28/28 ✓</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0;">
+                    <span style="color: #64748b;">Class 3-A</span>
+                    <span style="color: #f59e0b; font-weight: 600;">33/35 ⏳</span>
+                </div>
+            </div>
+
+            <div style="background: #f8fafc; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <h4 style="color: #1e293b; margin-bottom: 16px;">📝 Pending Homework</h4>
+                <div style="display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #e2e8f0; align-items: center;">
+                    <div style="width: 40px; height: 40px; background: #dbeafe; border-radius: 10px; display: flex; align-items: center; justify-content: center;">📐</div>
+                    <div>
+                        <div style="color: #1e293b; font-weight: 600;">Mathematics</div>
+                        <div style="color: #64748b; font-size: 12px;">Class 1-A • Due Today</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px; padding: 12px 0; align-items: center;">
+                    <div style="width: 40px; height: 40px; background: #ede9fe; border-radius: 10px; display: flex; align-items: center; justify-content: center;">🌍</div>
+                    <div>
+                        <div style="color: #1e293b; font-weight: 600;">EVS Project</div>
+                        <div style="color: #64748b; font-size: 12px;">Class 2-B • Due Tomorrow</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="text-align: center; margin: 60px 0 30px;">
+    <h1 style="color: white; font-size: 24px;">🎨 Color Theme Preview</h1>
+</div>
+
+<div class="preview-container" style="justify-content: center;">
+    <div style="background: white; padding: 30px; border-radius: 24px; display: flex; gap: 20px; flex-wrap: wrap; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+        <div style="text-align: center;">
+            <div style="width: 80px; height: 80px; background: #1e40af; border-radius: 16px; margin-bottom: 8px;"></div>
+            <span style="color: #64748b; font-size: 12px;">Primary</span>
+            <br><span style="color: #1e293b; font-size: 11px;">#1E40AF</span>
+        </div>
+        <div style="text-align: center;">
+            <div style="width: 80px; height: 80px; background: #3b82f6; border-radius: 16px; margin-bottom: 8px;"></div>
+            <span style="color: #64748b; font-size: 12px;">Accent</span>
+            <br><span style="color: #1e293b; font-size: 11px;">#3B82F6</span>
+        </div>
+        <div style="text-align: center;">
+            <div style="width: 80px; height: 80px; background: #10b981; border-radius: 16px; margin-bottom: 8px;"></div>
+            <span style="color: #64748b; font-size: 12px;">Success</span>
+            <br><span style="color: #1e293b; font-size: 11px;">#10B981</span>
+        </div>
+        <div style="text-align: center;">
+            <div style="width: 80px; height: 80px; background: #f59e0b; border-radius: 16px; margin-bottom: 8px;"></div>
+            <span style="color: #64748b; font-size: 12px;">Warning</span>
+            <br><span style="color: #1e293b; font-size: 11px;">#F59E0B</span>
+        </div>
+        <div style="text-align: center;">
+            <div style="width: 80px; height: 80px; background: #ef4444; border-radius: 16px; margin-bottom: 8px;"></div>
+            <span style="color: #64748b; font-size: 12px;">Error</span>
+            <br><span style="color: #1e293b; font-size: 11px;">#EF4444</span>
+        </div>
+        <div style="text-align: center;">
+            <div style="width: 80px; height: 80px; background: #8b5cf6; border-radius: 16px; margin-bottom: 8px;"></div>
+            <span style="color: #64748b; font-size: 12px;">Purple</span>
+            <br><span style="color: #1e293b; font-size: 11px;">#8B5CF6</span>
+        </div>
+        <div style="text-align: center;">
+            <div style="width: 80px; height: 80px; background: #ec4899; border-radius: 16px; margin-bottom: 8px;"></div>
+            <span style="color: #64748b; font-size: 12px;">Pink</span>
+            <br><span style="color: #1e293b; font-size: 11px;">#EC4899</span>
+        </div>
+        <div style="text-align: center;">
+            <div style="width: 80px; height: 80px; background: #fbbf24; border-radius: 16px; margin-bottom: 8px;"></div>
+            <span style="color: #64748b; font-size: 12px;">Gold</span>
+            <br><span style="color: #1e293b; font-size: 11px;">#FBBF24</span>
+        </div>
+    </div>
+</div>
+
+<div style="text-align: center; margin: 60px 0;">
+    <p style="color: rgba(255,255,255,0.5); font-size: 14px;">Generated by NEMPS UI Designer • Preview Only</p>
+</div>
+
+</body>
+</html>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +7,7 @@ import 'core/theme/app_theme.dart';
 import 'core/services/notification_service.dart';
 import 'features/data/providers.dart';
 import 'features/presentation/screens.dart';
+import 'features/presentation/new_shell_screen.dart';
 import 'features/examination/presentation/marks_entry_screen.dart';
 import 'features/examination/presentation/result_screen.dart';
 import 'features/examination/presentation/report_card_screen.dart';
@@ -63,58 +65,58 @@ class _NempsAppState extends ConsumerState<NempsApp> {
         GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
         GoRoute(
           path: '/dashboard',
-          builder: (_, __) => const ShellScreen(child: DashboardScreen()),
+          builder: (_, __) => const NewShellScreen(child: DashboardScreen()),
         ),
         GoRoute(
           path: '/class/:id',
-          builder: (_, s) => ShellScreen(
+          builder: (_, s) => NewShellScreen(
               child: ClassDetailScreen(classId: s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/attendance/:id',
-          builder: (_, s) => ShellScreen(
+          builder: (_, s) => NewShellScreen(
               child: AttendanceScreen(classId: s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/students/:id',
-          builder: (_, s) => ShellScreen(
+          builder: (_, s) => NewShellScreen(
               child: StudentsScreen(classId: s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/homework/:id',
-          builder: (_, s) => ShellScreen(
+          builder: (_, s) => NewShellScreen(
               child: HomeworkScreen(classId: s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/absent/:id',
-          builder: (_, s) => ShellScreen(
+          builder: (_, s) => NewShellScreen(
               child: AbsentNotifyScreen(classId: s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/reports',
-          builder: (_, __) => const ShellScreen(child: ReportsScreen()),
+          builder: (_, __) => const NewShellScreen(child: ReportsScreen()),
         ),
         GoRoute(
           path: '/admin',
-          builder: (_, __) => const ShellScreen(child: AdminPanelScreen()),
+          builder: (_, __) => const NewShellScreen(child: AdminPanelScreen()),
         ),
         // ── Phase 4: Marks Entry ──────────────────────────────────────────
         GoRoute(
           path: '/exam-marks/:id',
-          builder: (_, s) => ShellScreen(
+          builder: (_, s) => NewShellScreen(
               child: MarksEntryScreen(classId: s.pathParameters['id']!)),
         ),
         // ── Phase 5: Result Engine ────────────────────────────────────────
         GoRoute(
           path: '/results/:id',
-          builder: (_, s) => ShellScreen(
+          builder: (_, s) => NewShellScreen(
               child: ResultScreen(classId: s.pathParameters['id']!)),
         ),
         GoRoute(
           path: '/report-card/:classId/:studentId',
           builder: (_, s) {
             final args = s.extra as ReportCardArgs;
-            return ShellScreen(
+            return NewShellScreen(
               child: ReportCardScreen(
                 classId: s.pathParameters['classId']!,
                 studentId: s.pathParameters['studentId']!,
@@ -128,7 +130,7 @@ class _NempsAppState extends ConsumerState<NempsApp> {
           path: '/bulk-print/:classId',
           builder: (_, s) {
             final args = s.extra as BulkPrintArgs;
-            return ShellScreen(
+            return NewShellScreen(
               child: BulkPrintScreen(
                 classId: s.pathParameters['classId']!,
                 args: args,
@@ -140,18 +142,18 @@ class _NempsAppState extends ConsumerState<NempsApp> {
         GoRoute(
           path: '/promotion',
           builder: (_, __) =>
-              const ShellScreen(child: PromotionScreen()),
+              const NewShellScreen(child: PromotionScreen()),
         ),
         // ── Phase 8: Analytics ────────────────────────────────────────────
         GoRoute(
           path: '/analytics',
           builder: (_, __) =>
-              const ShellScreen(child: AnalyticsScreen()),
+              const NewShellScreen(child: AnalyticsScreen()),
         ),
         // ── Feature 1: Attendance Register ───────────────────────────────
         GoRoute(
           path: '/attendance-register/:id',
-          builder: (_, s) => ShellScreen(
+          builder: (_, s) => NewShellScreen(
               child: AttendanceRegisterScreen(
                   classId: s.pathParameters['id']!)),
         ),
