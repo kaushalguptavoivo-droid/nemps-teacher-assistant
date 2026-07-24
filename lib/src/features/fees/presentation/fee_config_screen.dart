@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
+import '../../examination/data/exam_providers.dart';
 import '../data/fee_providers.dart';
 import '../models/fee_models.dart';
 
@@ -501,30 +502,38 @@ class _ClassFeeConfigListState extends ConsumerState<_ClassFeeConfigList> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DropdownButtonFormField<String>(
-          value: _selectedClassId,
-          decoration: const InputDecoration(
-            labelText: 'Class choose karein',
-            prefixIcon: Icon(Icons.class_rounded),
+        allClasses.when(
+          data: (classes) => DropdownButtonFormField<String>(
+            value: _selectedClassId,
+            decoration: const InputDecoration(
+              labelText: 'Class choose karein',
+              prefixIcon: Icon(Icons.class_rounded),
+            ),
+            items: classes
+                .map((c) => DropdownMenuItem(
+                      value: c.id,
+                      child: Text('Class ${c.label}'),
+                    ))
+                .toList(),
+            onChanged: (v) => setState(() => _selectedClassId = v),
           ),
-          items: allClasses.whenData((classes) => classes
-              .map((c) => DropdownMenuItem(
-                    value: c.id,
-                    child: Text('Class ${c.label}'),
-                  ))
-              .toList()),
-          onChanged: (v) => setState(() => _selectedClassId = v),
+          loading: () => const LinearProgressIndicator(),
+          error: (e, _) => Text('Error: $e'),
         ),
         if (_selectedClassId != null)
-          activeSession.whenData((session) {
-            if (session == null) return const SizedBox.shrink();
-            return Expanded(
-              child: _ClassFeeConfigDetail(
-                classId: _selectedClassId!,
-                academicYear: session.label,
-              ),
-            );
-          }),
+          activeSession.when(
+            data: (session) {
+              if (session == null) return const SizedBox.shrink();
+              return Expanded(
+                child: _ClassFeeConfigDetail(
+                  classId: _selectedClassId!,
+                  academicYear: session.label,
+                ),
+              );
+            },
+            loading: () => const Expanded(child: Center(child: CircularProgressIndicator())),
+            error: (e, _) => Expanded(child: Center(child: Text('Error: $e'))),
+          ),
       ],
     );
   }

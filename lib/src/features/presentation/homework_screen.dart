@@ -7,6 +7,7 @@ import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
 import '../examination/data/exam_providers.dart';
+import '../examination/models/exam_models.dart';
 
 // Subject colors for visual differentiation
 const _subjectColors = {
