@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/providers.dart';
+import '../../../data/providers.dart';
 import '../data/fee_providers.dart';
 import '../models/fee_models.dart';
 

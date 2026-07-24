@@ -501,14 +501,19 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
                       ),
                     ),
                   ],
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.upload_file_rounded, size: 15),
-                    label: const Text('Import'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      textStyle: const TextStyle(fontSize: 12),
-                      visualDensity: VisualDensity.compact,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Theme.of(context).dividerColor),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.upload_file_rounded, size: 15),
+                        SizedBox(width: 4),
+                        Text('Import', style: TextStyle(fontSize: 12)),
+                      ],
                     ),
                   ),
                 ),
@@ -543,14 +548,19 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
                     ),
                   ),
                 ],
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.download_rounded, size: 15),
-                  label: const Text('Export'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    textStyle: const TextStyle(fontSize: 12),
-                    visualDensity: VisualDensity.compact,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.download_rounded, size: 15),
+                      SizedBox(width: 4),
+                      Text('Export', style: TextStyle(fontSize: 12)),
+                    ],
                   ),
                 ),
               ),
