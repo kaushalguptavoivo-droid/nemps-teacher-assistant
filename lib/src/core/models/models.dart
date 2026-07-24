@@ -72,9 +72,11 @@ class Homework {
     this.description = '',
     required this.assignedDate,
     this.assignedBy = '',
+    this.isHidden = false,
   });
   final String id, classId, subject, description, assignedBy;
   final DateTime assignedDate;
+  final bool isHidden;
   factory Homework.fromMap(Map<String, dynamic> m) => Homework(
     id: m['id'],
     classId: m['class_id'],
@@ -82,6 +84,7 @@ class Homework {
     description: m['description'] ?? '',
     assignedDate: DateTime.parse(m['assigned_date']),
     assignedBy: m['assigned_by'] ?? '',
+    isHidden: m['is_hidden'] as bool? ?? false,
   );
 }
 

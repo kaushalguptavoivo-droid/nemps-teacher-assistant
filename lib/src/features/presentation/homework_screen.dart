@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
+import '../examination/data/exam_providers.dart';
 
 // Subject colors for visual differentiation
 const _subjectColors = {
@@ -24,7 +25,8 @@ const _subjectColors = {
 Color _colorForSubject(String s) =>
     _subjectColors[s] ?? const Color(0xFF6B7280);
 
-const _subjects = [
+// Default hardcoded subjects - always available
+const _defaultSubjects = [
   'Math', 'English', 'Hindi', 'Science', 'Social Studies',
   'Computer', 'Drawing', 'EVS', 'GK', 'Sanskrit',
 ];
@@ -101,9 +103,43 @@ class _AssignTabState extends ConsumerState<_AssignTab> {
     super.dispose();
   }
 
+  List<String> _getAllSubjects(List<ClassSubject> dbSubjects) {
+    // Get subject names from database
+    final dbSubjectNames = dbSubjects
+        .where((s) => s.isActive)
+        .map((s) => s.subjectName)
+        .toSet();
+    
+    // Combine default subjects with database subjects
+    // Default subjects (GK, Sanskrit) are always available
+    final allSubjects = {..._defaultSubjects, ...dbSubjectNames}.toList();
+    
+    // Sort: default subjects first in order, then other subjects alphabetically
+    allSubjects.sort((a, b) {
+      final aIndex = _defaultSubjects.indexOf(a);
+      final bIndex = _defaultSubjects.indexOf(b);
+      if (aIndex >= 0 && bIndex >= 0) return aIndex.compareTo(bIndex);
+      if (aIndex >= 0) return -1;
+      if (bIndex >= 0) return 1;
+      return a.compareTo(b);
+    });
+    
+    return allSubjects;
+  }
+
   @override
   Widget build(BuildContext context) {
     final homework = ref.watch(homeworkProvider(widget.classId));
+    final activeSession = ref.watch(activeSessionProvider);
+    
+    // Get subjects from database
+    final subjectsAsync = activeSession.when(
+      data: (session) => session == null
+          ? AsyncValue<List<ClassSubject>>.data([])
+          : ref.watch(classSubjectsProvider((classId: widget.classId, year: session.label))),
+      loading: () => const AsyncValue<List<ClassSubject>>.loading(),
+      error: (e, _) => AsyncValue<List<ClassSubject>>.data([]),
+    );
 
     return Column(
       children: [
@@ -120,29 +156,59 @@ class _AssignTabState extends ConsumerState<_AssignTab> {
                       .titleMedium
                       ?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedSubject,
-                decoration: const InputDecoration(
-                    labelText: 'Subject choose karein',
-                    prefixIcon: Icon(Icons.book_outlined)),
-                items: _subjects
-                    .map((s) => DropdownMenuItem(
-                        value: s,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                  color: _colorForSubject(s),
-                                  shape: BoxShape.circle),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(s),
-                          ],
-                        )))
-                    .toList(),
-                onChanged: (v) => setState(() => selectedSubject = v),
+              subjectsAsync.when(
+                data: (dbSubjects) {
+                  final allSubjects = _getAllSubjects(dbSubjects);
+                  return DropdownButtonFormField<String>(
+                    value: selectedSubject,
+                    decoration: const InputDecoration(
+                        labelText: 'Subject choose karein',
+                        prefixIcon: Icon(Icons.book_outlined)),
+                    items: allSubjects
+                        .map((s) => DropdownMenuItem(
+                            value: s,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                      color: _colorForSubject(s),
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(s),
+                              ],
+                            )))
+                        .toList(),
+                    onChanged: (v) => setState(() => selectedSubject = v),
+                  );
+                },
+                loading: () => const LinearProgressIndicator(),
+                error: (e, _) => DropdownButtonFormField<String>(
+                  value: selectedSubject,
+                  decoration: const InputDecoration(
+                      labelText: 'Subject choose karein',
+                      prefixIcon: Icon(Icons.book_outlined)),
+                  items: _defaultSubjects
+                      .map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                    color: _colorForSubject(s),
+                                    shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(s),
+                            ],
+                          )))
+                      .toList(),
+                  onChanged: (v) => setState(() => selectedSubject = v),
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -246,81 +312,148 @@ class _HomeworkCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final color = _colorForSubject(hw.subject);
     final isAfter12PM = DateTime.now().hour >= 12;
+    final isHidden = hw.isHidden;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                      color: color.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8)),
-                  child: Text(hw.subject,
-                      style: TextStyle(
-                          color: color, fontWeight: FontWeight.bold)),
-                ),
-                const Spacer(),
-                Text(
-                  DateFormat('dd MMM').format(hw.assignedDate),
-                  style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 12),
-                ),
-              ],
-            ),
-            if (hw.description.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(hw.description),
-            ],
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _markHomework(context, ref, hw.id, classId),
-                    icon: const Icon(Icons.edit_note, size: 16),
-                    label: const Text('Mark Status'),
-                    style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.homeworkColor,
-                        side: const BorderSide(color: AppTheme.homeworkColor)),
+      color: isHidden ? Colors.grey.shade200 : null,
+      child: Opacity(
+        opacity: isHidden ? 0.7 : 1.0,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text(hw.subject,
+                        style: TextStyle(
+                            color: color, fontWeight: FontWeight.bold)),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: isAfter12PM
-                        ? () => _sendPendingWhatsApp(context, ref, hw)
-                        : null,
-                    icon: Icon(
-                      Icons.message,
-                      size: 16,
-                      color: isAfter12PM
-                          ? AppTheme.whatsappColor
+                  if (isHidden) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade400,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Hidden',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  Text(
+                    DateFormat('dd MMM').format(hw.assignedDate),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 12),
+                  ),
+                ],
+              ),
+              if (hw.description.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(hw.description),
+              ],
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _markHomework(context, ref, hw.id, classId),
+                      icon: const Icon(Icons.edit_note, size: 16),
+                      label: const Text('Mark Status'),
+                      style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.homeworkColor,
+                          side: const BorderSide(color: AppTheme.homeworkColor)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: isAfter12PM && !isHidden
+                          ? () => _sendPendingWhatsApp(context, ref, hw)
                           : null,
-                    ),
-                    label: Text(
-                      isAfter12PM ? 'WA Pending' : 'WA (12 baje ke baad)',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: isAfter12PM
-                              ? AppTheme.whatsappColor
-                              : Theme.of(context).disabledColor),
+                      icon: Icon(
+                        Icons.message,
+                        size: 16,
+                        color: isAfter12PM && !isHidden
+                            ? AppTheme.whatsappColor
+                            : null,
+                      ),
+                      label: Text(
+                        isHidden
+                            ? 'Hidden'
+                            : isAfter12PM
+                                ? 'Send WA'
+                                : 'WA (12 baje)',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: isAfter12PM && !isHidden
+                                ? AppTheme.whatsappColor
+                                : Theme.of(context).disabledColor),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 4),
+                  IconButton(
+                    onPressed: () => _toggleHidden(context, ref),
+                    icon: Icon(
+                      isHidden ? Icons.visibility : Icons.visibility_off,
+                      size: 20,
+                    ),
+                    tooltip: isHidden ? 'Unhide Homework' : 'Hide Homework',
+                    style: IconButton.styleFrom(
+                      foregroundColor: isHidden ? Colors.grey : Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _toggleHidden(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(repoProvider).toggleHomeworkHidden(hw.id, !hw.isHidden);
+      ref.invalidate(homeworkProvider(classId));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              hw.isHidden
+                  ? 'Homework unhide ho gaya!'
+                  : 'Homework hide ho gaya!',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _markHomework(BuildContext context, WidgetRef ref, String homeworkId, String classId) {
