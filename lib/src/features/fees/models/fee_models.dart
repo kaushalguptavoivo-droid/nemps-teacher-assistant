@@ -43,6 +43,156 @@ class FeeType {
       };
 }
 
+// Student Fee model
+class StudentFee {
+  StudentFee({
+    required this.id,
+    required this.studentId,
+    required this.feeTypeId,
+    required this.classId,
+    required this.academicYear,
+    required this.amount,
+    this.paidAmount = 0,
+    this.status = 'due',
+    required this.dueDate,
+    this.paidDate,
+    this.concession = 0,
+    this.lateFeeApplied = 0,
+    this.remarks,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String studentId;
+  final String feeTypeId;
+  final String classId;
+  final String academicYear;
+  final double amount;
+  final double paidAmount;
+  final String status;
+  final DateTime dueDate;
+  final DateTime? paidDate;
+  final double concession;
+  final double lateFeeApplied;
+  final String? remarks;
+  final DateTime createdAt;
+
+  // Relations (populated separately)
+  String? studentName;
+  String? studentRollNo;
+  String? feeTypeName;
+  String? className;
+
+  double get pendingAmount => amount - paidAmount + lateFeeApplied - concession;
+  bool get isPaid => status == 'paid';
+  bool get isOverdue => !isPaid && dueDate.isBefore(DateTime.now());
+
+  factory StudentFee.fromMap(Map<String, dynamic> m) => StudentFee(
+        id: m['id'] as String,
+        studentId: m['student_id'] as String,
+        feeTypeId: m['fee_type_id'] as String,
+        classId: m['class_id'] as String,
+        academicYear: m['academic_year'] as String,
+        amount: (m['amount'] as num).toDouble(),
+        paidAmount: (m['paid_amount'] as num?)?.toDouble() ?? 0,
+        status: m['status'] as String? ?? 'due',
+        dueDate: DateTime.parse(m['due_date'] as String),
+        paidDate: m['paid_date'] != null
+            ? DateTime.parse(m['paid_date'] as String)
+            : null,
+        concession: (m['concession'] as num?)?.toDouble() ?? 0,
+        lateFeeApplied: (m['late_fee_applied'] as num?)?.toDouble() ?? 0,
+        remarks: m['remarks'] as String?,
+        createdAt: DateTime.parse(m['created_at'] as String),
+      );
+
+  Map<String, dynamic> toInsertMap() => {
+        'student_id': studentId,
+        'fee_type_id': feeTypeId,
+        'class_id': classId,
+        'academic_year': academicYear,
+        'amount': amount,
+        'paid_amount': paidAmount,
+        'status': status,
+        'due_date': dueDate.toIso8601String().substring(0, 10),
+        if (paidDate != null) 'paid_date': paidDate!.toIso8601String().substring(0, 10),
+        'concession': concession,
+        'late_fee_applied': lateFeeApplied,
+        if (remarks != null) 'remarks': remarks,
+      };
+}
+
+// Payment record model
+class FeePayment {
+  const FeePayment({
+    required this.id,
+    required this.studentFeeId,
+    required this.studentId,
+    required this.amount,
+    required this.paymentDate,
+    this.paymentMethod = 'cash',
+    this.transactionId,
+    this.receivedBy,
+    this.remarks,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String studentFeeId;
+  final String studentId;
+  final double amount;
+  final DateTime paymentDate;
+  final String paymentMethod;
+  final String? transactionId;
+  final String? receivedBy;
+  final String? remarks;
+  final DateTime createdAt;
+
+  factory FeePayment.fromMap(Map<String, dynamic> m) => FeePayment(
+        id: m['id'] as String,
+        studentFeeId: m['student_fee_id'] as String,
+        studentId: m['student_id'] as String,
+        amount: (m['amount'] as num).toDouble(),
+        paymentDate: DateTime.parse(m['payment_date'] as String),
+        paymentMethod: m['payment_method'] as String? ?? 'cash',
+        transactionId: m['transaction_id'] as String?,
+        receivedBy: m['received_by'] as String?,
+        remarks: m['remarks'] as String?,
+        createdAt: DateTime.parse(m['created_at'] as String),
+      );
+
+  Map<String, dynamic> toInsertMap() => {
+        'student_fee_id': studentFeeId,
+        'student_id': studentId,
+        'amount': amount,
+        'payment_date': paymentDate.toIso8601String().substring(0, 10),
+        'payment_method': paymentMethod,
+        if (transactionId != null) 'transaction_id': transactionId,
+        if (receivedBy != null) 'received_by': receivedBy,
+        if (remarks != null) 'remarks': remarks,
+      };
+}
+
+// Fee summary for reports
+class FeeSummary {
+  const FeeSummary({
+    required this.totalStudents,
+    required this.totalAmount,
+    required this.collectedAmount,
+    required this.pendingAmount,
+    required this.overdueCount,
+  });
+
+  final int totalStudents;
+  final double totalAmount;
+  final double collectedAmount;
+  final double pendingAmount;
+  final int overdueCount;
+
+  double get collectionPercent =>
+      totalAmount > 0 ? (collectedAmount / totalAmount) * 100 : 0;
+}
+
 class ClassFeeConfig {
   const ClassFeeConfig({
     required this.id,

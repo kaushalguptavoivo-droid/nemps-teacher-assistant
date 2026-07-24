@@ -1,8 +1,9 @@
-// Fee Configuration Screen
-// Admin manages fee types and class-wise fee configuration.
+// Admin Fees Management Screen
+// Fully customizable fee management for admin
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../data/providers.dart';
 import '../data/fee_providers.dart';
 import '../../examination/data/exam_providers.dart';
@@ -22,7 +23,7 @@ class _FeeConfigScreenState extends ConsumerState<FeeConfigScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -41,9 +42,12 @@ class _FeeConfigScreenState extends ConsumerState<FeeConfigScreen>
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
+          isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.category), text: 'Fee Types'),
-            Tab(icon: Icon(Icons.settings), text: 'Class Config'),
+            Tab(icon: Icon(Icons.class_), text: 'Class Config'),
+            Tab(icon: Icon(Icons.payments), text: 'Collection'),
+            Tab(icon: Icon(Icons.analytics), text: 'Reports'),
           ],
         ),
       ),
@@ -52,6 +56,8 @@ class _FeeConfigScreenState extends ConsumerState<FeeConfigScreen>
         children: const [
           _FeeTypesTab(),
           _ClassFeeConfigTab(),
+          _FeeCollectionTab(),
+          _FeeReportsTab(),
         ],
       ),
     );
@@ -829,5 +835,755 @@ class _ClassFeeConfigCard extends ConsumerWidget {
         );
       }
     }
+  }
+}
+
+// ── Fee Collection Tab ───────────────────────────────────────────────────────
+
+class _FeeCollectionTab extends ConsumerStatefulWidget {
+  const _FeeCollectionTab();
+
+  @override
+  ConsumerState<_FeeCollectionTab> createState() => _FeeCollectionTabState();
+}
+
+class _FeeCollectionTabState extends ConsumerState<_FeeCollectionTab> {
+  String? _selectedClassId;
+  String _statusFilter = 'all';
+
+  @override
+  Widget build(BuildContext context) {
+    final activeSession = ref.watch(activeSessionProvider);
+
+    return activeSession.when(
+      data: (session) {
+        if (session == null) {
+          return const Center(
+            child: Text(
+              'Koi active session nahi.\nAdmin se poochein.',
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+        return _buildCollectionContent(session.label);
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+    );
+  }
+
+  Widget _buildCollectionContent(String academicYear) {
+    final classesAsync = ref.watch(allClassesProvider);
+    final summaryAsync = ref.watch(feeSummaryProvider((
+      classId: _selectedClassId,
+      academicYear: academicYear,
+    )));
+
+    return Column(
+      children: [
+        // Summary Card
+        summaryAsync.when(
+          data: (summary) => _buildSummaryCard(summary),
+          loading: () => const LinearProgressIndicator(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+        // Filters
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: classesAsync.when(
+                  data: (classes) => DropdownButtonFormField<String>(
+                    value: _selectedClassId,
+                    decoration: const InputDecoration(
+                      labelText: 'Class Filter',
+                      prefixIcon: Icon(Icons.class_),
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('All Classes')),
+                      ...classes.map((c) => DropdownMenuItem(
+                        value: c.id,
+                        child: Text('${c.name} - ${c.section}'),
+                      )),
+                    ],
+                    onChanged: (v) => setState(() => _selectedClassId = v),
+                  ),
+                  loading: () => const LinearProgressIndicator(),
+                  error: (_, __) => const Text('Error loading classes'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              DropdownButton<String>(
+                value: _statusFilter,
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('All')),
+                  DropdownMenuItem(value: 'due', child: Text('Due')),
+                  DropdownMenuItem(value: 'paid', child: Text('Paid')),
+                  DropdownMenuItem(value: 'overdue', child: Text('Overdue')),
+                ],
+                onChanged: (v) => setState(() => _statusFilter = v ?? 'all'),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        // Fee List
+        Expanded(
+          child: _buildFeeList(academicYear),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCard(FeeSummary summary) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Theme.of(context).colorScheme.primary,
+            Theme.of(context).colorScheme.secondary,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _summaryItem('Total', '₹${summary.totalAmount.toStringAsFixed(0)}', Colors.white),
+          _summaryItem('Collected', '₹${summary.collectedAmount.toStringAsFixed(0)}', Colors.greenAccent),
+          _summaryItem('Pending', '₹${summary.pendingAmount.toStringAsFixed(0)}', Colors.orangeAccent),
+          _summaryItem('Overdue', '${summary.overdueCount}', Colors.redAccent),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: Colors.white70),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeeList(String academicYear) {
+    final feesAsync = ref.watch(studentFeesProvider((
+      classId: _selectedClassId,
+      studentId: null,
+      academicYear: academicYear,
+      status: _statusFilter == 'all' ? null : _statusFilter,
+    )));
+
+    return feesAsync.when(
+      data: (fees) {
+        if (fees.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'Koi fee records nahi.\nPehle class mein fees generate karein.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(8),
+          itemCount: fees.length,
+          itemBuilder: (_, index) {
+            final fee = fees[index];
+            return _FeeCollectionCard(
+              fee: fee,
+              onCollectPayment: () => _showPaymentDialog(fee),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+    );
+  }
+
+  Future<void> _showPaymentDialog(StudentFee fee) async {
+    final amountCtrl = TextEditingController(
+      text: fee.pendingAmount.toStringAsFixed(0),
+    );
+    final remarksCtrl = TextEditingController();
+    String paymentMethod = 'cash';
+    DateTime paymentDate = DateTime.now();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setSt) => AlertDialog(
+          title: Text('Collect Payment - ${fee.feeTypeName ?? "Fee"}'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('Total Amount'),
+                  trailing: Text('₹${fee.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                ListTile(
+                  title: const Text('Pending'),
+                  trailing: Text('₹${fee.pendingAmount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+                ),
+                const Divider(),
+                TextField(
+                  controller: amountCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Payment Amount',
+                    prefixIcon: Icon(Icons.currency_rupee),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: paymentMethod,
+                  decoration: const InputDecoration(
+                    labelText: 'Payment Method',
+                    prefixIcon: Icon(Icons.payment),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
+                    DropdownMenuItem(value: 'card', child: Text('Card')),
+                    DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
+                    DropdownMenuItem(value: 'online', child: Text('Online Transfer')),
+                  ],
+                  onChanged: (v) => setSt(() => paymentMethod = v ?? 'cash'),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Payment Date'),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: ctx2,
+                        initialDate: paymentDate,
+                        firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) setSt(() => paymentDate = picked);
+                    },
+                    child: Text(DateFormat('dd/MM/yyyy').format(paymentDate)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: remarksCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Remarks (optional)',
+                    prefixIcon: Icon(Icons.note),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Collect'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true) return;
+
+    final amount = double.tryParse(amountCtrl.text) ?? 0;
+    if (amount <= 0) return;
+
+    try {
+      // Update student fee
+      final newPaidAmount = fee.paidAmount + amount;
+      final isFullyPaid = newPaidAmount >= fee.pendingAmount;
+      
+      await ref.read(feeRepoProvider).updateStudentFee(StudentFee(
+        id: fee.id,
+        studentId: fee.studentId,
+        feeTypeId: fee.feeTypeId,
+        classId: fee.classId,
+        academicYear: fee.academicYear,
+        amount: fee.amount,
+        paidAmount: newPaidAmount,
+        status: isFullyPaid ? 'paid' : 'partial',
+        dueDate: fee.dueDate,
+        paidDate: isFullyPaid ? paymentDate : null,
+        concession: fee.concession,
+        lateFeeApplied: fee.lateFeeApplied,
+        remarks: remarksCtrl.text.isNotEmpty ? remarksCtrl.text : fee.remarks,
+        createdAt: fee.createdAt,
+      ));
+
+      // Record payment
+      await ref.read(feeRepoProvider).recordPayment(FeePayment(
+        id: '',
+        studentFeeId: fee.id,
+        studentId: fee.studentId,
+        amount: amount,
+        paymentDate: paymentDate,
+        paymentMethod: paymentMethod,
+        remarks: remarksCtrl.text.isNotEmpty ? remarksCtrl.text : null,
+        createdAt: DateTime.now(),
+      ));
+
+      ref.invalidate(studentFeesProvider((
+        classId: _selectedClassId,
+        studentId: null,
+        academicYear: fee.academicYear,
+        status: _statusFilter == 'all' ? null : _statusFilter,
+      )));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('₹$amount payment record ho gaya! ✓'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+}
+
+class _FeeCollectionCard extends StatelessWidget {
+  const _FeeCollectionCard({
+    required this.fee,
+    required this.onCollectPayment,
+  });
+
+  final StudentFee fee;
+  final VoidCallback onCollectPayment;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPaid = fee.isPaid;
+    final isOverdue = fee.isOverdue;
+
+    Color statusColor = Colors.orange;
+    String statusText = 'Due';
+    
+    if (isPaid) {
+      statusColor = Colors.green;
+      statusText = 'Paid';
+    } else if (isOverdue) {
+      statusColor = Colors.red;
+      statusText = 'Overdue';
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: statusColor.withOpacity(0.2),
+          child: Icon(
+            isPaid ? Icons.check_circle : Icons.pending,
+            color: statusColor,
+          ),
+        ),
+        title: Text(
+          fee.studentName ?? fee.studentId.substring(0, 8),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${fee.feeTypeName ?? "Fee"} • Roll: ${fee.studentRollNo ?? "N/A"}'),
+            Row(
+              children: [
+                Text(
+                  'Paid: ₹${fee.paidAmount.toStringAsFixed(0)}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                const Text(' / ', style: TextStyle(fontSize: 12)),
+                Text(
+                  '₹${fee.amount.toStringAsFixed(0)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                statusText,
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (!isPaid)
+              FilledButton.tonal(
+                onPressed: onCollectPayment,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(0, 28),
+                ),
+                child: const Text('Collect', style: TextStyle(fontSize: 12)),
+              ),
+          ],
+        ),
+        isThreeLine: true,
+      ),
+    );
+  }
+}
+
+// ── Fee Reports Tab ───────────────────────────────────────────────────────────
+
+class _FeeReportsTab extends ConsumerWidget {
+  const _FeeReportsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeSession = ref.watch(activeSessionProvider);
+
+    return activeSession.when(
+      data: (session) {
+        if (session == null) {
+          return const Center(
+            child: Text(
+              'Koi active session nahi.\nAdmin se poochein.',
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+        return _FeeReportsContent(academicYear: session.label);
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+    );
+  }
+}
+
+class _FeeReportsContent extends ConsumerWidget {
+  const _FeeReportsContent({required this.academicYear});
+
+  final String academicYear;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(feeSummaryProvider((
+      classId: null,
+      academicYear: academicYear,
+    )));
+    final classesAsync = ref.watch(classesWithFeeSummaryProvider(academicYear));
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Overall Summary
+          summaryAsync.when(
+            data: (summary) => _buildOverallSummary(context, summary),
+            loading: () => const Card(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+            error: (_, __) => const Card(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Error loading summary'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Class-wise Collection',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          // Class-wise breakdown
+          classesAsync.when(
+            data: (classes) {
+              if (classes.isEmpty) {
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.class_outlined, size: 48, color: Colors.grey[400]),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Koi class nahi.',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: classes.map((cls) {
+                  final summary = cls['summary'] as FeeSummary;
+                  return _ClassFeeReportCard(
+                    className: '${cls['name']} - ${cls['section']}',
+                    summary: summary,
+                  );
+                }).toList(),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('Error: $e'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverallSummary(BuildContext context, FeeSummary summary) {
+    final percent = summary.collectionPercent;
+    
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.analytics, color: Colors.blue),
+                const SizedBox(width: 8),
+                Text(
+                  'Overall Fee Collection ($academicYear)',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: percent / 100,
+                minHeight: 20,
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation(
+                  percent >= 80 ? Colors.green :
+                  percent >= 50 ? Colors.orange : Colors.red,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${percent.toStringAsFixed(1)}% Collected',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: percent >= 80 ? Colors.green :
+                       percent >= 50 ? Colors.orange : Colors.red,
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Stats grid
+            Row(
+              children: [
+                Expanded(child: _reportStat('Total Students', '${summary.totalStudents}')),
+                Expanded(child: _reportStat('Total Amount', '₹${_formatAmount(summary.totalAmount)}')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _reportStat('Collected', '₹${_formatAmount(summary.collectedAmount)}', color: Colors.green)),
+                Expanded(child: _reportStat('Pending', '₹${_formatAmount(summary.pendingAmount)}', color: Colors.orange)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _reportStat('Overdue Entries', '${summary.overdueCount}', color: Colors.red),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reportStat(String label, String value, {Color? color}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        color: (color ?? Colors.blue).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatAmount(double amount) {
+    if (amount >= 100000) {
+      return '${(amount / 100000).toStringAsFixed(1)}L';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(1)}K';
+    }
+    return amount.toStringAsFixed(0);
+  }
+}
+
+class _ClassFeeReportCard extends StatelessWidget {
+  const _ClassFeeReportCard({
+    required this.className,
+    required this.summary,
+  });
+
+  final String className;
+  final FeeSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = summary.collectionPercent;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    className,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (percent >= 80 ? Colors.green :
+                            percent >= 50 ? Colors.orange : Colors.red).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    '${percent.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: percent >= 80 ? Colors.green :
+                             percent >= 50 ? Colors.orange : Colors.red,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: percent / 100,
+                minHeight: 8,
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation(
+                  percent >= 80 ? Colors.green :
+                  percent >= 50 ? Colors.orange : Colors.red,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _miniStat('Students', '${summary.totalStudents}'),
+                _miniStat('Total', '₹${summary.totalAmount.toStringAsFixed(0)}'),
+                _miniStat('Collected', '₹${summary.collectedAmount.toStringAsFixed(0)}', color: Colors.green),
+                _miniStat('Pending', '₹${summary.pendingAmount.toStringAsFixed(0)}', color: Colors.orange),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniStat(String label, String value, {Color? color}) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+        ),
+      ],
+    );
   }
 }
