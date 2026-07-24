@@ -338,7 +338,7 @@ class _AttendanceRegisterScreenState
     Widget totalCell(String txt, double w, {Color? bg}) => Container(
           width: w,
           height: rowH,
-          color: bg ?? cs.surfaceVariant,
+          color: bg ?? cs.surfaceContainerHighest,
           alignment: Alignment.center,
           child: Text(txt,
               style: TextStyle(

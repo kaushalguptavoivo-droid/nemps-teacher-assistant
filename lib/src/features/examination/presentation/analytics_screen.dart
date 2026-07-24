@@ -325,7 +325,7 @@ class _AnalyticsDashboard extends StatelessWidget {
                           ? null
                           : Theme.of(context)
                               .colorScheme
-                              .surfaceVariant
+                              .surfaceContainerHighest
                               .withOpacity(0.3),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 10),
@@ -522,7 +522,7 @@ class _ClassBar extends StatelessWidget {
                 value: pct,
                 minHeight: 10,
                 backgroundColor:
-                    theme.colorScheme.surfaceVariant,
+                    theme.colorScheme.surfaceContainerHighest,
                 color: color,
               ),
             ),

@@ -586,7 +586,7 @@ class _DashboardSearchState extends ConsumerState<_DashboardSearch> {
                   )
                 : null,
             filled: true,
-            fillColor: cs.surfaceVariant.withOpacity(0.5),
+            fillColor: cs.surfaceContainerHighest.withOpacity(0.5),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,

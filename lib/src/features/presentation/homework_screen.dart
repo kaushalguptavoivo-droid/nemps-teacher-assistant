@@ -795,7 +795,7 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
                 padding: const EdgeInsets.symmetric(
                     vertical: 36, horizontal: 20),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.4),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(

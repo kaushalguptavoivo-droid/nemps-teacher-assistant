@@ -606,7 +606,7 @@ class _BulkWhatsAppDialogState extends ConsumerState<_BulkWhatsAppDialog> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(message, style: const TextStyle(fontSize: 12)),

@@ -544,7 +544,7 @@ class _StudentResultTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: result.rank == 1
                       ? const Color(0xFFF59E0B).withOpacity(0.15)
-                      : theme.colorScheme.surfaceVariant,
+                      : theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
