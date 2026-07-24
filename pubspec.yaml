@@ -18,7 +18,8 @@ dependencies:
   hive_flutter: ^1.1.0
   flutter_secure_storage: ^9.2.2
   connectivity_plus: ^6.0.5
-  share_plus: ^10.0.2
+  share_plus:
+  printing: ^5.12.0
   url_launcher: ^6.3.0
   intl: ^0.20.2
   uuid: ^4.5.0

@@ -12,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import '../data/exam_providers.dart';
 import '../models/exam_models.dart';
 import 'result_screen.dart';
+import 'traditional_report_card.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,23 @@ class _ReportCardScreenState extends ConsumerState<ReportCardScreen> {
       appBar: AppBar(
         title: Text(r.studentName),
         actions: [
+          // Traditional Report Card Button
+          IconButton(
+            tooltip: 'Traditional Report Card',
+            icon: const Icon(Icons.print),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TraditionalReportCardScreen(
+                    classId: widget.classId,
+                    studentId: widget.studentId,
+                    args: widget.args,
+                  ),
+                ),
+              );
+            },
+          ),
           templateAsync.when(
             data: (template) => _generating
                 ? const Padding(
