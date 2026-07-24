@@ -94,14 +94,6 @@ class ReportsScreen extends ConsumerWidget {
             color: Colors.purple,
             onTap: () => _showPrintDialog(context),
           ),
-          const SizedBox(height: 8),
-          _ReportTile(
-            icon: Icons.receipt_long_rounded,
-            title: 'Print Fee Receipt',
-            subtitle: 'PDF - Student fee receipt print karo',
-            color: Colors.green,
-            onTap: () => _showFeeReceiptDialog(context),
-          ),
         ],
       ),
     );
@@ -139,53 +131,6 @@ class ReportsScreen extends ConsumerWidget {
             },
             icon: const Icon(Icons.picture_as_pdf),
             label: const Text('Select Class'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showFeeReceiptDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.receipt_long_rounded, color: Colors.green),
-            SizedBox(width: 8),
-            Text('Print Fee Receipt'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Fee Receipt Print karne ke liye:'),
-            SizedBox(height: 12),
-            Text('1. Student ka naam select karein'),
-            Text('2. Fee type select karein'),
-            Text('3. Receipt print/download karein'),
-            SizedBox(height: 12),
-            Text('PDF format mein receipt milegi.',
-                style: TextStyle(fontStyle: FontStyle.italic)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Fee receipt feature coming soon!'),
-                ),
-              );
-            },
-            icon: const Icon(Icons.picture_as_pdf),
-            label: const Text('Select Student'),
           ),
         ],
       ),

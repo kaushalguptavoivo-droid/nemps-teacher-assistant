@@ -1147,17 +1147,35 @@ class _FeeCollectionTabState extends ConsumerState<_FeeCollectionTab> {
       data: (fees) {
         if (fees.isEmpty) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'Koi fee records nahi.\nPehle class mein fees generate karein.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Koi fee records nahi.\nPehle fees generate karein.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => _generateFeesForAll(academicYear),
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Generate Fees for All'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ye step sirf ek baar karne ka hai\nTabhi students ko fees dikhengi.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -1177,6 +1195,85 @@ class _FeeCollectionTabState extends ConsumerState<_FeeCollectionTab> {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
     );
+  }
+
+  Future<void> _generateFeesForAll(String academicYear) async {
+    final classes = await ref.read(allClassesProvider.future);
+    
+    if (classes.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Koi class nahi hai. Pehle class add karein.')),
+        );
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Generate Fees'),
+        content: Text(
+          '${classes.length} classes ke students ke liye fees generate honge.\n\n'
+          'Ye action sirf ek baar karne ka hai.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Generate'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      int totalGenerated = 0;
+      
+      for (final cls in classes) {
+        final configs = await ref.read(feeRepoProvider).getClassFeeConfigs(cls.id, academicYear);
+        if (configs.isEmpty) continue;
+        
+        final students = await ref.read(feeRepoProvider).getStudentsForClass(cls.id);
+        if (students.isEmpty) continue;
+
+        await ref.read(feeRepoProvider).generateFeesForClass(
+          classId: cls.id,
+          academicYear: academicYear,
+          configs: configs,
+          students: students,
+          dueDate: DateTime.now().add(const Duration(days: 15)),
+        );
+        totalGenerated += students.length;
+      }
+
+      ref.invalidate(studentFeesProvider((
+        classId: _selectedClassId,
+        studentId: null,
+        academicYear: academicYear,
+        status: _statusFilter == 'all' ? null : _statusFilter,
+      )));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ $totalGenerated students ke fees generate ho gaye!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _showPaymentDialog(StudentFee fee) async {

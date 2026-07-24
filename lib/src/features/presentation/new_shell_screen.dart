@@ -33,7 +33,7 @@ class NewShellScreen extends ConsumerWidget {
       _NavItemData(icon: Icons.people_rounded, label: 'Students', route: '/dashboard'),
       _NavItemData(icon: Icons.check_circle_rounded, label: 'Attendance', route: '/dashboard'),
       _NavItemData(icon: Icons.assignment_rounded, label: 'Homework', route: '/dashboard'),
-      _NavItemData(icon: Icons.payments_rounded, label: 'Fees', route: '/reports'),
+      _NavItemData(icon: Icons.analytics_rounded, label: 'Results', route: '/reports'),
     ];
 
     void onNavTap(int index, String route) {
@@ -234,16 +234,16 @@ class _MobileDrawer extends StatelessWidget {
       _MenuSectionData('MANAGEMENT', [
         _MenuTileData(icon: Icons.people_rounded, title: 'Students', index: 1, route: '/dashboard'),
         _MenuTileData(icon: Icons.check_circle_rounded, title: 'Attendance', index: 2, route: '/dashboard'),
-        _MenuTileData(icon: Icons.payments_rounded, title: 'Fees', index: 3, route: '/reports'),
       ]),
       _MenuSectionData('ACADEMICS', [
-        _MenuTileData(icon: Icons.analytics_rounded, title: 'Reports', index: 4, route: '/reports'),
-        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 5, route: '/reports'),
+        _MenuTileData(icon: Icons.analytics_rounded, title: 'Reports', index: 3, route: '/reports'),
+        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 4, route: '/reports'),
       ]),
       _MenuSectionData('ADMIN', [
-        _MenuTileData(icon: Icons.admin_panel_settings_rounded, title: 'Admin Panel', index: 6, route: '/admin'),
-        _MenuTileData(icon: Icons.school_rounded, title: 'Academic Sessions', index: 7, route: '/admin'),
-        _MenuTileData(icon: Icons.class_rounded, title: 'Class Management', index: 8, route: '/admin'),
+        _MenuTileData(icon: Icons.admin_panel_settings_rounded, title: 'Admin Panel', index: 5, route: '/admin'),
+        _MenuTileData(icon: Icons.school_rounded, title: 'Academic Sessions', index: 6, route: '/admin'),
+        _MenuTileData(icon: Icons.class_rounded, title: 'Class Management', index: 7, route: '/admin'),
+        _MenuTileData(icon: Icons.payments_rounded, title: 'Fee Management', index: 8, route: '/admin'),
         _MenuTileData(icon: Icons.person_rounded, title: 'User Management', index: 9, route: '/admin'),
         _MenuTileData(icon: Icons.notifications_rounded, title: 'Notice Board', index: 10, route: '/admin'),
       ]),
@@ -256,9 +256,9 @@ class _MobileDrawer extends StatelessWidget {
         _MenuTileData(icon: Icons.check_circle_rounded, title: 'Mark Attendance', index: 2, route: '/dashboard'),
         _MenuTileData(icon: Icons.assignment_rounded, title: 'Homework', index: 3, route: '/dashboard'),
       ]),
-      _MenuSectionData('FINANCE', [
-        _MenuTileData(icon: Icons.payments_rounded, title: 'Fee Collection', index: 4, route: '/reports'),
-        _MenuTileData(icon: Icons.receipt_long_rounded, title: 'Print Receipt', index: 5, route: '/reports'),
+      _MenuSectionData('ACADEMICS', [
+        _MenuTileData(icon: Icons.analytics_rounded, title: 'Results', index: 4, route: '/reports'),
+        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 5, route: '/reports'),
       ]),
     ];
 
@@ -366,16 +366,16 @@ class _DesktopSidebar extends StatelessWidget {
       _MenuSectionData('MANAGEMENT', [
         _MenuTileData(icon: Icons.people_rounded, title: 'Students', index: 1, route: '/dashboard'),
         _MenuTileData(icon: Icons.check_circle_rounded, title: 'Attendance', index: 2, route: '/dashboard'),
-        _MenuTileData(icon: Icons.payments_rounded, title: 'Fees', index: 3, route: '/reports'),
       ]),
       _MenuSectionData('ACADEMICS', [
-        _MenuTileData(icon: Icons.analytics_rounded, title: 'Reports', index: 4, route: '/reports'),
-        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 5, route: '/reports'),
+        _MenuTileData(icon: Icons.analytics_rounded, title: 'Reports', index: 3, route: '/reports'),
+        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 4, route: '/reports'),
       ]),
       _MenuSectionData('ADMIN', [
-        _MenuTileData(icon: Icons.admin_panel_settings_rounded, title: 'Admin Panel', index: 6, route: '/admin'),
-        _MenuTileData(icon: Icons.school_rounded, title: 'Sessions', index: 7, route: '/admin'),
-        _MenuTileData(icon: Icons.class_rounded, title: 'Classes', index: 8, route: '/admin'),
+        _MenuTileData(icon: Icons.admin_panel_settings_rounded, title: 'Admin Panel', index: 5, route: '/admin'),
+        _MenuTileData(icon: Icons.school_rounded, title: 'Sessions', index: 6, route: '/admin'),
+        _MenuTileData(icon: Icons.class_rounded, title: 'Classes', index: 7, route: '/admin'),
+        _MenuTileData(icon: Icons.payments_rounded, title: 'Fee Management', index: 8, route: '/admin'),
         _MenuTileData(icon: Icons.person_rounded, title: 'Users', index: 9, route: '/admin'),
         _MenuTileData(icon: Icons.notifications_rounded, title: 'Notices', index: 10, route: '/admin'),
       ]),
@@ -388,9 +388,9 @@ class _DesktopSidebar extends StatelessWidget {
         _MenuTileData(icon: Icons.check_circle_rounded, title: 'Mark Attendance', index: 2, route: '/dashboard'),
         _MenuTileData(icon: Icons.assignment_rounded, title: 'Homework', index: 3, route: '/dashboard'),
       ]),
-      _MenuSectionData('FINANCE', [
-        _MenuTileData(icon: Icons.payments_rounded, title: 'Fee Collection', index: 4, route: '/reports'),
-        _MenuTileData(icon: Icons.receipt_long_rounded, title: 'Print Receipt', index: 5, route: '/reports'),
+      _MenuSectionData('ACADEMICS', [
+        _MenuTileData(icon: Icons.analytics_rounded, title: 'Results', index: 4, route: '/reports'),
+        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 5, route: '/reports'),
       ]),
     ];
 

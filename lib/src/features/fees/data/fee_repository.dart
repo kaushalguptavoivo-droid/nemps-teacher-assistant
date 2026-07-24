@@ -180,6 +180,21 @@ class FeeRepository {
     }
   }
 
+  // ── Get Students for Class ─────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getStudentsForClass(String classId) async {
+    try {
+      final data = await _client
+          .from('students')
+          .select('id')
+          .eq('class_id', classId)
+          .eq('is_active', true);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      return [];
+    }
+  }
+
   // ── Generate Fees for Class ─────────────────────────────────────────────────
 
   Future<void> generateFeesForClass({
