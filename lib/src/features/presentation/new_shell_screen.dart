@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../data/providers.dart';
+import '../../core/models/models.dart';
 
 // Navigation index provider
 final selectedNavIndexProvider = StateProvider<int>((ref) => 0);
@@ -17,9 +18,18 @@ class NewShellScreen extends ConsumerWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 900;
     final currentIndex = ref.watch(selectedNavIndexProvider);
+    final userRole = ref.watch(currentUserRoleProvider).valueOrNull;
+    final isAdmin = userRole == UserRole.admin;
 
-    final navItems = [
-      _NavItemData(icon: Icons.home_rounded, label: 'Home', route: '/dashboard'),
+    // Role-based navigation items
+    final navItems = isAdmin ? [
+      _NavItemData(icon: Icons.dashboard_rounded, label: 'Dashboard', route: '/dashboard'),
+      _NavItemData(icon: Icons.people_rounded, label: 'Students', route: '/dashboard'),
+      _NavItemData(icon: Icons.check_circle_rounded, label: 'Attendance', route: '/dashboard'),
+      _NavItemData(icon: Icons.analytics_rounded, label: 'Reports', route: '/reports'),
+      _NavItemData(icon: Icons.admin_panel_settings_rounded, label: 'Admin', route: '/admin'),
+    ] : [
+      _NavItemData(icon: Icons.dashboard_rounded, label: 'Dashboard', route: '/dashboard'),
       _NavItemData(icon: Icons.people_rounded, label: 'Students', route: '/dashboard'),
       _NavItemData(icon: Icons.check_circle_rounded, label: 'Attendance', route: '/dashboard'),
       _NavItemData(icon: Icons.assignment_rounded, label: 'Homework', route: '/dashboard'),
@@ -45,7 +55,21 @@ class NewShellScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(6)),
-                child: const Text('NEMPS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('NEMPS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isAdmin ? Colors.amber : Colors.lightBlue,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(isAdmin ? 'Admin' : 'Teacher', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87)),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -66,6 +90,18 @@ class NewShellScreen extends ConsumerWidget {
                 }
               },
               itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'role',
+                  enabled: false,
+                  child: Row(
+                    children: [
+                      Icon(isAdmin ? Icons.admin_panel_settings : Icons.person, size: 20, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Text(isAdmin ? 'Admin Account' : 'Teacher Account', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
                 const PopupMenuItem(value: 'logout', child: Text('Logout', style: TextStyle(color: Colors.red))),
               ],
             ),
@@ -75,7 +111,7 @@ class NewShellScreen extends ConsumerWidget {
           child: _MobileDrawer(selectedIndex: currentIndex, onItemSelected: (index, route) {
             onNavTap(index, route);
             Navigator.pop(context);
-          }),
+          }, isAdmin: isAdmin),
         ),
         body: child,
         bottomNavigationBar: NavigationBar(
@@ -91,7 +127,7 @@ class NewShellScreen extends ConsumerWidget {
         children: [
           SizedBox(
             width: 260,
-            child: _DesktopSidebar(selectedIndex: currentIndex, onItemSelected: onNavTap),
+            child: _DesktopSidebar(selectedIndex: currentIndex, onItemSelected: onNavTap, isAdmin: isAdmin),
           ),
           Expanded(
             child: Column(
@@ -108,6 +144,22 @@ class NewShellScreen extends ConsumerWidget {
                       Text(_getPageTitle(GoRouterState.of(context).matchedLocation),
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                       const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isAdmin ? Colors.amber.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(isAdmin ? Icons.admin_panel_settings : Icons.person, size: 16, color: isAdmin ? Colors.amber[700] : Colors.blue),
+                            const SizedBox(width: 4),
+                            Text(isAdmin ? 'Admin' : 'Teacher', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isAdmin ? Colors.amber[700] : Colors.blue)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       IconButton(
                         icon: Icon(ref.watch(themeProvider) == ThemeMode.dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded),
                         onPressed: () {
@@ -168,25 +220,44 @@ class _NavItemData {
 class _MobileDrawer extends StatelessWidget {
   final int selectedIndex;
   final Function(int, String) onItemSelected;
-  const _MobileDrawer({required this.selectedIndex, required this.onItemSelected});
+  final bool isAdmin;
+
+  const _MobileDrawer({required this.selectedIndex, required this.onItemSelected, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
-    final menuSections = [
+    // Role-based menu sections
+    final List<_MenuSectionData> menuSections = isAdmin ? [
       _MenuSectionData('MAIN', [
         _MenuTileData(icon: Icons.dashboard_rounded, title: 'Dashboard', index: 0, route: '/dashboard'),
       ]),
       _MenuSectionData('MANAGEMENT', [
         _MenuTileData(icon: Icons.people_rounded, title: 'Students', index: 1, route: '/dashboard'),
         _MenuTileData(icon: Icons.check_circle_rounded, title: 'Attendance', index: 2, route: '/dashboard'),
+      ]),
+      _MenuSectionData('ACADEMICS', [
+        _MenuTileData(icon: Icons.analytics_rounded, title: 'Reports', index: 3, route: '/reports'),
+        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 4, route: '/reports'),
+      ]),
+      _MenuSectionData('ADMIN', [
+        _MenuTileData(icon: Icons.admin_panel_settings_rounded, title: 'Admin Panel', index: 5, route: '/admin'),
+        _MenuTileData(icon: Icons.school_rounded, title: 'Academic Sessions', index: 6, route: '/admin'),
+        _MenuTileData(icon: Icons.class_rounded, title: 'Class Management', index: 7, route: '/admin'),
+        _MenuTileData(icon: Icons.person_rounded, title: 'User Management', index: 8, route: '/admin'),
+        _MenuTileData(icon: Icons.notifications_rounded, title: 'Notice Board', index: 9, route: '/admin'),
+      ]),
+    ] : [
+      _MenuSectionData('MAIN', [
+        _MenuTileData(icon: Icons.dashboard_rounded, title: 'Dashboard', index: 0, route: '/dashboard'),
+      ]),
+      _MenuSectionData('MY TASKS', [
+        _MenuTileData(icon: Icons.people_rounded, title: 'My Students', index: 1, route: '/dashboard'),
+        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Mark Attendance', index: 2, route: '/dashboard'),
         _MenuTileData(icon: Icons.assignment_rounded, title: 'Homework', index: 3, route: '/dashboard'),
       ]),
       _MenuSectionData('ACADEMICS', [
         _MenuTileData(icon: Icons.analytics_rounded, title: 'Results', index: 4, route: '/reports'),
-        _MenuTileData(icon: Icons.payments_rounded, title: 'Fees', index: 5, route: '/admin'),
-      ]),
-      _MenuSectionData('SYSTEM', [
-        _MenuTileData(icon: Icons.admin_panel_settings_rounded, title: 'Admin Panel', index: 6, route: '/admin'),
+        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 5, route: '/reports'),
       ]),
     ];
 
@@ -205,11 +276,19 @@ class _MobileDrawer extends StatelessWidget {
                     child: const Center(child: Text('🏫', style: TextStyle(fontSize: 24))),
                   ),
                   const SizedBox(width: 12),
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('NEMPS', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      Text('Teacher Assistant', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      const Text('NEMPS', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isAdmin ? Colors.amber : Colors.lightBlue,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(isAdmin ? 'Admin' : 'Teacher', style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
                     ],
                   ),
                 ],
@@ -272,25 +351,44 @@ class _MenuTileData {
 class _DesktopSidebar extends StatelessWidget {
   final int selectedIndex;
   final Function(int, String) onItemSelected;
-  const _DesktopSidebar({required this.selectedIndex, required this.onItemSelected});
+  final bool isAdmin;
+
+  const _DesktopSidebar({required this.selectedIndex, required this.onItemSelected, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
-    final menuSections = [
+    // Role-based menu sections
+    final List<_MenuSectionData> menuSections = isAdmin ? [
       _MenuSectionData('MAIN', [
         _MenuTileData(icon: Icons.dashboard_rounded, title: 'Dashboard', index: 0, route: '/dashboard'),
       ]),
       _MenuSectionData('MANAGEMENT', [
         _MenuTileData(icon: Icons.people_rounded, title: 'Students', index: 1, route: '/dashboard'),
         _MenuTileData(icon: Icons.check_circle_rounded, title: 'Attendance', index: 2, route: '/dashboard'),
+      ]),
+      _MenuSectionData('ACADEMICS', [
+        _MenuTileData(icon: Icons.analytics_rounded, title: 'Reports', index: 3, route: '/reports'),
+        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 4, route: '/reports'),
+      ]),
+      _MenuSectionData('ADMIN', [
+        _MenuTileData(icon: Icons.admin_panel_settings_rounded, title: 'Admin Panel', index: 5, route: '/admin'),
+        _MenuTileData(icon: Icons.school_rounded, title: 'Sessions', index: 6, route: '/admin'),
+        _MenuTileData(icon: Icons.class_rounded, title: 'Classes', index: 7, route: '/admin'),
+        _MenuTileData(icon: Icons.person_rounded, title: 'Users', index: 8, route: '/admin'),
+        _MenuTileData(icon: Icons.notifications_rounded, title: 'Notices', index: 9, route: '/admin'),
+      ]),
+    ] : [
+      _MenuSectionData('MAIN', [
+        _MenuTileData(icon: Icons.dashboard_rounded, title: 'Dashboard', index: 0, route: '/dashboard'),
+      ]),
+      _MenuSectionData('MY TASKS', [
+        _MenuTileData(icon: Icons.people_rounded, title: 'My Students', index: 1, route: '/dashboard'),
+        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Mark Attendance', index: 2, route: '/dashboard'),
         _MenuTileData(icon: Icons.assignment_rounded, title: 'Homework', index: 3, route: '/dashboard'),
       ]),
       _MenuSectionData('ACADEMICS', [
         _MenuTileData(icon: Icons.analytics_rounded, title: 'Results', index: 4, route: '/reports'),
-        _MenuTileData(icon: Icons.payments_rounded, title: 'Fees', index: 5, route: '/admin'),
-      ]),
-      _MenuSectionData('SYSTEM', [
-        _MenuTileData(icon: Icons.admin_panel_settings_rounded, title: 'Admin Panel', index: 6, route: '/admin'),
+        _MenuTileData(icon: Icons.print_rounded, title: 'Print Results', index: 5, route: '/reports'),
       ]),
     ];
 
@@ -314,11 +412,19 @@ class _DesktopSidebar extends StatelessWidget {
                   child: const Center(child: Text('🏫', style: TextStyle(fontSize: 24))),
                 ),
                 const SizedBox(width: 12),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('NEMPS', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                    Text('Teacher Assistant', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const Text('NEMPS', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isAdmin ? Colors.amber : Colors.lightBlue,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(isAdmin ? 'Admin' : 'Teacher', style: const TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
                   ],
                 ),
               ],

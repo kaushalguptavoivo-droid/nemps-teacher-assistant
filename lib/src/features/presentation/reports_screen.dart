@@ -80,6 +80,58 @@ class ReportsScreen extends ConsumerWidget {
             onTap: () =>
                 _openSheet(context, const _WhatsAppRangeReportSheet()),
           ),
+          const SizedBox(height: 24),
+          Text('Print Results',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          _ReportTile(
+            icon: Icons.print_rounded,
+            title: 'Print Result Cards',
+            subtitle: 'PDF banayein - Class wise report cards',
+            color: Colors.purple,
+            onTap: () => _showPrintDialog(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPrintDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.print_rounded, color: Colors.purple),
+            SizedBox(width: 8),
+            Text('Print Results'),
+          ],
+        ),
+        content: const Text(
+          'Select a class to print result cards.\n\n'
+          'PDF generate hoga jisme har student ka report card hoga.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Class select karein Reports section se'),
+                  action: SnackBarAction(label: 'OK', onPressed: () {}),
+                ),
+              );
+            },
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Select Class'),
+          ),
         ],
       ),
     );
