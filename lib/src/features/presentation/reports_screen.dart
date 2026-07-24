@@ -102,7 +102,7 @@ class ReportsScreen extends ConsumerWidget {
   void _showPrintDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Row(
           children: [
             Icon(Icons.print_rounded, color: Colors.purple),
@@ -116,15 +116,15 @@ class ReportsScreen extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Class select karein Reports section se'),
+                SnackBar(
+                  content: const Text('Class select karein Reports section se'),
                   action: SnackBarAction(label: 'OK', onPressed: () {}),
                 ),
               );
