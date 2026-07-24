@@ -1558,177 +1558,349 @@ class _FeeReportsTab extends ConsumerWidget {
   }
 }
 
-class _FeeReportsContent extends ConsumerWidget {
+class _FeeReportsContent extends ConsumerStatefulWidget {
   const _FeeReportsContent({required this.academicYear});
 
   final String academicYear;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final summaryAsync = ref.watch(feeSummaryProvider((
-      classId: null,
-      academicYear: academicYear,
-    )));
-    final classesAsync = ref.watch(classesWithFeeSummaryProvider(academicYear));
+  ConsumerState<_FeeReportsContent> createState() => _FeeReportsContentState();
+}
 
+class _FeeReportsContentState extends ConsumerState<_FeeReportsContent>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  String? _selectedClassId;
+  DateTime _selectedDate = DateTime.now();
+  String _exportType = 'due';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Tab Bar
+        Container(
+          color: Colors.grey[100],
+          child: TabBar(
+            controller: _tabController,
+            labelColor: Colors.blue,
+            unselectedLabelColor: Colors.grey,
+            tabs: const [
+              Tab(icon: Icon(Icons.warning_amber), text: 'Due List'),
+              Tab(icon: Icon(Icons.today), text: 'Collection'),
+              Tab(icon: Icon(Icons.download), text: 'Export'),
+            ],
+          ),
+        ),
+        // Tab Views
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildDueListTab(),
+              _buildCollectionTab(),
+              _buildExportTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Due List Tab ─────────────────────────────────────────────────────────
+
+  Widget _buildDueListTab() {
+    final dueAsync = ref.watch(dueStudentsProvider(widget.academicYear));
+
+    return Column(
+      children: [
+        // Class Filter
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: ref.watch(allClassesProvider).when(
+            data: (classes) => DropdownButtonFormField<String>(
+              value: _selectedClassId,
+              decoration: const InputDecoration(
+                labelText: 'Filter by Class',
+                prefixIcon: Icon(Icons.class_),
+              ),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('All Classes')),
+                ...classes.map((c) => DropdownMenuItem(
+                  value: c.id,
+                  child: Text('${c.name} - ${c.section}'),
+                )),
+              ],
+              onChanged: (v) => setState(() => _selectedClassId = v),
+            ),
+            loading: () => const LinearProgressIndicator(),
+            error: (_, __) => const Text('Error'),
+          ),
+        ),
+        // Due Students List
+        Expanded(
+          child: dueAsync.when(
+            data: (dueStudents) {
+              if (dueStudents.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, size: 64, color: Colors.green),
+                      SizedBox(height: 16),
+                      Text('🎉 Sab students ne fees pay kar di!'),
+                    ],
+                  ),
+                );
+              }
+
+              return Column(
+                children: [
+                  // Summary Card
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Column(
+                          children: [
+                            Text('${dueStudents.length}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red[700])),
+                            const Text('Due Students'),
+                          ],
+                        ),
+                        Container(width: 1, height: 40, color: Colors.grey[300]),
+                        Column(
+                          children: [
+                            Text('₹${dueStudents.fold<double>(0, (sum, s) => sum + s.totalPending).toStringAsFixed(0)}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red[700])),
+                            const Text('Total Due'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // List
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: dueStudents.length,
+                      itemBuilder: (context, index) {
+                        final student = dueStudents[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.red[50],
+                              child: Text(student.studentName.substring(0, 1).toUpperCase(), style: TextStyle(color: Colors.red[700])),
+                            ),
+                            title: Text(student.studentName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('${student.className} - ${student.section} | ${student.monthsPending.length} months'),
+                            trailing: Text('₹${student.totalPending.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red[700])),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Collection Tab ────────────────────────────────────────────────────────
+
+  Widget _buildCollectionTab() {
+    final dateStr = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+    final collectionAsync = ref.watch(dailyCollectionProvider(dateStr));
+
+    return Column(
+      children: [
+        // Date Selector
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: InkWell(
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+              );
+              if (date != null) {
+                setState(() => _selectedDate = date);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.calendar_today),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Collection Summary
+        Expanded(
+          child: collectionAsync.when(
+            data: (collection) {
+              if (collection.payments.isEmpty) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.money_off, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text('Aaj koi collection nahi'),
+                    ],
+                  ),
+                );
+              }
+
+              return Column(
+                children: [
+                  // Summary Card
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [Colors.green[700]!, Colors.green[500]!]),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Column(
+                          children: [
+                            Text('₹${collection.totalCollected.toStringAsFixed(0)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                            const Text('Total Collected', style: TextStyle(color: Colors.white70)),
+                          ],
+                        ),
+                        Container(width: 1, height: 50, color: Colors.white30),
+                        Column(
+                          children: [
+                            Text('${collection.studentCount}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                            const Text('Students', style: TextStyle(color: Colors.white70)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Payment List
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: collection.payments.length,
+                      itemBuilder: (context, index) {
+                        final payment = collection.payments[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            leading: CircleAvatar(backgroundColor: Colors.green[50], child: Icon(Icons.check, color: Colors.green[700])),
+                            title: Text(payment.studentName ?? 'Student'),
+                            subtitle: Text(payment.paymentMethod.toUpperCase()),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('₹${payment.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                Text('#${payment.receiptNo}', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Export Tab ────────────────────────────────────────────────────────────
+
+  Widget _buildExportTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Overall Summary
-          summaryAsync.when(
-            data: (summary) => _buildOverallSummary(context, summary),
-            loading: () => const Card(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-            error: (_, __) => const Card(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('Error loading summary'),
-              ),
-            ),
+          const Text('Select Report Type:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            children: [
+              ChoiceChip(label: const Text('📋 Due List'), selected: _exportType == 'due', onSelected: (_) => setState(() => _exportType = 'due')),
+              ChoiceChip(label: const Text('💰 Collection'), selected: _exportType == 'collection', onSelected: (_) => setState(() => _exportType = 'collection')),
+              ChoiceChip(label: const Text('👥 Student Ledger'), selected: _exportType == 'ledger', onSelected: (_) => setState(() => _exportType = 'ledger')),
+            ],
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Class-wise Collection',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          // Class-wise breakdown
-          classesAsync.when(
-            data: (classes) {
-              if (classes.isEmpty) {
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.class_outlined, size: 48, color: Colors.grey[400]),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Koi class nahi.',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-              return Column(
-                children: classes.map((cls) {
-                  final summary = cls['summary'] as FeeSummary;
-                  return _ClassFeeReportCard(
-                    className: '${cls['name']} - ${cls['section']}',
-                    summary: summary,
-                  );
-                }).toList(),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('Error: $e'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOverallSummary(BuildContext context, FeeSummary summary) {
-    final percent = summary.collectionPercent;
-    
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.analytics, color: Colors.blue),
-                const SizedBox(width: 8),
-                Text(
-                  'Overall Fee Collection ($academicYear)',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            // Progress bar
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(
-                value: percent / 100,
-                minHeight: 20,
-                backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation(
-                  percent >= 80 ? Colors.green :
-                  percent >= 50 ? Colors.orange : Colors.red,
-                ),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _exportReport(),
+              icon: const Icon(Icons.download),
+              label: const Text('Export to CSV'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.all(16),
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${percent.toStringAsFixed(1)}% Collected',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: percent >= 80 ? Colors.green :
-                       percent >= 50 ? Colors.orange : Colors.red,
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Stats grid
-            Row(
-              children: [
-                Expanded(child: _reportStat('Total Students', '${summary.totalStudents}')),
-                Expanded(child: _reportStat('Total Amount', '₹${_formatAmount(summary.totalAmount)}')),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _reportStat('Collected', '₹${_formatAmount(summary.collectedAmount)}', color: Colors.green)),
-                Expanded(child: _reportStat('Pending', '₹${_formatAmount(summary.pendingAmount)}', color: Colors.orange)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _reportStat('Overdue Entries', '${summary.overdueCount}', color: Colors.red),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _reportStat(String label, String value, {Color? color}) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(right: 8),
-      decoration: BoxDecoration(
-        color: (color ?? Colors.blue).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
+          const SizedBox(height: 16),
+          Card(
+            color: Colors.blue[50],
+            child: const Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [Icon(Icons.info, color: Colors.blue), SizedBox(width: 8), Text('Export Info', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue))]),
+                  SizedBox(height: 8),
+                  Text('• CSV file will be downloaded'),
+                  Text('• Open in Excel or Google Sheets'),
+                  Text('• Report for current academic year'),
+                ],
+              ),
             ),
           ),
         ],
@@ -1736,109 +1908,9 @@ class _FeeReportsContent extends ConsumerWidget {
     );
   }
 
-  String _formatAmount(double amount) {
-    if (amount >= 100000) {
-      return '${(amount / 100000).toStringAsFixed(1)}L';
-    } else if (amount >= 1000) {
-      return '${(amount / 1000).toStringAsFixed(1)}K';
-    }
-    return amount.toStringAsFixed(0);
-  }
-}
-
-class _ClassFeeReportCard extends StatelessWidget {
-  const _ClassFeeReportCard({
-    required this.className,
-    required this.summary,
-  });
-
-  final String className;
-  final FeeSummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final percent = summary.collectionPercent;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    className,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: (percent >= 80 ? Colors.green :
-                            percent >= 50 ? Colors.orange : Colors.red).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    '${percent.toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: percent >= 80 ? Colors.green :
-                             percent >= 50 ? Colors.orange : Colors.red,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: percent / 100,
-                minHeight: 8,
-                backgroundColor: Colors.grey[200],
-                valueColor: AlwaysStoppedAnimation(
-                  percent >= 80 ? Colors.green :
-                  percent >= 50 ? Colors.orange : Colors.red,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _miniStat('Students', '${summary.totalStudents}'),
-                _miniStat('Total', '₹${summary.totalAmount.toStringAsFixed(0)}'),
-                _miniStat('Collected', '₹${summary.collectedAmount.toStringAsFixed(0)}', color: Colors.green),
-                _miniStat('Pending', '₹${summary.pendingAmount.toStringAsFixed(0)}', color: Colors.orange),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _miniStat(String label, String value, {Color? color}) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-        ),
-      ],
+  Future<void> _exportReport() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Export feature coming soon!')),
     );
   }
 }
