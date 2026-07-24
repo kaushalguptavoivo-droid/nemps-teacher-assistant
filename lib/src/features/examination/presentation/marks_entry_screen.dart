@@ -11,7 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' hide Border;
 import '../../../core/services/offline_queue.dart';
 import '../../../core/models/models.dart';
 import '../../data/providers.dart';
@@ -505,7 +505,7 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       border: Border.all(color: Theme.of(context).dividerColor),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: const BorderRadius.all(Radius.circular(4)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
@@ -552,7 +552,7 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     border: Border.all(color: Theme.of(context).dividerColor),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: const BorderRadius.all(Radius.circular(4)),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
