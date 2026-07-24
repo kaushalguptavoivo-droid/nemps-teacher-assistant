@@ -254,6 +254,17 @@ class SchoolRepository {
     }
   }
 
+  Future<void> toggleHomeworkHidden(String homeworkId, bool isHidden) async {
+    try {
+      await _client
+          .from('homework')
+          .update({'is_hidden': isHidden})
+          .eq('id', homeworkId);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> markHomeworkStatus({
     required String homeworkId,
     required String studentId,

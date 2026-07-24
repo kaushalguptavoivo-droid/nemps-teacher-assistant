@@ -6,6 +6,7 @@ import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
 import '../examination/presentation/admin_exam_tab.dart';
+import '../fees/presentation/fee_config_screen.dart';
 
 class AdminPanelScreen extends ConsumerWidget {
   const AdminPanelScreen({super.key});
@@ -13,7 +14,7 @@ class AdminPanelScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin Panel'),
@@ -29,6 +30,7 @@ class AdminPanelScreen extends ConsumerWidget {
               Tab(icon: Icon(Icons.notifications), text: 'Notices'),
               Tab(icon: Icon(Icons.history), text: 'Activity'),
               Tab(icon: Icon(Icons.assignment_rounded), text: 'Exam Mgmt'),
+              Tab(icon: Icon(Icons.currency_rupee), text: 'Fees Mgmt'),
             ],
           ),
         ),
@@ -40,6 +42,7 @@ class AdminPanelScreen extends ConsumerWidget {
             _NoticeTab(classes: ref.watch(allClassesProvider)),
             const _TeacherActivityTab(),
             const AdminExamTab(),
+            const FeeConfigScreen(),
           ],
         ),
       ),

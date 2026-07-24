@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:excel/excel.dart';
 import '../../../core/services/offline_queue.dart';
 import '../../../core/models/models.dart';
 import '../../data/providers.dart';
@@ -464,35 +465,93 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
           ),
         ),
 
-        // Import / Export CSV toolbar
+        // Import / Export toolbar
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (!widget.isLocked) ...[
-                OutlinedButton.icon(
-                  onPressed: _importCsv,
-                  icon: const Icon(Icons.upload_file_rounded, size: 15),
-                  label: const Text('CSV Import'),
+                PopupMenuButton<String>(
+                  tooltip: 'Import',
+                  onSelected: (value) {
+                    if (value == 'csv') {
+                      _importCsv();
+                    } else if (value == 'excel') {
+                      _importExcel();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'csv',
+                      child: ListTile(
+                        leading: Icon(Icons.upload_file_rounded, size: 20),
+                        title: Text('Import CSV'),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'excel',
+                      child: ListTile(
+                        leading: Icon(Icons.table_chart, size: 20),
+                        title: Text('Import Excel'),
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.upload_file_rounded, size: 15),
+                    label: const Text('Import'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      textStyle: const TextStyle(fontSize: 12),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              PopupMenuButton<String>(
+                tooltip: 'Export',
+                onSelected: (value) {
+                  if (value == 'csv') {
+                    _exportCsv();
+                  } else if (value == 'excel') {
+                    _exportExcel();
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'csv',
+                    child: ListTile(
+                      leading: Icon(Icons.download_rounded, size: 20),
+                      title: Text('Export CSV'),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'excel',
+                    child: ListTile(
+                      leading: Icon(Icons.table_chart_outlined, size: 20),
+                      title: Text('Export Excel'),
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.download_rounded, size: 15),
+                  label: const Text('Export'),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     textStyle: const TextStyle(fontSize: 12),
                     visualDensity: VisualDensity.compact,
                   ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              OutlinedButton.icon(
-                onPressed: _exportCsv,
-                icon: const Icon(Icons.download_rounded, size: 15),
-                label: const Text('CSV Export'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
-                  textStyle: const TextStyle(fontSize: 12),
-                  visualDensity: VisualDensity.compact,
                 ),
               ),
             ],
@@ -887,6 +946,163 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Import error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // ── Excel Export ─────────────────────────────────────────────────────────────
+
+  Future<void> _exportExcel() async {
+    try {
+      final excel = Excel.createExcel();
+      final sheet = excel['Marks'];
+      
+      // Header row
+      final headers = ['Roll No', 'Student Name', ...widget.subjects.map((s) => s.subjectName)];
+      for (int i = 0; i < headers.length; i++) {
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(headers[i]);
+      }
+      
+      // Data rows
+      int rowIndex = 1;
+      for (final student in _sortedStudents) {
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: rowIndex)).value = TextCellValue(student.rollNo);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: rowIndex)).value = TextCellValue(student.fullName);
+        
+        int colIndex = 2;
+        for (final subject in widget.subjects) {
+          final k = _key(student.id, subject.id);
+          String value = '';
+          if (_absent[k] == true) {
+            value = 'Ab';
+          } else if (_draft[k] != null) {
+            value = _draft[k]!;
+          }
+          sheet.cell(CellIndex.indexByColumnRow(columnIndex: colIndex, rowIndex: rowIndex)).value = TextCellValue(value);
+          colIndex++;
+        }
+        rowIndex++;
+      }
+      
+      final bytes = excel.encode();
+      if (bytes != null) {
+        await Share.shareXFiles(
+          [
+            XFile.fromData(
+              Uint8List.fromList(bytes),
+              mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              name: 'marks_${widget.term.termName.replaceAll(' ', '_')}.xlsx',
+            )
+          ],
+          subject: 'Marks Export — ${widget.term.termName}',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Excel export error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // ── Excel Import ─────────────────────────────────────────────────────────────
+
+  Future<void> _importExcel() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final bytes = result.files.first.bytes;
+      if (bytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File read nahi ho saka.')),
+          );
+        }
+        return;
+      }
+
+      final excel = Excel.decodeBytes(bytes);
+      final table = excel.tables[excel.tables.keys.first];
+      if (table == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Excel file empty ya invalid hai.')),
+          );
+        }
+        return;
+      }
+
+      // Map column index → ClassSubject from header row
+      final subjectCols = <int, ClassSubject>{};
+      final headerRow = table.rows.isNotEmpty ? table.rows[0] : [];
+      for (int i = 2; i < headerRow.length; i++) {
+        final headerCell = headerRow[i]?.value?.toString() ?? '';
+        final match = widget.subjects
+            .where((s) =>
+                s.subjectName.trim().toLowerCase() ==
+                headerCell.trim().toLowerCase())
+            .firstOrNull;
+        if (match != null) subjectCols[i] = match;
+      }
+
+      int imported = 0;
+      setState(() {
+        for (int ri = 1; ri < table.rows.length; ri++) {
+          final row = table.rows[ri];
+          if (row.isEmpty) continue;
+          
+          final rollNo = row.isNotEmpty ? row[0]?.value?.toString().trim() ?? '' : '';
+          final student = widget.students
+              .where((s) => s.rollNo.trim() == rollNo)
+              .firstOrNull;
+          if (student == null) continue;
+
+          for (final entry in subjectCols.entries) {
+            if (entry.key >= row.length) continue;
+            final val = row[entry.key]?.value?.toString().trim() ?? '';
+            final k = _key(student.id, entry.value.id);
+            if (val.toLowerCase() == 'ab' ||
+                val.toLowerCase() == 'absent') {
+              _absent[k] = true;
+              _draft[k] = null;
+            } else if (val.isNotEmpty) {
+              _absent[k] = false;
+              _draft[k] = val;
+              imported++;
+            }
+          }
+        }
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$imported marks import ho gaye! '
+              'Ab "Saari Marks Save Karein" dabayein.',
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Excel import error: $e'),
             backgroundColor: Colors.red,
           ),
         );

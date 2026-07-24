@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io' if (dart.library.html) 'package:nemps_teacher_assistant/src/core/stubs/io_stub.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:excel/excel.dart';
 import '../../core/models/models.dart';
 import '../data/providers.dart';
 import '../../core/theme/app_theme.dart';
@@ -216,6 +218,96 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
     }
   }
 
+  Future<void> _exportStudentsExcel() async {
+    try {
+      final students = await ref.read(repoProvider).students(widget.classId);
+      final excel = Excel.createExcel();
+      final sheet = excel['Students'];
+      
+      // Header row
+      final headers = ['Roll No', 'Full Name', 'Father Name', 'Mother Name', 'WhatsApp', 'Address', 'DOB', 'Fee Status'];
+      for (int i = 0; i < headers.length; i++) {
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(headers[i]);
+      }
+      
+      // Data rows
+      int rowIndex = 1;
+      for (final student in students) {
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: rowIndex)).value = TextCellValue(student.rollNo);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: rowIndex)).value = TextCellValue(student.fullName);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: rowIndex)).value = TextCellValue(student.parentName);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: rowIndex)).value = TextCellValue(student.motherName);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: rowIndex)).value = TextCellValue(student.whatsapp);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: rowIndex)).value = TextCellValue(student.address);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: rowIndex)).value = TextCellValue(student.dob?.toString().split(' ')[0] ?? '');
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: rowIndex)).value = TextCellValue(student.feeStatus.name);
+        rowIndex++;
+      }
+      
+      final bytes = excel.encode();
+      if (bytes != null) {
+        await Share.shareXFiles(
+          [
+            XFile.fromData(
+              Uint8List.fromList(bytes),
+              mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              name: 'students.xlsx',
+            )
+          ],
+          subject: 'Students Export',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Excel export error: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
+  Future<void> _importStudentsExcel() async {
+    try {
+      final result = await FilePicker.platform
+          .pickFiles(type: FileType.custom, allowedExtensions: ['xlsx', 'xls'], withData: true);
+      if (result == null) return;
+      final bytes = result.files.single.bytes;
+      if (bytes == null) return;
+      
+      final excel = Excel.decodeBytes(bytes);
+      final table = excel.tables[excel.tables.keys.first];
+      if (table == null) return;
+      
+      // Convert Excel data to CSV-like format
+      final rows = <List<dynamic>>[];
+      for (final row in table.rows) {
+        rows.add(row.cells.map((c) => c?.value?.toString() ?? '').toList());
+      }
+      
+      if (rows.length < 2) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Excel file empty hai.'), backgroundColor: Colors.red));
+        }
+        return;
+      }
+      
+      // Convert to CSV string for reuse
+      final csvStr = rows.map((row) => row.join(',')).join('\n');
+      await ref.read(repoProvider).importStudentsFromBytes(widget.classId, Uint8List.fromList(csvStr.codeUnits));
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Students import ho gaye!'), backgroundColor: AppTheme.attendanceColor));
+        ref.invalidate(studentsProvider(widget.classId));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Excel import error: $e'), backgroundColor: Colors.red));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final students = ref.watch(studentsProvider(widget.classId));
@@ -230,17 +322,53 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
               () => _sortBy = _sortBy == _SortBy.rollNo ? _SortBy.name : _SortBy.rollNo,
             ),
           ),
-          PopupMenuButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) {
+              if (value == 'import_csv') {
+                _importStudents();
+              } else if (value == 'import_excel') {
+                _importStudentsExcel();
+              } else if (value == 'export_csv') {
+                _exportStudents();
+              } else if (value == 'export_excel') {
+                _exportStudentsExcel();
+              }
+            },
             itemBuilder: (context) => [
-              PopupMenuItem(
-                  child: const ListTile(
-                      leading: Icon(Icons.upload_file), title: Text('Import CSV'), contentPadding: EdgeInsets.zero),
-                  onTap: _importStudents),
-              PopupMenuItem(
-                  child: const ListTile(
-                      leading: Icon(Icons.download), title: Text('Export CSV'), contentPadding: EdgeInsets.zero),
-                  onTap: _exportStudents),
+              const PopupMenuItem(
+                value: 'import_csv',
+                child: ListTile(
+                  leading: Icon(Icons.upload_file),
+                  title: Text('Import CSV'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'import_excel',
+                child: ListTile(
+                  leading: Icon(Icons.table_chart),
+                  title: Text('Import Excel'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'export_csv',
+                child: ListTile(
+                  leading: Icon(Icons.download),
+                  title: Text('Export CSV'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'export_excel',
+                child: ListTile(
+                  leading: Icon(Icons.table_chart_outlined),
+                  title: Text('Export Excel'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
             ],
           ),
         ],
