@@ -108,7 +108,7 @@ class _TraditionalReportCardScreenState
     // Get student info from result
     final studentName = r.studentName;
     final rollNo = r.rollNo;
-    final className = template?.className ?? '';
+    final className = '';
 
     // Calculate totals
     double totalObtained = 0;
