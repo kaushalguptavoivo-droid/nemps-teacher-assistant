@@ -750,9 +750,10 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
 
   Widget _buildPaymentSection(String academicYear) {
     return _buildSectionCard(
-      title: 'Payment Details',
+      title: '💳 Payment Details',
       icon: Icons.payment,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Payment Method
           DropdownButtonFormField<String>(
@@ -762,43 +763,131 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
               prefixIcon: Icon(Icons.payment),
             ),
             items: const [
-              DropdownMenuItem(value: 'cash', child: Text('Cash')),
-              DropdownMenuItem(value: 'upi', child: Text('UPI')),
-              DropdownMenuItem(value: 'card', child: Text('Card')),
-              DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
-              DropdownMenuItem(value: 'online', child: Text('Online Transfer')),
+              DropdownMenuItem(value: 'cash', child: Text('💵 Cash')),
+              DropdownMenuItem(value: 'upi', child: Text('📱 UPI')),
+              DropdownMenuItem(value: 'card', child: Text('💳 Card')),
+              DropdownMenuItem(value: 'cheque', child: Text('📝 Cheque')),
+              DropdownMenuItem(value: 'online', child: Text('🌐 Online Transfer')),
             ],
             onChanged: (v) => setState(() => _paymentMethod = v ?? 'cash'),
           ),
-          const SizedBox(height: 12),
-          
-          // Concession
-          TextFormField(
-            decoration: const InputDecoration(
-              labelText: 'Concession (₹)',
-              prefixIcon: Icon(Icons.discount),
-            ),
-            keyboardType: TextInputType.number,
-            onChanged: (v) {
-              _concession = double.tryParse(v) ?? 0;
-              _calculateTotal(academicYear);
-            },
-          ),
           const SizedBox(height: 16),
           
-          // Total
+          // Concession Type
+          DropdownButtonFormField<String>(
+            value: _selectedConcessionType,
+            decoration: const InputDecoration(
+              labelText: 'Concession Type',
+              prefixIcon: Icon(Icons.discount),
+            ),
+            items: ConcessionType.values.map((type) {
+              return DropdownMenuItem(
+                value: type.name,
+                child: Text('${type.label} (${type.percentage}%)'),
+              );
+            }).toList(),
+            onChanged: (v) {
+              setState(() {
+                _selectedConcessionType = v ?? 'none';
+                _calculateTotal(academicYear);
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          
+          // Custom Concession Amount
+          if (_selectedConcessionType == 'other')
+            TextFormField(
+              decoration: const InputDecoration(
+                labelText: 'Concession Amount (₹)',
+                prefixIcon: Icon(Icons.currency_rupee),
+              ),
+              keyboardType: TextInputType.number,
+              onChanged: (v) {
+                _concession = double.tryParse(v) ?? 0;
+                _calculateTotal(academicYear);
+              },
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.discount, color: Colors.green),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Concession: ₹${_calculateConcessionAmount().toStringAsFixed(0)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                  ),
+                ],
+              ),
+            ),
+          
+          const SizedBox(height: 16),
+          
+          // Late Fee Warning
+          if (_lateFee > 0)
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.orange[700]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Late Fee Applied',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange[700]),
+                        ),
+                        Text(
+                          '₹${_lateFee.toStringAsFixed(0)} (${_selectedMonths.length} month(s) overdue)',
+                          style: TextStyle(color: Colors.orange[700], fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          // Total Breakdown
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.green[50],
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green[200]!),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                const Text('Final Amount:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                Text('₹${(_totalAmount - _concession).toStringAsFixed(0)}', 
-                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.green)),
+                _buildAmountRow('Base Amount', _totalAmount),
+                if (_calculateConcessionAmount() > 0)
+                  _buildAmountRow('Concession', -_calculateConcessionAmount(), isDiscount: true),
+                if (_lateFee > 0)
+                  _buildAmountRow('Late Fee', _lateFee, isLateFee: true),
+                const Divider(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Final Amount:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text(
+                      '₹${(_totalAmount - _calculateConcessionAmount() + _lateFee).toStringAsFixed(0)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.green),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -820,9 +909,45 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     );
   }
 
+  Widget _buildAmountRow(String label, double amount, {bool isDiscount = false, bool isLateFee = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey[700])),
+          Text(
+            '${isDiscount ? '-' : ''}₹${amount.toStringAsFixed(0)}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDiscount ? Colors.green : (isLateFee ? Colors.orange : null),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _selectedConcessionType = 'none';
+  double _lateFee = 0;
+
+  double _calculateConcessionAmount() {
+    if (_selectedConcessionType == 'none' || _selectedConcessionType == 'other') {
+      return _concession;
+    }
+    
+    final type = ConcessionType.values.firstWhere(
+      (t) => t.name == _selectedConcessionType,
+      orElse: () => ConcessionType.none,
+    );
+    
+    return (_totalAmount * type.percentage) / 100;
+  }
+
   void _calculateTotal(String academicYear) {
     // TODO: Calculate based on class fee config
     _totalAmount = _selectedMonths.length * 1000; // Placeholder
+    _lateFee = _selectedMonths.length * 50; // Example late fee
   }
 
   Future<void> _generateFeesForStudent(String academicYear) async {

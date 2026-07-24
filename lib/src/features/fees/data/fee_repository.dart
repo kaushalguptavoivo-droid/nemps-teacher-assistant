@@ -346,12 +346,16 @@ class FeeRepository {
       
       double totalDue = 0;
       double totalPaid = 0;
+      double totalConcession = 0;
+      double totalLateFee = 0;
       List<String> monthsPending = [];
       List<String> monthsPaid = [];
 
       for (final fee in fees) {
         totalDue += fee.totalAmount;
         totalPaid += fee.paidAmount;
+        totalConcession += fee.concession;
+        totalLateFee += fee.lateFee;
         if (fee.isPaid) {
           monthsPaid.add('${fee.month} ${fee.year}');
         } else {
@@ -363,6 +367,8 @@ class FeeRepository {
         totalDue: totalDue,
         totalPaid: totalPaid,
         totalPending: totalDue - totalPaid,
+        totalConcession: totalConcession,
+        totalLateFee: totalLateFee,
         monthsPending: monthsPending,
         monthsPaid: monthsPaid,
       );
@@ -371,9 +377,166 @@ class FeeRepository {
         totalDue: 0,
         totalPaid: 0,
         totalPending: 0,
+        totalConcession: 0,
+        totalLateFee: 0,
         monthsPending: [],
         monthsPaid: [],
       );
+    }
+  }
+
+  // ── Due Students List ───────────────────────────────────────────────────────
+
+  Future<List<DueStudent>> getDueStudents(String academicYear) async {
+    try {
+      // Get all students with pending fees
+      final students = await _client
+          .from('students')
+          .select()
+          .eq('is_active', true);
+
+      final dueStudents = <DueStudent>[];
+
+      for (final student in students) {
+        final fees = await getStudentMonthlyFees(student['id'], academicYear);
+        
+        double totalPending = 0;
+        List<String> monthsPending = [];
+        DateTime? lastPaid;
+
+        for (final fee in fees) {
+          if (!fee.isPaid) {
+            totalPending += fee.pendingAmount;
+            monthsPending.add('${fee.month}');
+          } else {
+            if (lastPaid == null || fee.createdAt.isAfter(lastPaid)) {
+              lastPaid = fee.createdAt;
+            }
+          }
+        }
+
+        if (monthsPending.isNotEmpty) {
+          dueStudents.add(DueStudent(
+            studentId: student['id'],
+            studentName: student['full_name'] ?? '',
+            rollNo: student['roll_no'] ?? '',
+            className: student['class_name'] ?? '',
+            section: student['section'] ?? '',
+            totalPending: totalPending,
+            monthsPending: monthsPending,
+            lastPaidDate: lastPaid,
+          ));
+        }
+      }
+
+      // Sort by total pending (highest first)
+      dueStudents.sort((a, b) => b.totalPending.compareTo(a.totalPending));
+      return dueStudents;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ── Daily Collection ────────────────────────────────────────────────────────
+
+  Future<DailyCollection> getDailyCollection(DateTime date) async {
+    try {
+      final dateStr = DateFormat('yyyy-MM-dd').format(date);
+      
+      final payments = await _client
+          .from('fee_payments')
+          .select()
+          .gte('payment_date', dateStr)
+          .lt('payment_date', DateFormat('yyyy-MM-dd').format(date.add(const Duration(days: 1))));
+
+      final paymentList = payments.map((r) {
+        final payment = FeePayment.fromMap(r);
+        // Populate student name
+        return payment;
+      }).toList();
+
+      double totalCollected = 0;
+      double totalConcession = 0;
+      double totalLateFee = 0;
+
+      for (final p in paymentList) {
+        totalCollected += p.amount;
+        totalConcession += p.concession;
+        totalLateFee += p.lateFee;
+      }
+
+      return DailyCollection(
+        date: date,
+        totalCollected: totalCollected,
+        totalConcession: totalConcession,
+        totalLateFee: totalLateFee,
+        studentCount: paymentList.length,
+        payments: paymentList,
+      );
+    } catch (e) {
+      return DailyCollection(
+        date: date,
+        totalCollected: 0,
+        totalConcession: 0,
+        totalLateFee: 0,
+        studentCount: 0,
+        payments: [],
+      );
+    }
+  }
+
+  // ── Get Payments in Date Range ──────────────────────────────────────────────
+
+  Future<List<FeePayment>> getPaymentsInRange(DateTime start, DateTime end) async {
+    try {
+      final data = await _client
+          .from('fee_payments')
+          .select()
+          .gte('payment_date', DateFormat('yyyy-MM-dd').format(start))
+          .lte('payment_date', DateFormat('yyyy-MM-dd').format(end))
+          .order('payment_date', ascending: false);
+      return data.map((r) => FeePayment.fromMap(r)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ── Get All Students ───────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getAllStudents() async {
+    try {
+      final data = await _client
+          .from('students')
+          .select()
+          .eq('is_active', true)
+          .order('roll_no');
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ── Late Fee Calculation ───────────────────────────────────────────────────
+
+  double calculateLateFee(double amount, DateTime dueDate, double lateFeePerMonth) {
+    if (DateTime.now().isBefore(dueDate)) return 0;
+    
+    final monthsLate = DateTime.now().difference(dueDate).inDays ~/ 30;
+    return monthsLate * lateFeePerMonth;
+  }
+
+  // ── Calculate Installment Amount ────────────────────────────────────────────
+
+  double calculateInstallmentAmount(double totalAmount, String plan) {
+    switch (plan) {
+      case '1':
+        return totalAmount;
+      case '2':
+        return totalAmount / 2;
+      case '3':
+        return totalAmount / 3;
+      default:
+        return totalAmount;
     }
   }
 
