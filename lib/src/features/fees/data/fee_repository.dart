@@ -195,6 +195,184 @@ class FeeRepository {
     }
   }
 
+  // ── Student Monthly Fee Records ─────────────────────────────────────────────
+
+  Future<List<StudentMonthlyFee>> getStudentMonthlyFees(String studentId, String academicYear) async {
+    try {
+      final data = await _client
+          .from('student_monthly_fees')
+          .select()
+          .eq('student_id', studentId)
+          .eq('academic_year', academicYear)
+          .order('year')
+          .order('month');
+      return data.map((r) => StudentMonthlyFee.fromMap(r)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<StudentMonthlyFee?> getStudentMonthFee(String studentId, String month, int year) async {
+    try {
+      final data = await _client
+          .from('student_monthly_fees')
+          .select()
+          .eq('student_id', studentId)
+          .eq('month', month)
+          .eq('year', year)
+          .maybeSingle();
+      return data != null ? StudentMonthlyFee.fromMap(data) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> createStudentMonthlyFee(StudentMonthlyFee fee) async {
+    await _client.from('student_monthly_fees').insert({
+      'id': _uuid.v4(),
+      ...fee.toInsertMap(),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  Future<void> updateStudentMonthlyFee(StudentMonthlyFee fee) async {
+    await _client.from('student_monthly_fees').update({
+      'paid_amount': fee.paidAmount,
+      'status': fee.status,
+      'concession': fee.concession,
+      'late_fee': fee.lateFee,
+      'remarks': fee.remarks,
+    }).eq('id', fee.id);
+  }
+
+  // ── Fee Payment ─────────────────────────────────────────────────────────────
+
+  Future<String> createFeePayment(FeePayment payment) async {
+    final id = _uuid.v4();
+    await _client.from('fee_payments').insert({
+      'id': id,
+      ...payment.toInsertMap(),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
+    return id;
+  }
+
+  Future<List<FeePayment>> getStudentPayments(String studentId, String academicYear) async {
+    try {
+      final data = await _client
+          .from('fee_payments')
+          .select()
+          .eq('student_id', studentId)
+          .eq('academic_year', academicYear)
+          .order('payment_date', ascending: false);
+      return data.map((r) => FeePayment.fromMap(r)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ── Get Pending Months for Student ─────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getPendingMonthsForStudent(
+    String studentId,
+    String academicYear,
+  ) async {
+    try {
+      final data = await _client
+          .from('student_monthly_fees')
+          .select()
+          .eq('student_id', studentId)
+          .eq('academic_year', academicYear)
+          .neq('status', 'paid');
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ── Generate Monthly Fees for All Students ──────────────────────────────────
+
+  Future<int> generateMonthlyFeesForStudent({
+    required String studentId,
+    required String classId,
+    required String academicYear,
+    required String month,
+    required int year,
+    required double totalAmount,
+  }) async {
+    // Check if already exists
+    final existing = await getStudentMonthFee(studentId, month, year);
+    if (existing != null) return 0;
+
+    await createStudentMonthlyFee(StudentMonthlyFee(
+      id: '',
+      studentId: studentId,
+      classId: classId,
+      month: month,
+      year: year,
+      academicYear: academicYear,
+      totalAmount: totalAmount,
+      status: 'due',
+      createdAt: DateTime.now(),
+    ));
+    return 1;
+  }
+
+  // ── Receipt Number Generator ───────────────────────────────────────────────
+
+  Future<String> generateReceiptNo() async {
+    final year = DateTime.now().year;
+    try {
+      final count = await _client
+          .from('fee_payments')
+          .select('id')
+          .gte('receipt_no', 'R-$year-')
+          .then((data) => data.length);
+      return 'R-$year-${(count + 1).toString().padLeft(4, '0')}';
+    } catch (e) {
+      return 'R-$year-0001';
+    }
+  }
+
+  // ── Student Fee Summary ────────────────────────────────────────────────────
+
+  Future<StudentFeeSummary> getStudentFeeSummary(String studentId, String academicYear) async {
+    try {
+      final fees = await getStudentMonthlyFees(studentId, academicYear);
+      
+      double totalDue = 0;
+      double totalPaid = 0;
+      List<String> monthsPending = [];
+      List<String> monthsPaid = [];
+
+      for (final fee in fees) {
+        totalDue += fee.totalAmount;
+        totalPaid += fee.paidAmount;
+        if (fee.isPaid) {
+          monthsPaid.add('${fee.month} ${fee.year}');
+        } else {
+          monthsPending.add('${fee.month} ${fee.year}');
+        }
+      }
+
+      return StudentFeeSummary(
+        totalDue: totalDue,
+        totalPaid: totalPaid,
+        totalPending: totalDue - totalPaid,
+        monthsPending: monthsPending,
+        monthsPaid: monthsPaid,
+      );
+    } catch (e) {
+      return StudentFeeSummary(
+        totalDue: 0,
+        totalPaid: 0,
+        totalPending: 0,
+        monthsPending: [],
+        monthsPaid: [],
+      );
+    }
+  }
+
   // ── Generate Fees for Class ─────────────────────────────────────────────────
 
   Future<void> generateFeesForClass({

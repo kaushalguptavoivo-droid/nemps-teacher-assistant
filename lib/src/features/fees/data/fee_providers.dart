@@ -68,3 +68,30 @@ final paymentHistoryProvider = FutureProvider.family<List<FeePayment>, String>(
     (ref, studentFeeId) async {
   return ref.read(feeRepoProvider).getPaymentHistory(studentFeeId);
 });
+
+// ── Student Monthly Fees (New) ───────────────────────────────────────────────
+
+final studentMonthlyFeesProvider = FutureProvider.family<List<StudentMonthlyFee>, ({
+  String studentId,
+  String academicYear
+})>((ref, args) async {
+  return ref.read(feeRepoProvider).getStudentMonthlyFees(args.studentId, args.academicYear);
+});
+
+// ── Student Fee Summary (New) ────────────────────────────────────────────────
+
+final studentFeeSummaryProvider = FutureProvider.family<StudentFeeSummary, ({
+  String studentId,
+  String academicYear
+})>((ref, args) async {
+  return ref.read(feeRepoProvider).getStudentFeeSummary(args.studentId, args.academicYear);
+});
+
+// ── Student Payments (New) ───────────────────────────────────────────────────
+
+final studentPaymentsProvider = FutureProvider.family<List<FeePayment>, ({
+  String studentId,
+  String academicYear
+})>((ref, args) async {
+  return ref.read(feeRepoProvider).getStudentPayments(args.studentId, args.academicYear);
+});
