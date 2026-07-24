@@ -30,6 +30,20 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
   double _concession = 0;
   String _paymentMethod = 'cash';
   String? _selectedAcademicYear;
+  
+  // Search functionality
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+  List<Student> _searchResults = [];
+  bool _isSearching = false;
+  bool _showSearchResults = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,105 +64,287 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
 
   Widget _buildContent(String academicYear) {
     final classesAsync = ref.watch(allClassesProvider);
+    final allStudentsAsync = ref.watch(allStudentsProvider);
+    
+    // Get students for selected class
     final studentsAsync = _selectedClassId != null 
         ? ref.watch(studentsProvider(_selectedClassId!))
         : const AsyncValue<List<Student>>.data([]);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Step 1: Select Class
-          _buildSectionCard(
-            title: 'Step 1: Class Select Karein',
-            icon: Icons.class_,
-            child: classesAsync.when(
-              data: (classes) => DropdownButtonFormField<String>(
-                value: _selectedClassId,
-                decoration: const InputDecoration(
-                  hintText: 'Class choose karein',
-                  prefixIcon: Icon(Icons.class_),
+    return Column(
+      children: [
+        // Search Bar (Always visible)
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Search Field
+              TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                decoration: InputDecoration(
+                  hintText: 'Student ka naam search karein...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchResults = [];
+                              _showSearchResults = false;
+                            });
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
-                items: classes.map((c) => DropdownMenuItem(
-                  value: c.id,
-                  child: Text('${c.name} - ${c.section}'),
-                )).toList(),
-                onChanged: (v) {
-                  setState(() {
-                    _selectedClassId = v;
-                    _selectedStudentId = null;
-                    _selectedStudent = null;
-                    _selectedMonths.clear();
-                    _totalAmount = 0;
-                  });
+                onChanged: (value) => _onSearch(value, allStudentsAsync),
+                onTap: () {
+                  if (_searchController.text.isNotEmpty) {
+                    setState(() => _showSearchResults = true);
+                  }
                 },
               ),
-              loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const Text('Error loading classes'),
+              
+              // Search Results Dropdown
+              if (_showSearchResults && _searchResults.isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  constraints: const BoxConstraints(maxHeight: 250),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final student = _searchResults[index];
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                          child: Text(
+                            student.fullName.substring(0, 1).toUpperCase(),
+                            style: TextStyle(color: AppTheme.primaryColor),
+                          ),
+                        ),
+                        title: Text(student.fullName),
+                        subtitle: Text('Class: ${student.className} - ${student.section} | Roll: ${student.rollNo ?? "N/A"}'),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () => _selectStudentFromSearch(student),
+                      );
+                    },
+                  ),
+                ),
+              
+              if (_showSearchResults && _searchController.text.isNotEmpty && _searchResults.isEmpty)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.search_off, color: Colors.grey),
+                      SizedBox(width: 8),
+                      Text('Koi student nahi mila', style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        // Main Content
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // OR Divider
+                if (_selectedStudent == null) ...[
+                  const Row(
+                    children: [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text('OR', style: TextStyle(color: Colors.grey)),
+                      ),
+                      Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Class select karke student choose karein:',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+                // Step 1: Select Class
+                _buildSectionCard(
+                  title: 'Class Select Karein',
+                  icon: Icons.class_,
+                  child: classesAsync.when(
+                    data: (classes) => DropdownButtonFormField<String>(
+                      value: _selectedClassId,
+                      decoration: const InputDecoration(
+                        hintText: 'Class choose karein',
+                        prefixIcon: Icon(Icons.class_),
+                      ),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('All Classes')),
+                        ...classes.map((c) => DropdownMenuItem(
+                          value: c.id,
+                          child: Text('${c.name} - ${c.section}'),
+                        )),
+                      ],
+                      onChanged: (v) {
+                        setState(() {
+                          _selectedClassId = v;
+                          _selectedStudentId = null;
+                          _selectedStudent = null;
+                          _selectedMonths.clear();
+                          _totalAmount = 0;
+                        });
+                      },
+                    ),
+                    loading: () => const LinearProgressIndicator(),
+                    error: (_, __) => const Text('Error loading classes'),
+                  ),
+                ),
+
+                if (_selectedClassId != null) ...[
+                  const SizedBox(height: 16),
+                  
+                  // Step 2: Select Student
+                  _buildSectionCard(
+                    title: 'Student Select Karein',
+                    icon: Icons.person,
+                    child: studentsAsync.when(
+                      data: (students) {
+                        if (students.isEmpty) {
+                          return const Text('Is class mein koi student nahi hai');
+                        }
+                        return DropdownButtonFormField<String>(
+                          value: _selectedStudentId,
+                          decoration: const InputDecoration(
+                            hintText: 'Student choose karein',
+                            prefixIcon: Icon(Icons.person),
+                          ),
+                          items: students.map((s) => DropdownMenuItem(
+                            value: s.id,
+                            child: Text('${s.fullName} (Roll: ${s.rollNo ?? "N/A"})'),
+                          )).toList(),
+                          onChanged: (v) {
+                            final student = students.firstWhere((s) => s.id == v);
+                            setState(() {
+                              _selectedStudentId = v;
+                              _selectedStudent = student;
+                              _selectedClassId = student.classId;
+                              _selectedMonths.clear();
+                              _totalAmount = 0;
+                            });
+                          },
+                        );
+                      },
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, __) => const Text('Error loading students'),
+                    ),
+                  ),
+                ],
+
+                if (_selectedStudent != null) ...[
+                  const SizedBox(height: 16),
+                  
+                  // Student Info Card
+                  _buildStudentInfoCard(),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Step 3: Student Fee Summary
+                  _buildStudentFeeSummary(academicYear),
+                ],
+
+                if (_selectedMonths.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  
+                  // Step 4: Payment Details
+                  _buildPaymentSection(academicYear),
+                ],
+
+                const SizedBox(height: 100),
+              ],
             ),
           ),
-
-          if (_selectedClassId != null) ...[
-            const SizedBox(height: 16),
-            
-            // Step 2: Select Student
-            _buildSectionCard(
-              title: 'Step 2: Student Select Karein',
-              icon: Icons.person,
-              child: studentsAsync.when(
-                data: (students) {
-                  if (students.isEmpty) {
-                    return const Text('Is class mein koi student nahi hai');
-                  }
-                  return DropdownButtonFormField<String>(
-                    value: _selectedStudentId,
-                    decoration: const InputDecoration(
-                      hintText: 'Student choose karein',
-                      prefixIcon: Icon(Icons.person),
-                    ),
-                    items: students.map((s) => DropdownMenuItem(
-                      value: s.id,
-                      child: Text('${s.fullName} (Roll: ${s.rollNo ?? "N/A"})'),
-                    )).toList(),
-                    onChanged: (v) {
-                      final student = students.firstWhere((s) => s.id == v);
-                      setState(() {
-                        _selectedStudentId = v;
-                        _selectedStudent = student;
-                        _selectedMonths.clear();
-                        _totalAmount = 0;
-                      });
-                    },
-                  );
-                },
-                loading: () => const LinearProgressIndicator(),
-                error: (_, __) => const Text('Error loading students'),
-              ),
-            ),
-          ],
-
-          if (_selectedStudent != null) ...[
-            const SizedBox(height: 16),
-            
-            // Student Info Card
-            _buildStudentInfoCard(),
-            
-            const SizedBox(height: 16),
-            
-            // Step 3: Student Fee Summary
-            _buildStudentFeeSummary(academicYear),
-          ],
-
-          if (_selectedMonths.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            
-            // Step 4: Payment Details
-            _buildPaymentSection(academicYear),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
+  }
+
+  void _onSearch(String query, AsyncValue<List<Student>> allStudentsAsync) {
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _showSearchResults = false;
+      });
+      return;
+    }
+
+    setState(() => _isSearching = true);
+
+    allStudentsAsync.whenData((students) {
+      final results = students.where((s) => 
+        s.fullName.toLowerCase().contains(query.toLowerCase()) ||
+        (s.rollNo?.toLowerCase().contains(query.toLowerCase()) ?? false) ||
+        s.parentName.toLowerCase().contains(query.toLowerCase())
+      ).toList();
+
+      setState(() {
+        _searchResults = results;
+        _showSearchResults = true;
+        _isSearching = false;
+      });
+    });
+  }
+
+  void _selectStudentFromSearch(Student student) {
+    _searchController.clear();
+    setState(() {
+      _selectedStudent = student;
+      _selectedStudentId = student.id;
+      _selectedClassId = student.classId;
+      _selectedMonths.clear();
+      _totalAmount = 0;
+      _searchResults = [];
+      _showSearchResults = false;
+    });
+    _searchFocusNode.unfocus();
   }
 
   Widget _buildSectionCard({
