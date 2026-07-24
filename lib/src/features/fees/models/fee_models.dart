@@ -420,20 +420,27 @@ class FeeRefund {
 // Fee Summary (for class/school level)
 class FeeSummary {
   FeeSummary({
-    required this.totalStudents,
-    required this.totalExpected,
-    required this.totalCollected,
-    required this.totalPending,
-    required this.totalConcession,
-    required this.totalLateFee,
+    this.totalStudents = 0,
+    this.totalAmount = 0,
+    this.collectedAmount = 0,
+    this.pendingAmount = 0,
+    this.concessionAmount = 0,
+    this.lateFeeAmount = 0,
+    this.overdueCount = 0,
   });
 
   final int totalStudents;
-  final double totalExpected;
-  final double totalCollected;
-  final double totalPending;
-  final double totalConcession;
-  final double totalLateFee;
+  final double totalAmount;
+  final double collectedAmount;
+  final double pendingAmount;
+  final double concessionAmount;
+  final double lateFeeAmount;
+  final int overdueCount;
+
+  double get collectionPercent {
+    if (totalAmount == 0) return 0;
+    return (collectedAmount / totalAmount) * 100;
+  }
 }
 
 // Legacy StudentFee for backward compatibility

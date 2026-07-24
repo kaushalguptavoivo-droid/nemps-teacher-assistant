@@ -955,8 +955,9 @@ class _ClassFeeConfigCard extends ConsumerWidget {
 
     if (result != true) return;
 
-    final customAmount = double.tryParse(amountCtrl.text);
+    final customAmount = double.tryParse(amountCtrl.text) ?? 0;
     final lateFee = double.tryParse(lateFeeCtrl.text) ?? 0;
+    final selectedDueDate = dueDate ?? DateTime.now().add(const Duration(days: 30));
 
     final newConfig = ClassFeeConfig(
       id: config?.id ?? '',
@@ -965,7 +966,7 @@ class _ClassFeeConfigCard extends ConsumerWidget {
       academicYear: academicYear,
       isEnabled: config?.isEnabled ?? true,
       customAmount: customAmount,
-      dueDate: dueDate,
+      dueDate: selectedDueDate,
       lateFee: lateFee,
       concessionAllowed: concessionAllowed,
       createdAt: DateTime.now(),
@@ -1396,14 +1397,16 @@ class _FeeCollectionTabState extends ConsumerState<_FeeCollectionTab> {
         createdAt: fee.createdAt,
       ));
 
-      // Record payment
-      await ref.read(feeRepoProvider).recordPayment(FeePayment(
+      // Record payment (using new payment system)
+      final receiptNo = await ref.read(feeRepoProvider).generateReceiptNo();
+      await ref.read(feeRepoProvider).createFeePayment(FeePayment(
         id: '',
-        studentFeeId: fee.id,
         studentId: fee.studentId,
         amount: amount,
         paymentDate: paymentDate,
         paymentMethod: paymentMethod,
+        receiptNo: receiptNo,
+        academicYear: fee.academicYear,
         remarks: remarksCtrl.text.isNotEmpty ? remarksCtrl.text : null,
         createdAt: DateTime.now(),
       ));

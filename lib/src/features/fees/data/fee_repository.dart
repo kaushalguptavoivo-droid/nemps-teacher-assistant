@@ -614,7 +614,7 @@ class FeeRepository {
         overdueCount: overdueCount,
       );
     } catch (e) {
-      return const FeeSummary(
+      return FeeSummary(
         totalStudents: 0,
         totalAmount: 0,
         collectedAmount: 0,
