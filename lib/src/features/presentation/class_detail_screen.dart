@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
 // Feature 1 & 2: new independent modules — no existing code modified

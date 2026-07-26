@@ -621,7 +621,6 @@ class _ClassFeeConfigTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeSession = ref.watch(activeSessionProvider);
     final allClasses = ref.watch(allClassesProvider);
 
     return Column(
@@ -1731,9 +1730,8 @@ class _FeeReportsContentState extends ConsumerState<_FeeReportsContent>
   // ── Collection Tab ────────────────────────────────────────────────────────
 
   Widget _buildCollectionTab() {
-    final dateStr = '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
-    final collectionAsync = ref.watch(dailyCollectionProvider(_selectedDate));
 
+    final dailyCollectionAsync = ref.watch(dailyCollectionProvider(_selectedDate));
     return Column(
       children: [
         // Date Selector
@@ -1773,7 +1771,7 @@ class _FeeReportsContentState extends ConsumerState<_FeeReportsContent>
         ),
         // Collection Summary
         Expanded(
-          child: collectionAsync.when(
+          child: dailyCollectionAsync.when(
             data: (collection) {
               if (collection.payments.isEmpty) {
                 return const Center(

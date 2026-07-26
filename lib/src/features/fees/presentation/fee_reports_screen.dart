@@ -12,7 +12,6 @@ import '../../data/providers.dart';
 import '../data/fee_providers.dart';
 import '../../examination/data/exam_providers.dart';
 import '../models/fee_models.dart';
-import '../../../core/models/models.dart';
 
 class FeeReportsScreen extends ConsumerStatefulWidget {
   const FeeReportsScreen({super.key});
@@ -26,7 +25,6 @@ class _FeeReportsScreenState extends ConsumerState<FeeReportsScreen>
   late TabController _tabController;
   DateTime _selectedDate = DateTime.now();
   String? _selectedClassId;
-  String _reportType = 'due';
 
   @override
   void initState() {

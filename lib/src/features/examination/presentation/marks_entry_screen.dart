@@ -412,7 +412,6 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
   // Absent map: key = "studentId__subjectId"
   final Map<String, bool> _absent = {};
   // Loaded marks from DB
-  Map<String, ExamMark> _loaded = {};
   bool _loadingMarks = true;
   bool _saving = false;
   // Per-subject term configs (max marks + inclusion) for this term
@@ -483,7 +482,6 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
       }
       if (mounted) {
         setState(() {
-          _loaded = map;
           _subjectTermConfigs = stcs;
           // Pre-fill draft with loaded values
           for (final entry in map.entries) {
