@@ -1,5 +1,57 @@
 # NEMPS Teacher Assistant
+Before coding, create ERP_IMPLEMENTATION_PLAN.md.
 
+The file should include:
+
+1. Current project analysis
+
+2. Existing database analysis
+
+3. Existing reusable modules
+
+4. New database tables
+
+5. Database ER Diagram
+
+6. Examination module architecture
+
+7. Fees module architecture
+
+8. Flutter folder structure
+
+9. API flow
+
+10. Supabase migrations
+
+11. RLS policies
+
+12. Index strategy
+
+13. Report card generation flow
+
+14. Fee receipt generation flow
+
+15. PDF generation architecture
+
+16. Future modules that can plug in later:
+   - Transport
+   - Hostel
+   - Library
+   - Inventory
+   - Payroll
+   - Timetable
+   - Parent App
+   - Student App
+   - SMS
+   - WhatsApp Automation
+   - Online Payment Gateway
+   - Biometric Attendance
+
+17. Phase-wise implementation checklist.
+
+18. Every completed task should have a checkbox.
+
+19. Never delete this file. Keep updating it after every completed phase.
 Flutter Android/Web application for **New Era Modern Public School, Vrindavan**, using **Supabase** backend.
 
 ## ✨ Features
