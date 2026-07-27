@@ -378,6 +378,8 @@ class _NoConfigViewState extends ConsumerState<_NoConfigView> {
                   .titleMedium
                   ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
+          // Dynamic pattern selector can be populated from DB.
+          // Fallback legacy patterns shown here for compatibility until custom patterns are mapped to classes.
           _PatternCard(
             selected: _pattern == 'nursery',
             pattern: 'nursery',
@@ -399,6 +401,15 @@ class _NoConfigViewState extends ConsumerState<_NoConfigView> {
             ],
             total: '200',
             onTap: () => setState(() => _pattern = 'prep_to_8'),
+          ),
+          const SizedBox(height: 12),
+          _PatternCard(
+            selected: _pattern == 'custom_dynamic',
+            pattern: 'custom_dynamic',
+            title: 'Custom ERP Pattern (Dynamic)',
+            terms: const ['Configure dynamically from Admin'],
+            total: 'Auto',
+            onTap: () => setState(() => _pattern = 'custom_dynamic'),
           ),
           const SizedBox(height: 24),
           SizedBox(
