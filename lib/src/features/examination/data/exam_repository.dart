@@ -79,7 +79,7 @@ class ExamRepository {
   Future<ExamConfig> createExamConfig({
     required String classId,
     required String academicYear,
-    required ExamPattern pattern,
+    required String pattern,
     double passingPercentage = 33.0,
     String resultType = 'marks',
   }) async {
@@ -88,7 +88,7 @@ class ExamRepository {
         .insert({
           'class_id': classId,
           'academic_year': academicYear,
-          'exam_pattern': pattern == ExamPattern.nursery ? 'nursery' : 'prep_to_8',
+          'exam_pattern': pattern,
           'passing_percentage': passingPercentage,
           'result_type': resultType,
           'is_locked': false,
@@ -101,9 +101,11 @@ class ExamRepository {
 
     // Auto-generate terms from pattern
     final terms = _defaultTermsFor(config.id, pattern);
-    await _client.from('exam_terms').insert(
-          terms.map((t) => t.toInsertMap()).toList(),
-        );
+    if (terms.isNotEmpty) {
+      await _client.from('exam_terms').insert(
+            terms.map((t) => t.toInsertMap()).toList(),
+          );
+    }
 
     return config;
   }
@@ -686,8 +688,8 @@ class ExamRepository {
 
   /// Returns the default term list for a given pattern.
   /// Admin may edit maximum_marks after creation.
-  List<ExamTerm> _defaultTermsFor(String configId, ExamPattern pattern) {
-    if (pattern == ExamPattern.nursery) {
+  List<ExamTerm> _defaultTermsFor(String configId, String pattern) {
+    if (pattern.toLowerCase() == 'nursery') {
       return [
         ExamTerm(
           id: '', examConfigId: configId,

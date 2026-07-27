@@ -26,21 +26,17 @@ class FeeRepository {
     }
   }
 
-  Future<void> addFeeType({
-    required String name,
-    required String description,
-    required double amount,
-    required String frequency,
-    required String academicYear,
-  }) async {
+  Future<void> addFeeType(FeeType feeType) async {
     final row = {
       'id': _uuid.v4(),
-      'name': name,
-      'description': description,
-      'amount': amount,
-      'frequency': frequency,
-      'academic_year': academicYear,
+      'name': feeType.name,
+      'description': feeType.description,
+      'amount': feeType.amount,
+      'frequency': feeType.frequency,
+      'academic_year': feeType.academicYear,
       'is_active': true,
+      'is_mandatory': feeType.isMandatory,
+      'depends_on_transport': feeType.dependsOnTransport,
       'created_at': DateTime.now().toUtc().toIso8601String(),
     };
     await _client.from('fee_types').insert(row);
@@ -53,6 +49,8 @@ class FeeRepository {
       'amount': feeType.amount,
       'frequency': feeType.frequency,
       'is_active': feeType.isActive,
+      'is_mandatory': feeType.isMandatory,
+      'depends_on_transport': feeType.dependsOnTransport,
     }).eq('id', feeType.id);
   }
 

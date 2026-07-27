@@ -4,7 +4,7 @@
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
-enum ExamPattern { nursery, prepTo8 }
+// enum ExamPattern { nursery, prepTo8 } -- Now replaced by dynamic Strings
 
 // ─── AcademicSession ─────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ class ExamConfig {
   final String id;
   final String classId;
   final String academicYear;
-  final ExamPattern examPattern;
+  final String examPattern;
   final double passingPercentage;
   final String resultType;   // 'marks' | 'grade' | 'both'
   final bool isLocked;
@@ -68,9 +68,7 @@ class ExamConfig {
         id: m['id'] as String,
         classId: m['class_id'] as String,
         academicYear: m['academic_year'] as String,
-        examPattern: (m['exam_pattern'] as String) == 'nursery'
-            ? ExamPattern.nursery
-            : ExamPattern.prepTo8,
+        examPattern: m['exam_pattern'] as String,
         passingPercentage: (m['passing_percentage'] as num).toDouble(),
         resultType: m['result_type'] as String? ?? 'marks',
         isLocked: m['is_locked'] as bool? ?? false,
