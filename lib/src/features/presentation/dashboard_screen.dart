@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -69,7 +70,8 @@ class DashboardScreen extends ConsumerWidget {
                               fontSize: 22,
                               fontWeight: FontWeight.bold)),
                       const Text('Aaj ka kaam poora karein 💪',
-                          style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          style:
+                              TextStyle(color: Colors.white70, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -134,20 +136,19 @@ class DashboardScreen extends ConsumerWidget {
                         children: [
                           Icon(Icons.class_outlined,
                               size: 48,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .outlineVariant),
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant),
                           const SizedBox(height: 8),
-                          const Text('Koi class assign nahi.\nAdmin se contact karein.',
+                          const Text(
+                              'Koi class assign nahi.\nAdmin se contact karein.',
                               textAlign: TextAlign.center),
                         ],
                       ),
                     ),
                   )
                 : Column(
-                    children: items
-                        .map((room) => _ClassCard(room: room))
-                        .toList(),
+                    children:
+                        items.map((room) => _ClassCard(room: room)).toList(),
                   ),
             error: (error, _) => Card(
               child: ListTile(
@@ -160,8 +161,7 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            loading: () =>
-                const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: CircularProgressIndicator()),
           ),
 
           const SizedBox(height: 24),
@@ -186,8 +186,7 @@ class DashboardScreen extends ConsumerWidget {
                 label: 'Attendance',
                 color: AppTheme.attendanceColor,
                 onTap: classes.valueOrNull?.isNotEmpty == true
-                    ? () => context
-                        .go('/attendance/${classes.value!.first.id}')
+                    ? () => context.go('/attendance/${classes.value!.first.id}')
                     : null,
               ),
               _QuickActionCard(
@@ -195,8 +194,7 @@ class DashboardScreen extends ConsumerWidget {
                 label: 'Homework',
                 color: AppTheme.homeworkColor,
                 onTap: classes.valueOrNull?.isNotEmpty == true
-                    ? () =>
-                        context.go('/homework/${classes.value!.first.id}')
+                    ? () => context.go('/homework/${classes.value!.first.id}')
                     : null,
               ),
               _QuickActionCard(
@@ -204,8 +202,7 @@ class DashboardScreen extends ConsumerWidget {
                 label: 'WhatsApp',
                 color: AppTheme.whatsappColor,
                 onTap: classes.valueOrNull?.isNotEmpty == true
-                    ? () =>
-                        context.go('/absent/${classes.value!.first.id}')
+                    ? () => context.go('/absent/${classes.value!.first.id}')
                     : null,
               ),
               _QuickActionCard(
@@ -295,12 +292,9 @@ class _NoticesBanner extends ConsumerWidget {
                     color: Color(0xFF7C3AED), size: 20),
                 const SizedBox(width: 6),
                 Text('School Notices',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF7C3AED))),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF7C3AED))),
                 const Spacer(),
                 Text('${items.length} notice',
                     style: TextStyle(
@@ -362,7 +356,8 @@ class _NoticeCard extends StatelessWidget {
                     Text(notice.body,
                         style: TextStyle(
                             fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis),
                   ],
@@ -549,9 +544,11 @@ class _DashboardSearch extends ConsumerStatefulWidget {
 class _DashboardSearchState extends ConsumerState<_DashboardSearch> {
   final _ctrl = TextEditingController();
   bool _expanded = false;
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _ctrl.dispose();
     super.dispose();
   }
@@ -577,10 +574,10 @@ class _DashboardSearchState extends ConsumerState<_DashboardSearch> {
                 ? IconButton(
                     icon: const Icon(Icons.clear_rounded),
                     onPressed: () {
+                      _debounce?.cancel();
                       _ctrl.clear();
-                      ref
-                          .read(dashboardSearchQueryProvider.notifier)
-                          .state = '';
+                      ref.read(dashboardSearchQueryProvider.notifier).state =
+                          '';
                       setState(() => _expanded = false);
                     },
                   )
@@ -595,9 +592,12 @@ class _DashboardSearchState extends ConsumerState<_DashboardSearch> {
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
           onChanged: (v) {
-            ref.read(dashboardSearchQueryProvider.notifier).state =
-                v.trim();
-            setState(() => _expanded = v.trim().isNotEmpty);
+            final trimmed = v.trim();
+            if (_debounce?.isActive ?? false) _debounce!.cancel();
+            _debounce = Timer(const Duration(milliseconds: 300), () {
+              ref.read(dashboardSearchQueryProvider.notifier).state = trimmed;
+            });
+            setState(() => _expanded = trimmed.isNotEmpty);
           },
         ),
 
@@ -611,8 +611,7 @@ class _DashboardSearchState extends ConsumerState<_DashboardSearch> {
             ),
             error: (_, __) => Padding(
               padding: const EdgeInsets.all(8),
-              child: Text('Search error',
-                  style: TextStyle(color: cs.error)),
+              child: Text('Search error', style: TextStyle(color: cs.error)),
             ),
             data: (students) {
               if (students.isEmpty && query.isNotEmpty) {
@@ -641,13 +640,13 @@ class _DashboardSearchState extends ConsumerState<_DashboardSearch> {
                                     fontWeight: FontWeight.bold)),
                           ),
                           title: Text(s.fullName,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w600)),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
                           subtitle: Text(
                               '${s.classLabel} · ${s.parentName.isNotEmpty ? s.parentName : "—"}',
                               style: const TextStyle(fontSize: 11)),
-                          trailing: const Icon(Icons.info_outline_rounded,
-                              size: 18),
+                          trailing:
+                              const Icon(Icons.info_outline_rounded, size: 18),
                           onTap: () {
                             // Feature 2: open student details from search result
                             showStudentDetailsModal(context, s);

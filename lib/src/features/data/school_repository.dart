@@ -6,7 +6,8 @@ import '../../core/models/models.dart';
 import '../../core/services/offline_queue.dart';
 
 // Conditional import: use dart:io on mobile/desktop, stub on web
-import 'dart:io' if (dart.library.html) 'package:nemps_teacher_assistant/src/core/stubs/io_stub.dart';
+import 'dart:io'
+    if (dart.library.html) 'package:nemps_teacher_assistant/src/core/stubs/io_stub.dart';
 
 class SchoolRepository {
   SchoolRepository(this._client) : _outbox = OfflineQueue(_client);
@@ -19,11 +20,8 @@ class SchoolRepository {
 
   Future<UserRole> getCurrentUserRole() async {
     try {
-      final data = await _client
-          .from('profiles')
-          .select('role')
-          .eq('id', _uid)
-          .single();
+      final data =
+          await _client.from('profiles').select('role').eq('id', _uid).single();
       final roleStr = data['role'] as String? ?? 'teacher';
       return roleStr == 'admin' ? UserRole.admin : UserRole.teacher;
     } catch (_) {
@@ -39,7 +37,9 @@ class SchoolRepository {
           .from('teacher_classes')
           .select('classes(id,name,section)')
           .eq('teacher_id', _uid);
-      return data.map<ClassRoom>((e) => ClassRoom.fromMap(e['classes'])).toList();
+      return data
+          .map<ClassRoom>((e) => ClassRoom.fromMap(e['classes']))
+          .toList();
     } catch (e) {
       rethrow;
     }
@@ -86,7 +86,9 @@ class SchoolRepository {
   }
 
   Future<void> deactivateStudent(String studentId) async {
-    await _client.from('students').update({'active': false}).eq('id', studentId);
+    await _client
+        .from('students')
+        .update({'active': false}).eq('id', studentId);
   }
 
   // ── Attendance ────────────────────────────────────────────────────────────
@@ -151,7 +153,8 @@ class SchoolRepository {
     }
   }
 
-  Future<List<Student>> getPresentStudents(String classId, DateTime date) async {
+  Future<List<Student>> getPresentStudents(
+      String classId, DateTime date) async {
     try {
       final attendanceData = await _client
           .from('attendance')
@@ -240,7 +243,8 @@ class SchoolRepository {
     }
   }
 
-  Future<List<Homework>> getHomeworkForDate(String classId, DateTime date) async {
+  Future<List<Homework>> getHomeworkForDate(
+      String classId, DateTime date) async {
     try {
       final data = await _client
           .from('homework')
@@ -258,8 +262,7 @@ class SchoolRepository {
     try {
       await _client
           .from('homework')
-          .update({'is_hidden': isHidden})
-          .eq('id', homeworkId);
+          .update({'is_hidden': isHidden}).eq('id', homeworkId);
     } catch (e) {
       rethrow;
     }
@@ -279,21 +282,24 @@ class SchoolRepository {
     };
     try {
       await _client.from('homework_status').upsert(
-        row,
-        onConflict: 'homework_id,student_id',
-      );
+            row,
+            onConflict: 'homework_id,student_id',
+          );
     } catch (_) {
       await _outbox.enqueue('homework_status', row);
     }
   }
 
-  Future<List<HomeworkStatusRecord>> getHomeworkStatus(String homeworkId) async {
+  Future<List<HomeworkStatusRecord>> getHomeworkStatus(
+      String homeworkId) async {
     try {
       final data = await _client
           .from('homework_status')
           .select('*, students(full_name)')
           .eq('homework_id', homeworkId);
-      return data.map<HomeworkStatusRecord>((e) => HomeworkStatusRecord.fromMap(e)).toList();
+      return data
+          .map<HomeworkStatusRecord>((e) => HomeworkStatusRecord.fromMap(e))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -309,7 +315,8 @@ class SchoolRepository {
           .inFilter('status', ['incomplete', 'not_checked']);
       final allStudents = await students(classId);
       if (statusData.isEmpty) return allStudents;
-      final pendingIds = statusData.map((e) => e['student_id'] as String).toSet();
+      final pendingIds =
+          statusData.map((e) => e['student_id'] as String).toSet();
       return allStudents.where((s) => pendingIds.contains(s.id)).toList();
     } catch (_) {
       return [];
@@ -410,7 +417,8 @@ class SchoolRepository {
     };
     try {
       await _client.from('notices').insert(row);
-      await _logActivity('notice_sent', audienceClassId ?? '', {'title': title});
+      await _logActivity(
+          'notice_sent', audienceClassId ?? '', {'title': title});
     } catch (_) {
       await _outbox.enqueue('notices', row);
     }
@@ -447,11 +455,8 @@ class SchoolRepository {
   /// Permanently delete a notice by its ID.
   /// Throws if RLS blocks the delete (returns empty list = not deleted).
   Future<void> deleteNotice(String noticeId) async {
-    final deleted = await _client
-        .from('notices')
-        .delete()
-        .eq('id', noticeId)
-        .select('id');
+    final deleted =
+        await _client.from('notices').delete().eq('id', noticeId).select('id');
     if ((deleted as List).isEmpty) {
       throw Exception(
           'Notice delete nahi ho paya. Permission check karein (Admin role chahiye).');
@@ -465,7 +470,8 @@ class SchoolRepository {
     try {
       await _client.from('teacher_activity').insert({
         'teacher_id': _uid,
-        'class_id': classId.isEmpty ? '00000000-0000-0000-0000-000000000000' : classId,
+        'class_id':
+            classId.isEmpty ? '00000000-0000-0000-0000-000000000000' : classId,
         'activity_type': type,
         'activity_date': DateTime.now().toIso8601String().substring(0, 10),
         'details': details,
@@ -481,7 +487,9 @@ class SchoolRepository {
           .eq('teacher_id', teacherId)
           .order('created_at', ascending: false)
           .limit(50);
-      return data.map<TeacherActivity>((e) => TeacherActivity.fromMap(e)).toList();
+      return data
+          .map<TeacherActivity>((e) => TeacherActivity.fromMap(e))
+          .toList();
     } catch (e) {
       return [];
     }
@@ -494,8 +502,14 @@ class SchoolRepository {
       final studentList = await students(classId);
       List<List<dynamic>> rows = [];
       rows.add([
-        'Roll No', 'Full Name', 'Father Name', 'Mother Name',
-        'WhatsApp', 'Address', 'DOB', 'Fee Status',
+        'Roll No',
+        'Full Name',
+        'Father Name',
+        'Mother Name',
+        'WhatsApp',
+        'Address',
+        'DOB',
+        'Fee Status',
       ]);
       for (var student in studentList) {
         rows.add([
@@ -515,14 +529,17 @@ class SchoolRepository {
     }
   }
 
-  Future<void> importStudentsFromBytes(String classId, Uint8List csvBytes) async {
+  Future<void> importStudentsFromBytes(
+      String classId, Uint8List csvBytes) async {
     try {
       final contents = String.fromCharCodes(csvBytes);
       final rowsAsListOfValues = const CsvToListConverter().convert(contents);
       if (rowsAsListOfValues.isEmpty) return;
 
       // Detect if header row exists and map column indices
-      final firstRow = rowsAsListOfValues[0].map((e) => e.toString().toLowerCase().trim()).toList();
+      final firstRow = rowsAsListOfValues[0]
+          .map((e) => e.toString().toLowerCase().trim())
+          .toList();
       final bool hasHeader = firstRow.contains('full name') ||
           firstRow.contains('roll no') ||
           firstRow.contains('full_name');
@@ -537,14 +554,14 @@ class SchoolRepository {
       }
 
       final hdr = hasHeader ? firstRow : <String>[];
-      final iRoll    = col(hdr, ['roll no', 'roll_no'], 0);
-      final iName    = col(hdr, ['full name', 'full_name'], 1);
-      final iFather  = col(hdr, ['father name', 'father_name'], 2);
-      final iMother  = col(hdr, ['mother name', 'mother_name'], 3);
-      final iWa      = col(hdr, ['whatsapp'], hasHeader ? 4 : 3);
-      final iAddr    = col(hdr, ['address'], hasHeader ? 5 : -1);
-      final iDob     = col(hdr, ['dob'], hasHeader ? 6 : 4);
-      final iFee     = col(hdr, ['fee status', 'fee_status'], hasHeader ? 7 : 5);
+      final iRoll = col(hdr, ['roll no', 'roll_no'], 0);
+      final iName = col(hdr, ['full name', 'full_name'], 1);
+      final iFather = col(hdr, ['father name', 'father_name'], 2);
+      final iMother = col(hdr, ['mother name', 'mother_name'], 3);
+      final iWa = col(hdr, ['whatsapp'], hasHeader ? 4 : 3);
+      final iAddr = col(hdr, ['address'], hasHeader ? 5 : -1);
+      final iDob = col(hdr, ['dob'], hasHeader ? 6 : 4);
+      final iFee = col(hdr, ['fee status', 'fee_status'], hasHeader ? 7 : 5);
 
       String _safe(List row, int idx) =>
           idx >= 0 && idx < row.length ? row[idx].toString().trim() : '';
@@ -553,17 +570,17 @@ class SchoolRepository {
       for (int i = startRow; i < rowsAsListOfValues.length; i++) {
         final row = rowsAsListOfValues[i];
         if (row.length < 2) continue;
-        final rollNo   = _safe(row, iRoll);
+        final rollNo = _safe(row, iRoll);
         final fullName = _safe(row, iName);
         if (rollNo.isEmpty || fullName.isEmpty) continue;
 
         final studentData = <String, dynamic>{
-          'class_id':   classId,
-          'roll_no':    rollNo,
-          'full_name':  fullName,
+          'class_id': classId,
+          'roll_no': rollNo,
+          'full_name': fullName,
           'father_name': _safe(row, iFather),
-          'whatsapp':   _safe(row, iWa),
-          'active':     true,
+          'whatsapp': _safe(row, iWa),
+          'active': true,
         };
         final mother = _safe(row, iMother);
         if (mother.isNotEmpty) studentData['mother_name'] = mother;
@@ -575,7 +592,9 @@ class SchoolRepository {
         if (fee.isNotEmpty) studentData['fee_status'] = fee;
 
         try {
-          await _client.from('students').upsert(studentData, onConflict: 'class_id,roll_no');
+          await _client
+              .from('students')
+              .upsert(studentData, onConflict: 'class_id,roll_no');
         } catch (_) {}
       }
     } catch (e) {
@@ -644,7 +663,8 @@ class SchoolRepository {
         .select('classes(id,name,section)')
         .eq('teacher_id', teacherId);
     return data
-        .map<ClassRoom>((e) => ClassRoom.fromMap(e['classes'] as Map<String, dynamic>))
+        .map<ClassRoom>(
+            (e) => ClassRoom.fromMap(e['classes'] as Map<String, dynamic>))
         .toList();
   }
 
@@ -673,7 +693,9 @@ class SchoolRepository {
   }
 
   Future<void> moveStudentToClass(String studentId, String classId) async {
-    await _client.from('students').update({'class_id': classId}).eq('id', studentId);
+    await _client
+        .from('students')
+        .update({'class_id': classId}).eq('id', studentId);
   }
 
   Future<void> deleteStudent(String studentId) async {
@@ -718,7 +740,8 @@ class SchoolRepository {
           .from('whatsapp_notifications')
           .select('notification_date')
           .eq('class_id', classId)
-          .gte('notification_date', startDate.toIso8601String().substring(0, 10))
+          .gte(
+              'notification_date', startDate.toIso8601String().substring(0, 10))
           .lte('notification_date', endDate.toIso8601String().substring(0, 10));
       final Map<String, int> result = {};
       for (final row in data) {
@@ -738,8 +761,7 @@ class SchoolRepository {
       String classId, int year, int month) async {
     try {
       final start = '$year-${month.toString().padLeft(2, '0')}-01';
-      final lastDay =
-          DateTime(year, month + 1, 0).day; // last day of month
+      final lastDay = DateTime(year, month + 1, 0).day; // last day of month
       final end =
           '$year-${month.toString().padLeft(2, '0')}-${lastDay.toString().padLeft(2, '0')}';
       final data = await _client
@@ -790,22 +812,23 @@ class SchoolRepository {
 
   /// Search students by name or roll-no within optional [classIds].
   /// If [classIds] is null/empty and user is admin, searches all classes.
-  Future<List<Student>> searchStudents(
-      String query, {List<String>? classIds}) async {
+  Future<List<Student>> searchStudents(String query,
+      {List<String>? classIds}) async {
     try {
       if (query.trim().isEmpty) return [];
-      var q = _client.from('students').select('*, classes(name, section)').eq('active', true);
+      var q = _client
+          .from('students')
+          .select('*, classes(name, section)')
+          .eq('active', true);
       if (classIds != null && classIds.isNotEmpty) {
         q = q.inFilter('class_id', classIds);
       }
+      // Push filtering to the database to avoid fetching all active students in memory
+      q = q.or(
+          'full_name.ilike."%${query.trim()}%",roll_no.ilike."%${query.trim()}%"');
+
       final data = await q;
-      final lower = query.toLowerCase();
-      return data
-          .map<Student>((r) => Student.fromMap(r))
-          .where((s) =>
-              s.fullName.toLowerCase().contains(lower) ||
-              s.rollNo.toLowerCase().contains(lower))
-          .toList();
+      return data.map<Student>((r) => Student.fromMap(r)).toList();
     } catch (_) {
       return [];
     }
