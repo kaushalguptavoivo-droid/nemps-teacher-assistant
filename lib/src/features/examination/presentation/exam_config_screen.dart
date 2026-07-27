@@ -330,7 +330,7 @@ class _NoConfigView extends ConsumerStatefulWidget {
 }
 
 class _NoConfigViewState extends ConsumerState<_NoConfigView> {
-  ExamPattern? _pattern;
+  String? _pattern;
 
   Future<void> _create() async {
     if (_pattern == null) return;
@@ -378,18 +378,20 @@ class _NoConfigViewState extends ConsumerState<_NoConfigView> {
                   .titleMedium
                   ?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
+          // Dynamic pattern selector can be populated from DB.
+          // Fallback legacy patterns shown here for compatibility until custom patterns are mapped to classes.
           _PatternCard(
-            selected: _pattern == ExamPattern.nursery,
-            pattern: ExamPattern.nursery,
+            selected: _pattern == 'nursery',
+            pattern: 'nursery',
             title: 'Nursery Pattern',
             terms: const ['Oral (40)', 'Written (60)'],
             total: '100',
-            onTap: () => setState(() => _pattern = ExamPattern.nursery),
+            onTap: () => setState(() => _pattern = 'nursery'),
           ),
           const SizedBox(height: 12),
           _PatternCard(
-            selected: _pattern == ExamPattern.prepTo8,
-            pattern: ExamPattern.prepTo8,
+            selected: _pattern == 'prep_to_8',
+            pattern: 'prep_to_8',
             title: 'Prep to Class 8 Pattern',
             terms: const [
               'UT1 (20)',
@@ -398,7 +400,16 @@ class _NoConfigViewState extends ConsumerState<_NoConfigView> {
               'Annual (80)',
             ],
             total: '200',
-            onTap: () => setState(() => _pattern = ExamPattern.prepTo8),
+            onTap: () => setState(() => _pattern = 'prep_to_8'),
+          ),
+          const SizedBox(height: 12),
+          _PatternCard(
+            selected: _pattern == 'custom_dynamic',
+            pattern: 'custom_dynamic',
+            title: 'Custom ERP Pattern (Dynamic)',
+            terms: const ['Configure dynamically from Admin'],
+            total: 'Auto',
+            onTap: () => setState(() => _pattern = 'custom_dynamic'),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -426,7 +437,7 @@ class _PatternCard extends StatelessWidget {
     required this.onTap,
   });
   final bool selected;
-  final ExamPattern pattern;
+  final String pattern;
   final String title;
   final List<String> terms;
   final String total;
@@ -452,7 +463,7 @@ class _PatternCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Radio<ExamPattern>(
+            Radio<String>(
               value: pattern,
               groupValue: selected ? pattern : null,
               onChanged: (_) => onTap(),
@@ -613,7 +624,7 @@ class _InfoChipRow extends StatelessWidget {
       children: [
         Chip(
           label: Text(
-              config.examPattern == ExamPattern.nursery
+              config.examPattern == 'nursery'
                   ? 'Nursery'
                   : 'Prep to 8',
               style: const TextStyle(fontWeight: FontWeight.bold)),

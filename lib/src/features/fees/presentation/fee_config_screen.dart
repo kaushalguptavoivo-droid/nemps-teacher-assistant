@@ -301,7 +301,9 @@ class _FeeTypesList extends ConsumerWidget {
     final nameCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
-    String frequency = 'one-time';
+    String frequency = 'one_time';
+    bool isMandatory = true;
+    bool dependsOnTransport = false;
 
     final result = await showDialog<bool>(
       context: context,
@@ -380,13 +382,20 @@ class _FeeTypesList extends ConsumerWidget {
     if (amount <= 0) return;
 
     try {
-      await ref.read(feeRepoProvider).addFeeType(
+      final newFee = FeeType(
+        id: '',
         name: nameCtrl.text.trim(),
         description: descCtrl.text.trim(),
         amount: amount,
         frequency: frequency,
         academicYear: academicYear,
+        isActive: true,
+        isOneTime: frequency == 'one_time',
+        isMandatory: isMandatory,
+        dependsOnTransport: dependsOnTransport,
+        createdAt: DateTime.now(),
       );
+      await ref.read(feeRepoProvider).addFeeType(newFee);
       ref.invalidate(feeTypesProvider(academicYear));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1730,8 +1739,8 @@ class _FeeReportsContentState extends ConsumerState<_FeeReportsContent>
   // ── Collection Tab ────────────────────────────────────────────────────────
 
   Widget _buildCollectionTab() {
+    final collectionAsync = ref.watch(dailyCollectionProvider(_selectedDate));
 
-    final dailyCollectionAsync = ref.watch(dailyCollectionProvider(_selectedDate));
     return Column(
       children: [
         // Date Selector
@@ -1771,7 +1780,7 @@ class _FeeReportsContentState extends ConsumerState<_FeeReportsContent>
         ),
         // Collection Summary
         Expanded(
-          child: dailyCollectionAsync.when(
+          child: collectionAsync.when(
             data: (collection) {
               if (collection.payments.isEmpty) {
                 return const Center(

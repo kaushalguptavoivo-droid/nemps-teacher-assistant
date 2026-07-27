@@ -310,8 +310,8 @@ class _TraditionalReportCardScreenState
 
   pw.Widget _buildMarksTable(StudentResult r, List<ExamTerm> terms) {
     // Split terms into Bi-Annual and Annual sections
-    final biAnnualTerms = terms.take(2).toList(); // UT1, Half Yearly
-    final annualTerms = terms.skip(2).toList(); // UT2, Annual
+    final biAnnualTerms = terms.toList(); // UT1, Half Yearly
+    final annualTerms = []; // UT2, Annual
 
     return pw.Container(
       decoration: pw.BoxDecoration(
@@ -484,8 +484,8 @@ class _TraditionalReportCardScreenState
   }
 
   pw.Widget _buildSubjectRow(SubjectResult sub, List<ExamTerm> terms) {
-    final biAnnualTerms = terms.take(2).toList();
-    final annualTerms = terms.skip(2).toList();
+    final biAnnualTerms = terms.toList();
+    final annualTerms = [];
 
     // Get marks for each term
 

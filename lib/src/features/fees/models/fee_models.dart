@@ -54,6 +54,8 @@ class FeeType {
     this.academicYear = '',
     this.isOneTime = false,
     this.lateFeePerMonth = 0,
+    this.isMandatory = true,
+    this.dependsOnTransport = false,
     required this.createdAt,
   });
 
@@ -66,6 +68,8 @@ class FeeType {
   final String academicYear;
   final bool isOneTime;
   final double lateFeePerMonth;
+  final bool isMandatory;
+  final bool dependsOnTransport;
   final DateTime createdAt;
 
   factory FeeType.fromMap(Map<String, dynamic> m) => FeeType(
@@ -78,6 +82,8 @@ class FeeType {
         academicYear: m['academic_year'] as String? ?? '',
         isOneTime: m['is_one_time'] as bool? ?? false,
         lateFeePerMonth: (m['late_fee_per_month'] as num?)?.toDouble() ?? 0,
+        isMandatory: m['is_mandatory'] as bool? ?? true,
+        dependsOnTransport: m['depends_on_transport'] as bool? ?? false,
         createdAt: DateTime.parse(m['created_at'] as String),
       );
 
@@ -90,6 +96,8 @@ class FeeType {
         'academic_year': academicYear,
         'is_one_time': isOneTime,
         'late_fee_per_month': lateFeePerMonth,
+        'is_mandatory': isMandatory,
+        'depends_on_transport': dependsOnTransport,
       };
 }
 
