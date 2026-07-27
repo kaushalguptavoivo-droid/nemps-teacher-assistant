@@ -488,10 +488,6 @@ class _TraditionalReportCardScreenState
     final annualTerms = terms.skip(2).toList();
 
     // Get marks for each term
-    final ut1Marks = sub.termMarks[biAnnualTerms.isNotEmpty ? biAnnualTerms[0].id : ''];
-    final hyMarks = sub.termMarks[biAnnualTerms.length > 1 ? biAnnualTerms[1].id : ''];
-    final ut2Marks = sub.termMarks[annualTerms.isNotEmpty ? annualTerms[0].id : ''];
-    final annualMarks = sub.termMarks[annualTerms.length > 1 ? annualTerms[1].id : ''];
 
     return pw.Container(
       decoration: const pw.BoxDecoration(

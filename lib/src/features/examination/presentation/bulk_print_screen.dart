@@ -15,7 +15,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import '../data/exam_providers.dart';
 import '../models/exam_models.dart';
-import 'result_screen.dart' show BulkPrintArgs, ReportCardArgs;
+import 'result_screen.dart' show BulkPrintArgs;
 
 // ── Print mode ────────────────────────────────────────────────────────────────
 

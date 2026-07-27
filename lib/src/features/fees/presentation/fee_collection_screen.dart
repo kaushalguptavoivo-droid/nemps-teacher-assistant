@@ -1,8 +1,7 @@
 // Fee Collection Screen
 // Complete month-wise fee collection with receipt printing
 
-import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import "package:flutter/material.dart";
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -29,13 +28,11 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
   double _totalAmount = 0;
   double _concession = 0;
   String _paymentMethod = 'cash';
-  String? _selectedAcademicYear;
   
   // Search functionality
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
   List<Student> _searchResults = [];
-  bool _isSearching = false;
   bool _showSearchResults = false;
 
   @override
@@ -54,7 +51,6 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
         if (session == null) {
           return const Center(child: Text('No active session'));
         }
-        _selectedAcademicYear = session.label;
         return _buildContent(session.label);
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -144,7 +140,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                           ),
                         ),
                         title: Text(student.fullName),
-                        subtitle: Text('Class: ${student.className} - ${student.section} | Roll: ${student.rollNo ?? "N/A"}'),
+                        subtitle: Text('Class: ${student.className} - ${student.section} | Roll: ${student.rollNo}'),
                         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                         onTap: () => _selectStudentFromSearch(student),
                       );
@@ -259,7 +255,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                           ),
                           items: students.map((s) => DropdownMenuItem(
                             value: s.id,
-                            child: Text('${s.fullName} (Roll: ${s.rollNo ?? "N/A"})'),
+                            child: Text('${s.fullName} (Roll: ${s.rollNo})'),
                           )).toList(),
                           onChanged: (v) {
                             final student = students.firstWhere((s) => s.id == v);
@@ -498,21 +494,20 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
       return;
     }
 
-    setState(() => _isSearching = true);
-
+    setState(() {});
     allStudentsAsync.whenData((students) {
       final results = students.where((s) => 
         s.fullName.toLowerCase().contains(query.toLowerCase()) ||
-        (s.rollNo?.toLowerCase().contains(query.toLowerCase()) ?? false) ||
+        s.rollNo.toLowerCase().contains(query.toLowerCase()) ||
         s.parentName.toLowerCase().contains(query.toLowerCase())
       ).toList();
 
       setState(() {
         _searchResults = results;
+
         _showSearchResults = true;
-        _isSearching = false;
       });
-    });
+      });
   }
 
   void _selectStudentFromSearch(Student student) {
@@ -585,7 +580,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Class: ${student.className} - ${student.section}  |  Roll No: ${student.rollNo ?? "N/A"}',
+                        'Class: ${student.className} - ${student.section}  |  Roll No: ${student.rollNo}',
                         style: TextStyle(color: Colors.grey[700]),
                       ),
                     ],
@@ -1056,7 +1051,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text('Student: ${student.fullName}'),
-                      pw.Text('Roll No: ${student.rollNo ?? "N/A"}'),
+                      pw.Text('Roll No: ${student.rollNo}'),
                     ],
                   ),
                   pw.SizedBox(height: 5),

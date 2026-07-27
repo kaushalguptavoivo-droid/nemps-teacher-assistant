@@ -1128,7 +1128,7 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
                                       onPressed: () => _sendToGroup(
                                           context,
                                           ref,
-                                          link!,
+                                          link,
                                           selectedList),
                                       style: FilledButton.styleFrom(
                                         backgroundColor:

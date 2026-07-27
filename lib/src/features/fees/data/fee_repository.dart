@@ -563,7 +563,7 @@ class FeeRepository {
             'fee_type_id': config.feeTypeId,
             'class_id': classId,
             'academic_year': academicYear,
-            'amount': config.customAmount ?? 0,
+            'amount': config.customAmount,
             'paid_amount': 0,
             'status': 'due',
             'due_date': dueDate.toIso8601String().substring(0, 10),

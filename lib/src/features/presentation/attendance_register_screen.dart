@@ -298,12 +298,6 @@ class _AttendanceRegisterScreenState
     final tallied = sumOfColTotals == sumOfRowTotals && _rows.isNotEmpty;
 
     // ── Border style ───────────────────────────────────────────────────────
-    final border = BorderSide(color: cs.outlineVariant, width: 0.5);
-    final borderAll = TableBorder(
-      top: border, bottom: border, left: border, right: border,
-      horizontalInside: border, verticalInside: border,
-    );
-
     Widget headerCell(String txt, double w, {Color? bg}) => Container(
           width: w,
           height: hdrH,
