@@ -1,3 +1,7 @@
 ## 2025-07-27 - Supabase Text Search Optimization
 **Learning:** When using Supabase's `.or()` syntax for text matching, string values containing spaces or special characters like commas must be enclosed in double quotes within the PostgREST string representation to prevent parsing errors. e.g. `q.or('full_name.ilike."%${query}%",roll_no.ilike."%${query}%"')`. Also, Riverpod's `onChanged` debouncing needs to explicitly clear its timer upon unmount or when explicitly clearing the field via the "x" button to prevent state race conditions.
 **Action:** Always wrap query string interpolations in `.or()` in double quotes. Always explicitly cancel timers inside `dispose()` and manual clear actions when building custom debouncers in Flutter.
+
+## 2026-07-27 - Examination System Exemption Logic
+**Learning:** When calculating student percentages in exam setups, exempting a student from a term (via `is_exempt`) requires dropping that specific term's maximum marks from the student's *total maximum marks* calculation. This prevents the student's overall percentage from being artificially deflated. `termExemptions` tracking needs to be handled dynamically within the Dart repository instead of exclusively via complex Postgres views to maintain Flutter Riverpod state updates correctly.
+**Action:** Include both the obtained marks and `is_exempt` boolean flags on `exam_marks` saving methods, and explicitly track a `Map<String, bool> termExemptions` on `SubjectResult` to render accurate frontend feedback for blank cells.
