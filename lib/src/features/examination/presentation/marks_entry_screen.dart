@@ -2,11 +2,13 @@
 // Spreadsheet-style grid: Students (rows) × Subjects (columns)
 // One tab per term. Auto-save with offline fallback. Lock-aware.
 
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert' show utf8;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
@@ -986,14 +988,13 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
         'marks_${widget.term.termName.replaceAll(' ', '_')}.csv';
 
     try {
+      // Save to temp file first — required on Android for Share to work
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/$filename');
+      await file.writeAsBytes(utf8.encode(csvStr));
+
       await Share.shareXFiles(
-        [
-          XFile.fromData(
-            Uint8List.fromList(utf8.encode(csvStr)),
-            mimeType: 'text/csv',
-            name: filename,
-          )
-        ],
+        [XFile(file.path, mimeType: 'text/csv', name: filename)],
         subject: 'Marks Export — ${widget.term.termName}',
       );
     } catch (e) {
@@ -1140,12 +1141,20 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
       
       final bytes = excel.encode();
       if (bytes != null) {
+        final filename =
+            'marks_${widget.term.termName.replaceAll(' ', '_')}.xlsx';
+        // Save to temp file — required on Android for Share
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/$filename');
+        await file.writeAsBytes(bytes);
+
         await Share.shareXFiles(
           [
-            XFile.fromData(
-              Uint8List.fromList(bytes),
-              mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-              name: 'marks_${widget.term.termName.replaceAll(' ', '_')}.xlsx',
+            XFile(
+              file.path,
+              mimeType:
+                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              name: filename,
             )
           ],
           subject: 'Marks Export — ${widget.term.termName}',
@@ -1302,7 +1311,13 @@ class _MarkCellState extends State<_MarkCell> {
   void didUpdateWidget(_MarkCell old) {
     super.didUpdateWidget(old);
     if (old.value != widget.value && !widget.isGradeSubject) {
-      _ctrl.text = widget.value ?? '';
+      // Only update controller when text truly changed externally.
+      // If the controller already shows the new value (user just typed it),
+      // skipping the assignment avoids resetting cursor mid-input —
+      // which caused the "need to retype for 2nd digit" bug.
+      if (_ctrl.text != (widget.value ?? '')) {
+        _ctrl.text = widget.value ?? '';
+      }
     }
   }
 

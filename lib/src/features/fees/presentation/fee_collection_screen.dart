@@ -28,6 +28,9 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
   double _totalAmount = 0;
   double _concession = 0;
   String _paymentMethod = 'cash';
+
+  // Class fee configs cache — loaded when a student is selected
+  List<ClassFeeConfig>? _classFeeConfigs;
   
   // Search functionality
   final _searchController = TextEditingController();
@@ -265,7 +268,9 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                               _selectedClassId = student.classId;
                               _selectedMonths.clear();
                               _totalAmount = 0;
+                              _classFeeConfigs = null;
                             });
+                            _loadClassFeeConfigs(student.classId);
                           },
                         );
                       },
@@ -518,10 +523,23 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
       _selectedClassId = student.classId;
       _selectedMonths.clear();
       _totalAmount = 0;
+      _classFeeConfigs = null;
       _searchResults = [];
       _showSearchResults = false;
     });
     _searchFocusNode.unfocus();
+    _loadClassFeeConfigs(student.classId);
+  }
+
+  Future<void> _loadClassFeeConfigs(String classId) async {
+    final session = ref.read(activeSessionProvider).valueOrNull;
+    if (session == null) return;
+    try {
+      final configs = await ref
+          .read(feeRepoProvider)
+          .getClassFeeConfigs(classId, session.label);
+      if (mounted) setState(() => _classFeeConfigs = configs);
+    } catch (_) {}
   }
 
   Widget _buildSectionCard({
@@ -940,15 +958,102 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
   }
 
   void _calculateTotal(String academicYear) {
-    // TODO: Calculate based on class fee config
-    _totalAmount = _selectedMonths.length * 1000; // Placeholder
-    _lateFee = _selectedMonths.length * 50; // Example late fee
+    final configs = _classFeeConfigs ?? [];
+    final enabledConfigs = configs.where((c) => c.isEnabled).toList();
+    if (enabledConfigs.isEmpty) {
+      _totalAmount = 0;
+    } else {
+      final monthlyAmount =
+          enabledConfigs.fold(0.0, (sum, c) => sum + c.customAmount);
+      _totalAmount = _selectedMonths.length * monthlyAmount;
+    }
+    _lateFee = 0;
   }
 
   Future<void> _generateFeesForStudent(String academicYear) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fees generate ho rahe hain...')),
-    );
+    if (_selectedStudent == null || _selectedClassId == null) return;
+
+    // Ensure fee configs are loaded
+    List<ClassFeeConfig> configs = _classFeeConfigs ?? [];
+    if (configs.isEmpty) {
+      configs = await ref
+          .read(feeRepoProvider)
+          .getClassFeeConfigs(_selectedClassId!, academicYear);
+      if (mounted) setState(() => _classFeeConfigs = configs);
+    }
+
+    final enabledConfigs = configs.where((c) => c.isEnabled).toList();
+    if (enabledConfigs.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Is class ke liye koi fee type enable nahi hai.\n'
+              'Admin → Fees Management → Class Config mein'
+              ' fee types ON karein.',
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+      return;
+    }
+
+    final double totalMonthlyAmount =
+        enabledConfigs.fold(0.0, (sum, c) => sum + c.customAmount);
+
+    // Parse academic year start/end (e.g. "2024-25" → 2024 / 2025)
+    final parts = academicYear.split('-');
+    final startYear = int.tryParse(parts[0]) ?? DateTime.now().year;
+    final endYear = parts.length > 1
+        ? (parts[1].length == 2
+            ? startYear + 1
+            : int.tryParse(parts[1]) ?? startYear + 1)
+        : startYear + 1;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fees generate ho rahe hain...')),
+      );
+    }
+
+    int generated = 0;
+    for (final month in monthNames) {
+      final monthIdx = monthIndex[month]!;
+      final year = monthIdx >= 4 ? startYear : endYear;
+      generated += await ref
+          .read(feeRepoProvider)
+          .generateMonthlyFeesForStudent(
+            studentId: _selectedStudent!.id,
+            classId: _selectedClassId!,
+            academicYear: academicYear,
+            month: month,
+            year: year,
+            totalAmount: totalMonthlyAmount,
+          );
+    }
+
+    // Refresh fee summary
+    ref.invalidate(studentFeeSummaryProvider((
+      studentId: _selectedStudentId!,
+      academicYear: academicYear,
+    )));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            generated > 0
+                ? '$generated mahine ki fees generate ho gayi! '
+                    '₹${totalMonthlyAmount.toStringAsFixed(0)}/month ✓'
+                : 'Fees pehle se exist karti hain.',
+          ),
+          backgroundColor: generated > 0 ? Colors.green : Colors.blue,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Future<void> _collectFees(String academicYear) async {

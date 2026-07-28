@@ -632,19 +632,23 @@ class _ClassFeeConfigTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final allClasses = ref.watch(allClassesProvider);
 
+    // Expanded is required so that _ClassFeeConfigList's internal
+    // Expanded child gets bounded height (fixes RenderFlex overflow).
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: allClasses.when(
-            data: (classes) {
-              if (classes.isEmpty) {
-                return const Text('Pehle classes banayein.');
-              }
-              return const _ClassFeeConfigList();
-            },
-            loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text('Error: $e'),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: allClasses.when(
+              data: (classes) {
+                if (classes.isEmpty) {
+                  return const Center(child: Text('Pehle classes banayein.'));
+                }
+                return const _ClassFeeConfigList();
+              },
+              loading: () => const Center(child: LinearProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+            ),
           ),
         ),
       ],
