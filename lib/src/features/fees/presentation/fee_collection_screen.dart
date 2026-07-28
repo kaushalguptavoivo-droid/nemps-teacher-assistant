@@ -1152,7 +1152,7 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a5,
-        margin: const pw.EdgeInsets.all(22),
+        margin: pw.EdgeInsets.all(22),
         build: (pw.Context ctx) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
@@ -1186,7 +1186,7 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
               children: [
                 pw.RichText(
                   text: pw.TextSpan(children: [
-                    const pw.TextSpan(
+                    pw.TextSpan(
                         text: 'Receipt No: ',
                         style: pw.TextStyle(fontSize: 11)),
                     pw.TextSpan(
@@ -1198,18 +1198,18 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                 ),
                 pw.Text(
                     'Date: ${df.format(payment.paymentDate)}',
-                    style: const pw.TextStyle(fontSize: 11)),
+                    style: pw.TextStyle(fontSize: 11)),
               ],
             ),
             pw.SizedBox(height: 12),
 
             // Student info box
             pw.Container(
-              padding: const pw.EdgeInsets.all(10),
+              padding: pw.EdgeInsets.all(10),
               decoration: pw.BoxDecoration(
                 color: PdfColors.grey100,
                 borderRadius:
-                    const pw.BorderRadius.all(pw.Radius.circular(5)),
+                    pw.BorderRadius.all(pw.Radius.circular(5)),
               ),
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -1224,7 +1224,7 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                               fontWeight: pw.FontWeight.bold)),
                       pw.Text('Roll No: $rollNo',
                           style:
-                              const pw.TextStyle(fontSize: 11)),
+                              pw.TextStyle(fontSize: 11)),
                     ],
                   ),
                   pw.SizedBox(height: 4),
@@ -1234,11 +1234,11 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                     children: [
                       pw.Text('Class: $className',
                           style:
-                              const pw.TextStyle(fontSize: 11)),
+                              pw.TextStyle(fontSize: 11)),
                       pw.Text(
                           'Academic Year: ${payment.academicYear}',
                           style:
-                              const pw.TextStyle(fontSize: 11)),
+                              pw.TextStyle(fontSize: 11)),
                     ],
                   ),
                 ],
@@ -1248,11 +1248,11 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
 
             // Payment details box
             pw.Container(
-              padding: const pw.EdgeInsets.all(10),
+              padding: pw.EdgeInsets.all(10),
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: PdfColors.grey300),
                 borderRadius:
-                    const pw.BorderRadius.all(pw.Radius.circular(5)),
+                    pw.BorderRadius.all(pw.Radius.circular(5)),
               ),
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -1267,7 +1267,7 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                       crossAxisAlignment:
                           pw.CrossAxisAlignment.start,
                       children: [
-                        const pw.Text('Fee For: ',
+                        pw.Text('Fee For: ',
                             style:
                                 pw.TextStyle(fontSize: 11)),
                         pw.Expanded(
@@ -1316,7 +1316,7 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                     children: [
                       pw.Text('Payment Mode:',
                           style:
-                              const pw.TextStyle(fontSize: 11)),
+                              pw.TextStyle(fontSize: 11)),
                       pw.Text(
                           payment.paymentMethod.toUpperCase(),
                           style: pw.TextStyle(
@@ -1340,11 +1340,11 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                   children: [
                     pw.Text('Parent Signature',
                         style:
-                            const pw.TextStyle(fontSize: 9)),
+                            pw.TextStyle(fontSize: 9)),
                     pw.SizedBox(height: 22),
                     pw.Container(
                         width: 90,
-                        decoration: const pw.BoxDecoration(
+                        decoration: pw.BoxDecoration(
                             border: pw.Border(
                                 bottom: pw.BorderSide()))),
                   ],
@@ -1354,11 +1354,11 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                   children: [
                     pw.Text('Authorised Signatory',
                         style:
-                            const pw.TextStyle(fontSize: 9)),
+                            pw.TextStyle(fontSize: 9)),
                     pw.SizedBox(height: 22),
                     pw.Container(
                         width: 90,
-                        decoration: const pw.BoxDecoration(
+                        decoration: pw.BoxDecoration(
                             border: pw.Border(
                                 bottom: pw.BorderSide()))),
                   ],
@@ -1369,7 +1369,7 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
             pw.Center(
               child: pw.Text(
                   'This is a computer generated receipt',
-                  style: const pw.TextStyle(
+                  style: pw.TextStyle(
                       fontSize: 8, color: PdfColors.grey)),
             ),
           ],
@@ -1388,12 +1388,12 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
   static pw.Widget _pRow(String label, String value,
       {PdfColor? color}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      padding: pw.EdgeInsets.symmetric(vertical: 2),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
           pw.Text(label,
-              style: const pw.TextStyle(fontSize: 11)),
+              style: pw.TextStyle(fontSize: 11)),
           pw.Text(value,
               style: pw.TextStyle(
                   fontSize: 11,
