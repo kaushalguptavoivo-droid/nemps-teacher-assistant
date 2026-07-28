@@ -139,10 +139,12 @@ class ClassFeeConfig {
         id: m['id'] as String,
         classId: m['class_id'] as String,
         feeTypeId: m['fee_type_id'] as String,
-        academicYear: m['academic_year'] as String,
+        academicYear: m['academic_year'] as String? ?? '',
         isEnabled: m['is_enabled'] as bool? ?? false,
         customAmount: (m['custom_amount'] as num?)?.toDouble() ?? 0,
-        dueDate: DateTime.parse(m['due_date'] as String),
+        dueDate: m['due_date'] != null
+            ? DateTime.parse(m['due_date'] as String)
+            : DateTime.now().add(const Duration(days: 15)),
         lateFee: (m['late_fee'] as num?)?.toDouble() ?? 0,
         concessionAllowed: m['concession_allowed'] as bool? ?? false,
         installmentPlan: m['installment_plan'] as String? ?? 'none',
@@ -160,6 +162,9 @@ class ClassFeeConfig {
         'due_date': dueDate.toIso8601String().substring(0, 10),
         'late_fee': lateFee,
         'concession_allowed': concessionAllowed,
+        'installment_plan': installmentPlan,
+        'sibling_discount_2nd': siblingDiscount2nd,
+        'sibling_discount_3rd': siblingDiscount3rd,
       };
 
   Map<String, dynamic> toUpdateMap() => {
@@ -168,6 +173,9 @@ class ClassFeeConfig {
         'due_date': dueDate.toIso8601String().substring(0, 10),
         'late_fee': lateFee,
         'concession_allowed': concessionAllowed,
+        'installment_plan': installmentPlan,
+        'sibling_discount_2nd': siblingDiscount2nd,
+        'sibling_discount_3rd': siblingDiscount3rd,
       };
 }
 
@@ -219,10 +227,10 @@ class StudentMonthlyFee {
   factory StudentMonthlyFee.fromMap(Map<String, dynamic> m) => StudentMonthlyFee(
         id: m['id'] as String,
         studentId: m['student_id'] as String,
-        classId: m['class_id'] as String,
+        classId: m['class_id'] as String? ?? '',
         month: m['month'] as String,
-        year: m['year'] as int,
-        academicYear: m['academic_year'] as String,
+        year: (m['year'] as num?)?.toInt() ?? DateTime.now().year,
+        academicYear: m['academic_year'] as String? ?? '',
         totalAmount: (m['total_amount'] as num).toDouble(),
         paidAmount: (m['paid_amount'] as num?)?.toDouble() ?? 0,
         status: m['status'] as String? ?? 'due',
@@ -230,7 +238,7 @@ class StudentMonthlyFee {
         concessionType: m['concession_type'] as String? ?? 'none',
         lateFee: (m['late_fee'] as num?)?.toDouble() ?? 0,
         isInstallment: m['is_installment'] as bool? ?? false,
-        installmentNo: m['installment_no'] as int? ?? 0,
+        installmentNo: (m['installment_no'] as num?)?.toInt() ?? 0,
         remarks: m['remarks'] as String?,
         createdAt: DateTime.parse(m['created_at'] as String),
       );
@@ -266,6 +274,7 @@ class FeePayment {
     this.concessionType = 'none',
     this.lateFee = 0,
     this.remarks,
+    this.monthsCovered,
     required this.createdAt,
   });
 
@@ -280,39 +289,57 @@ class FeePayment {
   final String concessionType;
   final double lateFee;
   final String? remarks;
+  final String? monthsCovered; // e.g. "April 2024, May 2024, June 2024"
   final DateTime createdAt;
 
+  // Mutable lookup fields — set after construction
   String? studentName;
   String? studentRollNo;
   String? className;
+  String? schoolName;
 
-  factory FeePayment.fromMap(Map<String, dynamic> m) => FeePayment(
-        id: m['id'] as String,
-        studentId: m['student_id'] as String,
-        amount: (m['amount'] as num).toDouble(),
-        paymentDate: DateTime.parse(m['payment_date'] as String),
-        paymentMethod: m['payment_method'] as String,
-        receiptNo: m['receipt_no'] as String,
-        academicYear: m['academic_year'] as String,
-        concession: (m['concession'] as num?)?.toDouble() ?? 0,
-        concessionType: m['concession_type'] as String? ?? 'none',
-        lateFee: (m['late_fee'] as num?)?.toDouble() ?? 0,
-        remarks: m['remarks'] as String?,
-        createdAt: DateTime.parse(m['created_at'] as String),
-      );
+  factory FeePayment.fromMap(Map<String, dynamic> m) {
+    final fp = FeePayment(
+      id: m['id'] as String,
+      studentId: m['student_id'] as String,
+      amount: (m['amount'] as num).toDouble(),
+      paymentDate: DateTime.parse(m['payment_date'] as String),
+      paymentMethod: m['payment_method'] as String? ?? 'cash',
+      receiptNo: m['receipt_no'] as String? ?? '',
+      academicYear: m['academic_year'] as String? ?? '',
+      concession: (m['concession'] as num?)?.toDouble() ?? 0,
+      concessionType: m['concession_type'] as String? ?? 'none',
+      lateFee: (m['late_fee'] as num?)?.toDouble() ?? 0,
+      remarks: m['remarks'] as String?,
+      monthsCovered: m['months_covered'] as String?,
+      createdAt: DateTime.parse(m['created_at'] as String),
+    );
+    fp.studentName = m['student_name'] as String?;
+    fp.studentRollNo = m['student_roll_no'] as String?;
+    fp.className = m['class_name'] as String?;
+    fp.schoolName = m['school_name'] as String?;
+    return fp;
+  }
 
-  Map<String, dynamic> toInsertMap() => {
-        'student_id': studentId,
-        'amount': amount,
-        'payment_date': paymentDate.toIso8601String().substring(0, 10),
-        'payment_method': paymentMethod,
-        'receipt_no': receiptNo,
-        'academic_year': academicYear,
-        'concession': concession,
-        'concession_type': concessionType,
-        'late_fee': lateFee,
-        'remarks': remarks,
-      };
+  Map<String, dynamic> toInsertMap() {
+    final map = <String, dynamic>{
+      'student_id': studentId,
+      'amount': amount,
+      'payment_date': paymentDate.toIso8601String().substring(0, 10),
+      'payment_method': paymentMethod,
+      'receipt_no': receiptNo,
+      'academic_year': academicYear,
+      'concession': concession,
+      'concession_type': concessionType,
+      'late_fee': lateFee,
+      'remarks': remarks,
+      'months_covered': monthsCovered,
+    };
+    if (studentName != null) map['student_name'] = studentName;
+    if (className != null) map['class_name'] = className;
+    if (schoolName != null) map['school_name'] = schoolName;
+    return map;
+  }
 }
 
 class StudentFeeSummary {
@@ -447,7 +474,7 @@ class FeeSummary {
   }
 }
 
-// Legacy StudentFee for backward compatibility
+// Legacy StudentFee for backward compatibility with fee_config_screen
 class StudentFee {
   StudentFee({
     required this.id,
@@ -481,9 +508,9 @@ class StudentFee {
   final String? remarks;
   final DateTime createdAt;
 
+  String? feeTypeName;
   String? studentName;
   String? studentRollNo;
-  String? feeTypeName;
   String? className;
 
   double get pendingAmount => amount - paidAmount + lateFeeApplied - concession;
@@ -493,13 +520,15 @@ class StudentFee {
   factory StudentFee.fromMap(Map<String, dynamic> m) => StudentFee(
         id: m['id'] as String,
         studentId: m['student_id'] as String,
-        feeTypeId: m['fee_type_id'] as String,
-        classId: m['class_id'] as String,
-        academicYear: m['academic_year'] as String,
-        amount: (m['amount'] as num).toDouble(),
+        feeTypeId: m['fee_type_id'] as String? ?? '',
+        classId: m['class_id'] as String? ?? m['class_id_text'] as String? ?? '',
+        academicYear: m['academic_year'] as String? ?? '',
+        amount: (m['amount'] as num?)?.toDouble() ?? 0,
         paidAmount: (m['paid_amount'] as num?)?.toDouble() ?? 0,
         status: m['status'] as String? ?? 'due',
-        dueDate: DateTime.parse(m['due_date'] as String),
+        dueDate: m['due_date'] != null
+            ? DateTime.parse(m['due_date'] as String)
+            : DateTime.now().add(const Duration(days: 30)),
         paidDate: m['paid_date'] != null
             ? DateTime.parse(m['paid_date'] as String)
             : null,

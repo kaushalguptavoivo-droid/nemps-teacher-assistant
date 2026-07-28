@@ -15,6 +15,8 @@ import 'features/examination/presentation/promotion_screen.dart';
 import 'features/examination/presentation/analytics_screen.dart';
 // Feature 1: Attendance Register (new independent module)
 import 'features/presentation/attendance_register_screen.dart';
+// Feature 2: Fee Collection direct access
+import 'features/fees/presentation/fee_collection_screen.dart';
 
 /// Notifier that GoRouter listens to for auth state changes.
 /// This ensures the router re-evaluates redirects when Supabase restores
@@ -155,6 +157,11 @@ class _NempsAppState extends ConsumerState<NempsApp> {
           builder: (_, s) => NewShellScreen(
               child: AttendanceRegisterScreen(
                   classId: s.pathParameters['id']!)),
+        ),
+        GoRoute(
+          path: '/fee-collection',
+          builder: (_, __) =>
+              const NewShellScreen(child: FeeCollectionScreen()),
         ),
       ],
     );

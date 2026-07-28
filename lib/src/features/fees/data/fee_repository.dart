@@ -97,7 +97,7 @@ class FeeRepository {
     }
   }
 
-  // ── Student Fees ─────────────────────────────────────────────────────────────
+  // ── Student Fees (legacy — used by fee_config_screen) ────────────────────────
 
   Future<List<StudentFee>> getStudentFees({
     String? classId,
@@ -107,12 +107,12 @@ class FeeRepository {
   }) async {
     try {
       var query = _client.from('student_fees').select();
-      
+
       if (classId != null) query = query.eq('class_id', classId);
       if (studentId != null) query = query.eq('student_id', studentId);
       if (academicYear != null) query = query.eq('academic_year', academicYear);
       if (status != null) query = query.eq('status', status);
-      
+
       final data = await query.order('due_date');
       return data.map((r) => StudentFee.fromMap(r)).toList();
     } catch (e) {
@@ -158,6 +158,7 @@ class FeeRepository {
     await _client.from('student_fees').delete().eq('id', id);
   }
 
+  /// Legacy record payment — kept for backward compat with fee_config_screen
   Future<void> recordPayment(FeePayment payment) async {
     await _client.from('fee_payments').insert({
       'id': _uuid.v4(),
@@ -166,12 +167,16 @@ class FeeRepository {
     });
   }
 
-  Future<List<FeePayment>> getPaymentHistory(String studentFeeId) async {
+  // ── Payment History — fixed to use student_id ─────────────────────────────
+  // NOTE: Previously this incorrectly used 'student_fee_id' (non-existent column).
+  // Now uses 'student_id' which is the actual FK in fee_payments.
+
+  Future<List<FeePayment>> getPaymentHistory(String studentId) async {
     try {
       final data = await _client
           .from('fee_payments')
           .select()
-          .eq('student_fee_id', studentFeeId)
+          .eq('student_id', studentId)
           .order('payment_date', ascending: false);
       return data.map((r) => FeePayment.fromMap(r)).toList();
     } catch (e) {
@@ -187,7 +192,7 @@ class FeeRepository {
           .from('students')
           .select('id')
           .eq('class_id', classId)
-          .eq('active', true);   // 'active' matches the actual schema column
+          .eq('active', true);
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       return [];
@@ -196,7 +201,8 @@ class FeeRepository {
 
   // ── Student Monthly Fee Records ─────────────────────────────────────────────
 
-  Future<List<StudentMonthlyFee>> getStudentMonthlyFees(String studentId, String academicYear) async {
+  Future<List<StudentMonthlyFee>> getStudentMonthlyFees(
+      String studentId, String academicYear) async {
     try {
       final data = await _client
           .from('student_monthly_fees')
@@ -211,7 +217,8 @@ class FeeRepository {
     }
   }
 
-  Future<StudentMonthlyFee?> getStudentMonthFee(String studentId, String month, int year) async {
+  Future<StudentMonthlyFee?> getStudentMonthFee(
+      String studentId, String month, int year) async {
     try {
       final data = await _client
           .from('student_monthly_fees')
@@ -244,19 +251,19 @@ class FeeRepository {
     }).eq('id', fee.id);
   }
 
-  // ── Mark Monthly Fees as Paid ────────────────────────────────────────────────
+  // ── Mark Monthly Fees as Paid ──────────────────────────────────────────────
   // Called after a payment is collected for one or more months.
   // monthLabels format: 'April 2024', 'May 2024', etc.
+
   Future<void> markMonthlyFeesAsPaid({
     required String studentId,
     required String academicYear,
-    required List<String> monthLabels,    // e.g. ['April 2024', 'May 2024']
+    required List<String> monthLabels,
     required double totalPaidAmount,
     required double concessionAmount,
   }) async {
     if (monthLabels.isEmpty) return;
 
-    // Split the amount evenly across months
     final perMonth = totalPaidAmount / monthLabels.length;
     final perConcession = concessionAmount / monthLabels.length;
 
@@ -268,7 +275,6 @@ class FeeRepository {
       final year = int.tryParse(parts[1]);
       if (year == null) continue;
 
-      // Fetch existing record
       final existing = await getStudentMonthFee(studentId, month, year);
       if (existing == null) continue;
 
@@ -277,6 +283,7 @@ class FeeRepository {
         'status': 'paid',
         'concession': existing.concession + perConcession,
         'paid_date': DateTime.now().toIso8601String().substring(0, 10),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', existing.id);
     }
   }
@@ -297,12 +304,28 @@ class FeeRepository {
     await _client.from('fee_payments').delete().eq('id', paymentId);
   }
 
-  Future<List<FeePayment>> getStudentPayments(String studentId, String academicYear) async {
+  Future<List<FeePayment>> getStudentPayments(
+      String studentId, String academicYear) async {
     try {
       final data = await _client
           .from('fee_payments')
           .select()
           .eq('student_id', studentId)
+          .eq('academic_year', academicYear)
+          .order('payment_date', ascending: false);
+      return data.map((r) => FeePayment.fromMap(r)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // ── Get All Payments (for receipt history tab) ────────────────────────────
+
+  Future<List<FeePayment>> getAllPayments(String academicYear) async {
+    try {
+      final data = await _client
+          .from('fee_payments')
+          .select()
           .eq('academic_year', academicYear)
           .order('payment_date', ascending: false);
       return data.map((r) => FeePayment.fromMap(r)).toList();
@@ -358,12 +381,11 @@ class FeeRepository {
     return 1;
   }
 
-  // ── Receipt Number Generator ───────────────────────────────────────────────
+  // ── Receipt Number Generator ──────────────────────────────────────────────
 
   Future<String> generateReceiptNo() async {
     final year = DateTime.now().year;
     try {
-      // Count payments this year by prefix
       final data = await _client
           .from('fee_payments')
           .select('id')
@@ -377,16 +399,17 @@ class FeeRepository {
 
   // ── Student Fee Summary ────────────────────────────────────────────────────
 
-  Future<StudentFeeSummary> getStudentFeeSummary(String studentId, String academicYear) async {
+  Future<StudentFeeSummary> getStudentFeeSummary(
+      String studentId, String academicYear) async {
     try {
       final fees = await getStudentMonthlyFees(studentId, academicYear);
-      
+
       double totalDue = 0;
       double totalPaid = 0;
       double totalConcession = 0;
       double totalLateFee = 0;
-      List<String> monthsPending = [];
-      List<String> monthsPaid = [];
+      final List<String> monthsPending = [];
+      final List<String> monthsPaid = [];
 
       for (final fee in fees) {
         totalDue += fee.totalAmount;
@@ -434,10 +457,11 @@ class FeeRepository {
       final dueStudents = <DueStudent>[];
 
       for (final student in students) {
-        final fees = await getStudentMonthlyFees(student['id'] as String, academicYear);
-        
+        final fees =
+            await getStudentMonthlyFees(student['id'] as String, academicYear);
+
         double totalPending = 0;
-        List<String> monthsPending = [];
+        final List<String> monthsPending = [];
         DateTime? lastPaid;
 
         for (final fee in fees) {
@@ -457,7 +481,9 @@ class FeeRepository {
             studentId: student['id'] as String,
             studentName: student['full_name'] as String? ?? '',
             rollNo: student['roll_no'] as String? ?? '',
-            className: student['class_name'] as String? ?? student['className'] as String? ?? '',
+            className: student['class_name'] as String? ??
+                student['className'] as String? ??
+                '',
             section: student['section'] as String? ?? '',
             totalPending: totalPending,
             monthsPending: monthsPending,
@@ -478,15 +504,17 @@ class FeeRepository {
   Future<DailyCollection> getDailyCollection(DateTime date) async {
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(date);
-      final nextStr = DateFormat('yyyy-MM-dd').format(date.add(const Duration(days: 1)));
-      
+      final nextStr = DateFormat('yyyy-MM-dd')
+          .format(date.add(const Duration(days: 1)));
+
       final payments = await _client
           .from('fee_payments')
           .select()
           .gte('payment_date', dateStr)
           .lt('payment_date', nextStr);
 
-      final paymentList = payments.map((r) => FeePayment.fromMap(r)).toList();
+      final paymentList =
+          payments.map((r) => FeePayment.fromMap(r)).toList();
 
       double totalCollected = 0;
       double totalConcession = 0;
@@ -520,7 +548,8 @@ class FeeRepository {
 
   // ── Get Payments in Date Range ──────────────────────────────────────────────
 
-  Future<List<FeePayment>> getPaymentsInRange(DateTime start, DateTime end) async {
+  Future<List<FeePayment>> getPaymentsInRange(
+      DateTime start, DateTime end) async {
     try {
       final data = await _client
           .from('fee_payments')
@@ -551,9 +580,11 @@ class FeeRepository {
 
   // ── Late Fee Calculation ───────────────────────────────────────────────────
 
-  double calculateLateFee(double amount, DateTime dueDate, double lateFeePerMonth) {
+  double calculateLateFee(
+      double amount, DateTime dueDate, double lateFeePerMonth) {
     if (DateTime.now().isBefore(dueDate)) return 0;
-    final monthsLate = DateTime.now().difference(dueDate).inDays ~/ 30;
+    final monthsLate =
+        DateTime.now().difference(dueDate).inDays ~/ 30;
     return monthsLate * lateFeePerMonth;
   }
 
@@ -606,22 +637,25 @@ class FeeRepository {
     }
 
     if (batch.isNotEmpty) {
-      await _client.from('student_fees').insert(batch);
+      await _client.from('student_fees').upsert(batch,
+          onConflict: 'student_id,fee_type_id,academic_year',
+          ignoreDuplicates: true);
     }
   }
 
-  // ── Fee Reports ──────────────────────────────────────────────────────────────
+  // ── Fee Summary ─────────────────────────────────────────────────────────────
 
   Future<FeeSummary> getFeeSummary({
     String? classId,
-    String? academicYear,
+    required String academicYear,
   }) async {
     try {
-      var query = _client.from('student_fees').select();
-      
+      var query = _client
+          .from('student_fees')
+          .select()
+          .eq('academic_year', academicYear);
       if (classId != null) query = query.eq('class_id', classId);
-      if (academicYear != null) query = query.eq('academic_year', academicYear);
-      
+
       final data = await query;
       final fees = data.map((r) => StudentFee.fromMap(r)).toList();
 
@@ -651,7 +685,8 @@ class FeeRepository {
 
   // ── Get all classes with fees ───────────────────────────────────────────────
 
-  Future<List<Map<String, dynamic>>> getClassesWithSummary(String academicYear) async {
+  Future<List<Map<String, dynamic>>> getClassesWithSummary(
+      String academicYear) async {
     try {
       final classes = await _client
           .from('classes')
@@ -659,7 +694,7 @@ class FeeRepository {
           .eq('academic_year', academicYear);
 
       final result = <Map<String, dynamic>>[];
-      
+
       for (final cls in classes) {
         final summary = await getFeeSummary(
           classId: cls['id'] as String,
@@ -670,7 +705,7 @@ class FeeRepository {
           'summary': summary,
         });
       }
-      
+
       return result;
     } catch (e) {
       return [];

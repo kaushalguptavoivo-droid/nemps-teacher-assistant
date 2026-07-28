@@ -13,6 +13,7 @@ import '../../data/providers.dart';
 import '../data/fee_providers.dart';
 import '../../examination/data/exam_providers.dart';
 import '../models/fee_models.dart';
+import 'fee_collection_screen.dart';
 
 class FeeConfigScreen extends ConsumerStatefulWidget {
   const FeeConfigScreen({super.key});
@@ -90,7 +91,7 @@ class _FeeConfigScreenState extends ConsumerState<FeeConfigScreen>
         children: const [
           _FeeTypesTab(),
           _ClassFeeConfigTab(),
-          _FeeCollectionTab(),
+          const FeeCollectionScreen(),
           _FeeReportsTab(),
         ],
       ),

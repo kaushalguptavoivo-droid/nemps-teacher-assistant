@@ -111,3 +111,10 @@ final dailyCollectionProvider = FutureProvider.family<DailyCollection, DateTime>
     (ref, date) async {
   return ref.read(feeRepoProvider).getDailyCollection(date);
 });
+
+// ── All Payments (for Receipt History tab) ────────────────────────────────────
+
+final allPaymentsProvider = FutureProvider.family<List<FeePayment>, String>(
+    (ref, academicYear) async {
+  return ref.read(feeRepoProvider).getAllPayments(academicYear);
+});
