@@ -15277,9 +15277,9 @@ var require_mime_types = __commonJS({
   }
 });
 
-// ../../node_modules/.pnpm/media-typer@1.1.0/node_modules/media-typer/index.js
+// ../../node_modules/.pnpm/media-typer@1.1.1/node_modules/media-typer/index.js
 var require_media_typer = __commonJS({
-  "../../node_modules/.pnpm/media-typer@1.1.0/node_modules/media-typer/index.js"(exports) {
+  "../../node_modules/.pnpm/media-typer@1.1.1/node_modules/media-typer/index.js"(exports) {
     "use strict";
     var SUBTYPE_NAME_REGEXP = /^[A-Za-z0-9][A-Za-z0-9!#$&^_.-]{0,126}$/;
     var TYPE_NAME_REGEXP = /^[A-Za-z0-9][A-Za-z0-9!#$&^_-]{0,126}$/;
@@ -15310,18 +15310,12 @@ var require_media_typer = __commonJS({
       return string;
     }
     function test(string) {
-      if (!string) {
-        throw new TypeError("argument string is required");
-      }
       if (typeof string !== "string") {
         throw new TypeError("argument string is required to be a string");
       }
       return TYPE_REGEXP.test(string.toLowerCase());
     }
     function parse(string) {
-      if (!string) {
-        throw new TypeError("argument string is required");
-      }
       if (typeof string !== "string") {
         throw new TypeError("argument string is required to be a string");
       }
