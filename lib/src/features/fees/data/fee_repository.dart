@@ -187,7 +187,7 @@ class FeeRepository {
           .from('students')
           .select('id')
           .eq('class_id', classId)
-          .eq('is_active', true);
+          .eq('active', true);   // 'active' matches the actual schema column
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       return [];
@@ -244,6 +244,43 @@ class FeeRepository {
     }).eq('id', fee.id);
   }
 
+  // ── Mark Monthly Fees as Paid ────────────────────────────────────────────────
+  // Called after a payment is collected for one or more months.
+  // monthLabels format: 'April 2024', 'May 2024', etc.
+  Future<void> markMonthlyFeesAsPaid({
+    required String studentId,
+    required String academicYear,
+    required List<String> monthLabels,    // e.g. ['April 2024', 'May 2024']
+    required double totalPaidAmount,
+    required double concessionAmount,
+  }) async {
+    if (monthLabels.isEmpty) return;
+
+    // Split the amount evenly across months
+    final perMonth = totalPaidAmount / monthLabels.length;
+    final perConcession = concessionAmount / monthLabels.length;
+
+    for (final label in monthLabels) {
+      // label is 'Month Year', e.g. 'April 2024'
+      final parts = label.trim().split(' ');
+      if (parts.length < 2) continue;
+      final month = parts[0];
+      final year = int.tryParse(parts[1]);
+      if (year == null) continue;
+
+      // Fetch existing record
+      final existing = await getStudentMonthFee(studentId, month, year);
+      if (existing == null) continue;
+
+      await _client.from('student_monthly_fees').update({
+        'paid_amount': existing.paidAmount + perMonth,
+        'status': 'paid',
+        'concession': existing.concession + perConcession,
+        'paid_date': DateTime.now().toIso8601String().substring(0, 10),
+      }).eq('id', existing.id);
+    }
+  }
+
   // ── Fee Payment ─────────────────────────────────────────────────────────────
 
   Future<String> createFeePayment(FeePayment payment) async {
@@ -293,7 +330,7 @@ class FeeRepository {
     }
   }
 
-  // ── Generate Monthly Fees for All Students ──────────────────────────────────
+  // ── Generate Monthly Fees for a Student ─────────────────────────────────────
 
   Future<int> generateMonthlyFeesForStudent({
     required String studentId,
@@ -326,14 +363,15 @@ class FeeRepository {
   Future<String> generateReceiptNo() async {
     final year = DateTime.now().year;
     try {
-      final count = await _client
+      // Count payments this year by prefix
+      final data = await _client
           .from('fee_payments')
           .select('id')
-          .gte('receipt_no', 'R-$year-')
-          .then((data) => data.length);
+          .like('receipt_no', 'R-$year-%');
+      final count = (data as List).length;
       return 'R-$year-${(count + 1).toString().padLeft(4, '0')}';
     } catch (e) {
-      return 'R-$year-0001';
+      return 'R-$year-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
     }
   }
 
@@ -388,16 +426,15 @@ class FeeRepository {
 
   Future<List<DueStudent>> getDueStudents(String academicYear) async {
     try {
-      // Get all students with pending fees
       final students = await _client
           .from('students')
           .select()
-          .eq('is_active', true);
+          .eq('active', true);
 
       final dueStudents = <DueStudent>[];
 
       for (final student in students) {
-        final fees = await getStudentMonthlyFees(student['id'], academicYear);
+        final fees = await getStudentMonthlyFees(student['id'] as String, academicYear);
         
         double totalPending = 0;
         List<String> monthsPending = [];
@@ -406,7 +443,7 @@ class FeeRepository {
         for (final fee in fees) {
           if (!fee.isPaid) {
             totalPending += fee.pendingAmount;
-            monthsPending.add('${fee.month}');
+            monthsPending.add(fee.month);
           } else {
             if (lastPaid == null || fee.createdAt.isAfter(lastPaid)) {
               lastPaid = fee.createdAt;
@@ -416,12 +453,12 @@ class FeeRepository {
 
         if (monthsPending.isNotEmpty) {
           dueStudents.add(DueStudent(
-            id: student['id'],
-            studentId: student['id'],
-            studentName: student['full_name'] ?? '',
-            rollNo: student['roll_no'] ?? '',
-            className: student['class_name'] ?? '',
-            section: student['section'] ?? '',
+            id: student['id'] as String,
+            studentId: student['id'] as String,
+            studentName: student['full_name'] as String? ?? '',
+            rollNo: student['roll_no'] as String? ?? '',
+            className: student['class_name'] as String? ?? student['className'] as String? ?? '',
+            section: student['section'] as String? ?? '',
             totalPending: totalPending,
             monthsPending: monthsPending,
             lastPaidDate: lastPaid,
@@ -429,7 +466,6 @@ class FeeRepository {
         }
       }
 
-      // Sort by total pending (highest first)
       dueStudents.sort((a, b) => b.totalPending.compareTo(a.totalPending));
       return dueStudents;
     } catch (e) {
@@ -442,18 +478,15 @@ class FeeRepository {
   Future<DailyCollection> getDailyCollection(DateTime date) async {
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(date);
+      final nextStr = DateFormat('yyyy-MM-dd').format(date.add(const Duration(days: 1)));
       
       final payments = await _client
           .from('fee_payments')
           .select()
           .gte('payment_date', dateStr)
-          .lt('payment_date', DateFormat('yyyy-MM-dd').format(date.add(const Duration(days: 1))));
+          .lt('payment_date', nextStr);
 
-      final paymentList = payments.map((r) {
-        final payment = FeePayment.fromMap(r);
-        // Populate student name
-        return payment;
-      }).toList();
+      final paymentList = payments.map((r) => FeePayment.fromMap(r)).toList();
 
       double totalCollected = 0;
       double totalConcession = 0;
@@ -508,7 +541,7 @@ class FeeRepository {
       final data = await _client
           .from('students')
           .select()
-          .eq('is_active', true)
+          .eq('active', true)
           .order('roll_no');
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
@@ -520,7 +553,6 @@ class FeeRepository {
 
   double calculateLateFee(double amount, DateTime dueDate, double lateFeePerMonth) {
     if (DateTime.now().isBefore(dueDate)) return 0;
-    
     final monthsLate = DateTime.now().difference(dueDate).inDays ~/ 30;
     return monthsLate * lateFeePerMonth;
   }
@@ -613,13 +645,7 @@ class FeeRepository {
         overdueCount: overdueCount,
       );
     } catch (e) {
-      return FeeSummary(
-        totalStudents: 0,
-        totalAmount: 0,
-        collectedAmount: 0,
-        pendingAmount: 0,
-        overdueCount: 0,
-      );
+      return FeeSummary();
     }
   }
 
@@ -636,7 +662,7 @@ class FeeRepository {
       
       for (final cls in classes) {
         final summary = await getFeeSummary(
-          classId: cls['id'],
+          classId: cls['id'] as String,
           academicYear: academicYear,
         );
         result.add({

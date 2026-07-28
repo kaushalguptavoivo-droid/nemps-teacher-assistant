@@ -136,7 +136,7 @@ class _DueListTab extends ConsumerWidget {
             Expanded(
               child: _DueStudentsList(
                 academicYear: session.label,
-                classId: selectedClassId,
+                selectedClassId: selectedClassId,
               ),
             ),
           ],
@@ -150,11 +150,11 @@ class _DueListTab extends ConsumerWidget {
 
 class _DueStudentsList extends ConsumerWidget {
   final String academicYear;
-  final String? classId;
+  final String? selectedClassId;
 
   const _DueStudentsList({
     required this.academicYear,
-    this.classId,
+    this.selectedClassId,
   });
 
   @override
@@ -163,10 +163,15 @@ class _DueStudentsList extends ConsumerWidget {
 
     return dueAsync.when(
       data: (dueStudents) {
-        // Filter by class if selected
-        final filtered = classId != null
-            ? dueStudents.where((s) => s.className == ref.read(classNameByIdProvider(classId!))).toList()
-            : dueStudents;
+        // Filter by class name client-side if a class is selected
+        List<DueStudent> filtered = dueStudents;
+        if (selectedClassId != null) {
+          final classRoom = ref.read(allClassesProvider).valueOrNull
+              ?.firstWhere((c) => c.id == selectedClassId, orElse: () => ref.read(allClassesProvider).valueOrNull!.first);
+          if (classRoom != null) {
+            filtered = dueStudents.where((s) => s.className == classRoom.name).toList();
+          }
+        }
 
         if (filtered.isEmpty) {
           return const Center(
@@ -251,7 +256,9 @@ class _DueStudentCard extends StatelessWidget {
             CircleAvatar(
               backgroundColor: Colors.red[50],
               child: Text(
-                student.studentName.substring(0, 1).toUpperCase(),
+                student.studentName.isNotEmpty
+                    ? student.studentName.substring(0, 1).toUpperCase()
+                    : '?',
                 style: TextStyle(color: Colors.red[700]),
               ),
             ),
@@ -368,7 +375,7 @@ class _DailyCollectionTabState extends ConsumerState<_DailyCollectionTab> {
               ),
             ),
 
-            // Collection Summary
+            // Collection Summary — uses DateTime directly from dailyCollectionProvider
             Expanded(
               child: _DailyCollectionList(
                 date: widget.selectedDate,
@@ -395,8 +402,8 @@ class _DailyCollectionList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dateStr = DateFormat('yyyy-MM-dd').format(date);
-    final collectionAsync = ref.watch(dailyCollectionProvider(dateStr));
+    // dailyCollectionProvider takes DateTime (defined in fee_providers.dart)
+    final collectionAsync = ref.watch(dailyCollectionProvider(date));
 
     return collectionAsync.when(
       data: (collection) {
@@ -671,9 +678,9 @@ class _ExportTabState extends ConsumerState<_ExportTab> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text('• CSV file will be downloaded'),
-                      const Text('• Open in Excel or Google Sheets'),
-                      const Text('• Report for current academic year'),
+                      const Text('• CSV file save aur share hoga'),
+                      const Text('• Excel ya Google Sheets mein open karein'),
+                      const Text('• Current academic year ka report'),
                     ],
                   ),
                 ),
@@ -695,11 +702,11 @@ class _ExportTabState extends ConsumerState<_ExportTab> {
 
       if (_exportType == 'due') {
         final dueStudents = await ref.read(dueStudentsProvider(academicYear).future);
-        
+
         csvData = [
-          ['S.No', 'Student Name', 'Roll No', 'Class', 'Section', 'Pending Months', 'Total Due'],
+          ['S.No', 'Student Name', 'Roll No', 'Class', 'Section', 'Pending Months', 'Total Due (₹)'],
         ];
-        
+
         int i = 1;
         for (final student in dueStudents) {
           csvData.add([
@@ -720,27 +727,27 @@ class _ExportTabState extends ConsumerState<_ExportTab> {
         );
 
         csvData = [
-          ['Date', 'Receipt No', 'Student', 'Class', 'Amount', 'Concession', 'Late Fee', 'Method'],
+          ['Date', 'Receipt No', 'Student ID', 'Amount (₹)', 'Concession (₹)', 'Late Fee (₹)', 'Method', 'Remarks'],
         ];
 
         for (final payment in payments) {
           csvData.add([
             DateFormat('yyyy-MM-dd').format(payment.paymentDate),
             payment.receiptNo,
-            payment.studentName ?? '',
-            payment.className ?? '',
+            payment.studentId,
             payment.amount,
             payment.concession,
             payment.lateFee,
             payment.paymentMethod,
+            payment.remarks ?? '',
           ]);
         }
       } else {
         // Student Ledger
         final students = await ref.read(feeRepoProvider).getAllStudents();
-        
+
         csvData = [
-          ['Roll No', 'Student Name', 'Class', 'Section', 'Father Name', 'Total Due', 'Total Paid', 'Balance'],
+          ['Roll No', 'Student Name', 'Class', 'Section', 'Total Due (₹)', 'Total Paid (₹)', 'Balance (₹)'],
         ];
 
         for (final student in students) {
@@ -749,9 +756,8 @@ class _ExportTabState extends ConsumerState<_ExportTab> {
           csvData.add([
             student['roll_no'] ?? '',
             student['full_name'] ?? '',
-            student["class_name"] ?? "",
-            student["section"] ?? "",
-            student['father_name'] ?? '',
+            student['class_name'] ?? '',
+            student['section'] ?? '',
             summary.totalDue,
             summary.totalPaid,
             summary.totalPending,
@@ -761,7 +767,7 @@ class _ExportTabState extends ConsumerState<_ExportTab> {
 
       // Convert to CSV
       final csv = const ListToCsvConverter().convert(csvData);
-      
+
       // Save file
       final directory = await getApplicationDocumentsDirectory();
       final fileName = 'fee_${_exportType}_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv';
@@ -782,7 +788,7 @@ class _ExportTabState extends ConsumerState<_ExportTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -815,28 +821,3 @@ class _ExportTypeChip extends StatelessWidget {
     );
   }
 }
-
-// ── Providers ────────────────────────────────────────────────────────────────
-
-final dueStudentsProvider = FutureProvider.family<List<DueStudent>, String>(
-    (ref, academicYear) async {
-  return ref.read(feeRepoProvider).getDueStudents(academicYear);
-});
-
-final dailyCollectionProvider = FutureProvider.family<DailyCollection, String>(
-    (ref, dateStr) async {
-  final date = DateFormat('yyyy-MM-dd').parse(dateStr);
-  return ref.read(feeRepoProvider).getDailyCollection(date);
-});
-
-final classNameByIdProvider = Provider.family<String?, String>((ref, classId) {
-  return ref.read(allClassesProvider).whenOrNull(
-    data: (classes) {
-      try {
-        return classes.firstWhere((c) => c.id == classId).name;
-      } catch (_) {
-        return null;
-      }
-    },
-  );
-});

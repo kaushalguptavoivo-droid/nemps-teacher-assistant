@@ -1,5 +1,5 @@
 // Fee Collection Screen
-// Complete month-wise fee collection with receipt printing
+// Month-wise fee collection with receipt printing
 
 import "package:flutter/material.dart";
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,11 +28,13 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
   double _totalAmount = 0;
   double _concession = 0;
   String _paymentMethod = 'cash';
+  String _selectedConcessionType = 'none';
+  double _lateFee = 0;
 
-  // Class fee configs cache — loaded when a student is selected
+  // Class fee configs cache
   List<ClassFeeConfig>? _classFeeConfigs;
-  
-  // Search functionality
+
+  // Search
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
   List<Student> _searchResults = [];
@@ -44,6 +46,8 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     _searchFocusNode.dispose();
     super.dispose();
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -64,26 +68,24 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
   Widget _buildContent(String academicYear) {
     final classesAsync = ref.watch(allClassesProvider);
     final allStudentsAsync = ref.watch(allStudentsProvider);
-    
-    // Get students for selected class
-    final studentsAsync = _selectedClassId != null 
+
+    final studentsAsync = _selectedClassId != null
         ? ref.watch(studentsProvider(_selectedClassId!))
         : const AsyncValue<List<Student>>.data([]);
 
     return Column(
       children: [
-        // Search Bar (Always visible)
+        // ── Search Bar ──────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Search Field
               TextField(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
                 decoration: InputDecoration(
-                  hintText: 'Student ka naam search karein...',
+                  hintText: 'Student ka naam / roll no search karein...',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
@@ -112,8 +114,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                   }
                 },
               ),
-              
-              // Search Results Dropdown
+
               if (_showSearchResults && _searchResults.isNotEmpty)
                 Container(
                   margin: const EdgeInsets.only(top: 4),
@@ -138,8 +139,10 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                         leading: CircleAvatar(
                           backgroundColor: const Color(0xFF4F46E5).withOpacity(0.1),
                           child: Text(
-                            student.fullName.substring(0, 1).toUpperCase(),
-                            style: TextStyle(color: const Color(0xFF4F46E5)),
+                            student.fullName.isNotEmpty
+                                ? student.fullName.substring(0, 1).toUpperCase()
+                                : '?',
+                            style: const TextStyle(color: Color(0xFF4F46E5)),
                           ),
                         ),
                         title: Text(student.fullName),
@@ -150,7 +153,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                     },
                   ),
                 ),
-              
+
               if (_showSearchResults && _searchController.text.isNotEmpty && _searchResults.isEmpty)
                 Container(
                   margin: const EdgeInsets.only(top: 4),
@@ -178,21 +181,21 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
           ),
         ),
 
-        // Main Content
+        // ── Main Scrollable Content ─────────────────────────────────────────
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // OR Divider
+                // OR divider shown only when no student selected
                 if (_selectedStudent == null) ...[
                   const Row(
                     children: [
                       Expanded(child: Divider()),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('OR', style: TextStyle(color: Colors.grey)),
+                        child: Text('YA', style: TextStyle(color: Colors.grey)),
                       ),
                       Expanded(child: Divider()),
                     ],
@@ -240,8 +243,6 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
 
                 if (_selectedClassId != null) ...[
                   const SizedBox(height: 16),
-                  
-                  // Step 2: Select Student
                   _buildSectionCard(
                     title: 'Student Select Karein',
                     icon: Icons.person,
@@ -282,25 +283,15 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
 
                 if (_selectedStudent != null) ...[
                   const SizedBox(height: 16),
-                  
-                  // Student Info Card
                   _buildStudentInfoCard(),
-                  
                   const SizedBox(height: 16),
-                  
-                  // Receipt History Section
                   _buildReceiptHistory(academicYear),
-                  
                   const SizedBox(height: 16),
-                  
-                  // Step 3: Student Fee Summary
                   _buildStudentFeeSummary(academicYear),
                 ],
 
-                if (_selectedMonths.isNotEmpty) ...[
+                if (_selectedStudent != null && _selectedMonths.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  
-                  // Step 4: Payment Details
                   _buildPaymentSection(academicYear),
                 ],
 
@@ -312,6 +303,8 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
       ],
     );
   }
+
+  // ── Receipt History ─────────────────────────────────────────────────────────
 
   Widget _buildReceiptHistory(String academicYear) {
     final paymentsAsync = ref.watch(studentPaymentsProvider((
@@ -347,7 +340,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             itemBuilder: (context, index) {
               final payment = payments[index];
               final dateFormat = DateFormat('dd MMM yyyy');
-              
+
               return ListTile(
                 leading: CircleAvatar(
                   backgroundColor: Colors.green[50],
@@ -464,10 +457,8 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
 
   Future<void> _deleteReceipt(FeePayment payment, String academicYear) async {
     try {
-      // Delete from database
       await ref.read(feeRepoProvider).deletePayment(payment.id);
-      
-      // Refresh the list
+
       ref.invalidate(studentPaymentsProvider((
         studentId: _selectedStudentId!,
         academicYear: academicYear,
@@ -490,6 +481,8 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     }
   }
 
+  // ── Search ──────────────────────────────────────────────────────────────────
+
   void _onSearch(String query, AsyncValue<List<Student>> allStudentsAsync) {
     if (query.isEmpty) {
       setState(() {
@@ -499,20 +492,19 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
       return;
     }
 
-    setState(() {});
     allStudentsAsync.whenData((students) {
-      final results = students.where((s) => 
-        s.fullName.toLowerCase().contains(query.toLowerCase()) ||
-        s.rollNo.toLowerCase().contains(query.toLowerCase()) ||
-        s.parentName.toLowerCase().contains(query.toLowerCase())
+      final q = query.toLowerCase();
+      final results = students.where((s) =>
+        s.fullName.toLowerCase().contains(q) ||
+        s.rollNo.toLowerCase().contains(q) ||
+        s.parentName.toLowerCase().contains(q)
       ).toList();
 
       setState(() {
         _searchResults = results;
-
         _showSearchResults = true;
       });
-      });
+    });
   }
 
   void _selectStudentFromSearch(Student student) {
@@ -542,6 +534,8 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     } catch (_) {}
   }
 
+  // ── Section Card Helper ─────────────────────────────────────────────────────
+
   Widget _buildSectionCard({
     required String title,
     required IconData icon,
@@ -568,6 +562,8 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     );
   }
 
+  // ── Student Info Card ───────────────────────────────────────────────────────
+
   Widget _buildStudentInfoCard() {
     final student = _selectedStudent!;
     return Card(
@@ -583,7 +579,9 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                   radius: 30,
                   backgroundColor: const Color(0xFF4F46E5),
                   child: Text(
-                    student.fullName.substring(0, 1).toUpperCase(),
+                    student.fullName.isNotEmpty
+                        ? student.fullName.substring(0, 1).toUpperCase()
+                        : '?',
                     style: const TextStyle(fontSize: 24, color: Colors.white),
                   ),
                 ),
@@ -598,7 +596,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Class: ${student.className} - ${student.section}  |  Roll No: ${student.rollNo}',
+                        'Class: ${student.className} - ${student.section}  |  Roll: ${student.rollNo}',
                         style: TextStyle(color: Colors.grey[700]),
                       ),
                     ],
@@ -630,6 +628,8 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     );
   }
 
+  // ── Fee Summary ─────────────────────────────────────────────────────────────
+
   Widget _buildStudentFeeSummary(String academicYear) {
     final summaryAsync = ref.watch(studentFeeSummaryProvider((
       studentId: _selectedStudentId!,
@@ -642,7 +642,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
       child: summaryAsync.when(
         data: (summary) => Column(
           children: [
-            // Summary Cards
+            // Summary chips
             Row(
               children: [
                 Expanded(child: _buildSummaryChip('Total', summary.totalDue, Colors.blue)),
@@ -653,24 +653,12 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
               ],
             ),
 
-            if (summary.monthsPending.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              const Text('Pending Months:', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: summary.monthsPending.map((m) => Chip(
-                  label: Text(m),
-                  backgroundColor: Colors.red[50],
-                  avatar: const Icon(Icons.pending, size: 18, color: Colors.red),
-                )).toList(),
-              ),
-            ],
-
             if (summary.monthsPaid.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text('Paid Months:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('✅ Paid Months:', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -685,9 +673,10 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
 
             if (summary.monthsPending.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text('Select Months to Collect:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('⏳ Pending Months:', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -702,37 +691,35 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                       } else {
                         _selectedMonths.remove(m);
                       }
-                      _calculateTotal(academicYear);
+                      _recalculateTotal();
                     });
                   },
-                  selectedColor: Colors.green[200],
+                  selectedColor: Colors.indigo[100],
+                  checkmarkColor: Colors.indigo,
+                  avatar: Icon(Icons.pending, size: 18, color: Colors.red[400]),
                 )).toList(),
               ),
-              
-              if (_selectedMonths.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => _collectFees(academicYear),
-                  icon: const Icon(Icons.payment),
-                  label: Text('Collect ₹${_totalAmount.toStringAsFixed(0)} for ${_selectedMonths.length} month(s)'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
+              if (summary.monthsPending.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Upar se months select karein aur payment karein',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                 ),
-              ],
             ],
 
             if (summary.monthsPending.isEmpty && summary.monthsPaid.isEmpty) ...[
               const SizedBox(height: 16),
-              const Text('Is student ke liye koi fee record nahi hai.',
-                          style: TextStyle(color: Colors.grey)),
+              const Text(
+                'Is student ke liye koi fee record nahi hai.',
+                style: TextStyle(color: Colors.grey),
+              ),
               const SizedBox(height: 8),
               ElevatedButton.icon(
                 onPressed: () => _generateFeesForStudent(academicYear),
                 icon: const Icon(Icons.auto_awesome),
-                label: const Text('Generate Fees'),
+                label: const Text('Generate Fees (12 Months)'),
               ),
             ],
           ],
@@ -754,12 +741,16 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
       child: Column(
         children: [
           Text(label, style: TextStyle(color: color, fontSize: 12)),
-          Text('₹${amount.toStringAsFixed(0)}', 
-               style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            '₹${amount.toStringAsFixed(0)}',
+            style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16),
+          ),
         ],
       ),
     );
   }
+
+  // ── Payment Section ─────────────────────────────────────────────────────────
 
   Widget _buildPaymentSection(String academicYear) {
     return _buildSectionCard(
@@ -768,6 +759,28 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Selected Months Summary
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.indigo[50],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_month, color: Colors.indigo),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Selected: ${_selectedMonths.join(", ")}',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // Payment Method
           DropdownButtonFormField<String>(
             value: _paymentMethod,
@@ -785,7 +798,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             onChanged: (v) => setState(() => _paymentMethod = v ?? 'cash'),
           ),
           const SizedBox(height: 16),
-          
+
           // Concession Type
           DropdownButtonFormField<String>(
             value: _selectedConcessionType,
@@ -802,13 +815,13 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             onChanged: (v) {
               setState(() {
                 _selectedConcessionType = v ?? 'none';
-                _calculateTotal(academicYear);
+                _recalculateTotal();
               });
             },
           ),
           const SizedBox(height: 12),
-          
-          // Custom Concession Amount
+
+          // Custom concession amount (only for 'other')
           if (_selectedConcessionType == 'other')
             TextFormField(
               decoration: const InputDecoration(
@@ -817,8 +830,10 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
               ),
               keyboardType: TextInputType.number,
               onChanged: (v) {
-                _concession = double.tryParse(v) ?? 0;
-                _calculateTotal(academicYear);
+                setState(() {
+                  _concession = double.tryParse(v) ?? 0;
+                  _recalculateTotal();
+                });
               },
             )
           else
@@ -839,43 +854,10 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                 ],
               ),
             ),
-          
+
           const SizedBox(height: 16),
-          
-          // Late Fee Warning
-          if (_lateFee > 0)
-            Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.warning, color: Colors.orange[700]),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Late Fee Applied',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange[700]),
-                        ),
-                        Text(
-                          '₹${_lateFee.toStringAsFixed(0)} (${_selectedMonths.length} month(s) overdue)',
-                          style: TextStyle(color: Colors.orange[700], fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
-          // Total Breakdown
+
+          // Amount breakdown
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -885,18 +867,18 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             ),
             child: Column(
               children: [
-                _buildAmountRow('Base Amount', _totalAmount),
+                _buildAmountRow('Base Amount (${_selectedMonths.length} months)', _totalAmount),
                 if (_calculateConcessionAmount() > 0)
-                  _buildAmountRow('Concession', -_calculateConcessionAmount(), isDiscount: true),
+                  _buildAmountRow('Concession', _calculateConcessionAmount(), isDiscount: true),
                 if (_lateFee > 0)
                   _buildAmountRow('Late Fee', _lateFee, isLateFee: true),
                 const Divider(),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Final Amount:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const Text('Final Amount:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     Text(
-                      '₹${(_totalAmount - _calculateConcessionAmount() + _lateFee).toStringAsFixed(0)}',
+                      '₹${_finalAmount().toStringAsFixed(0)}',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.green),
                     ),
                   ],
@@ -905,16 +887,16 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Collect Button
           ElevatedButton.icon(
             onPressed: () => _collectFees(academicYear),
             icon: const Icon(Icons.receipt),
-            label: const Text('Collect & Print Receipt'),
+            label: Text('Collect ₹${_finalAmount().toStringAsFixed(0)} & Print Receipt'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
+              minimumSize: const Size(double.infinity, 52),
             ),
           ),
         ],
@@ -941,39 +923,39 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     );
   }
 
-  String _selectedConcessionType = 'none';
-  double _lateFee = 0;
+  // ── Calculations ────────────────────────────────────────────────────────────
 
-  double _calculateConcessionAmount() {
-    if (_selectedConcessionType == 'none' || _selectedConcessionType == 'other') {
-      return _concession;
-    }
-    
-    final type = ConcessionType.values.firstWhere(
-      (t) => t.name == _selectedConcessionType,
-      orElse: () => ConcessionType.none,
-    );
-    
-    return (_totalAmount * type.percentage) / 100;
-  }
-
-  void _calculateTotal(String academicYear) {
+  void _recalculateTotal() {
     final configs = _classFeeConfigs ?? [];
     final enabledConfigs = configs.where((c) => c.isEnabled).toList();
     if (enabledConfigs.isEmpty) {
       _totalAmount = 0;
     } else {
-      final monthlyAmount =
-          enabledConfigs.fold(0.0, (sum, c) => sum + c.customAmount);
+      final monthlyAmount = enabledConfigs.fold(0.0, (sum, c) => sum + c.customAmount);
       _totalAmount = _selectedMonths.length * monthlyAmount;
     }
-    _lateFee = 0;
+    _lateFee = 0; // Can add late fee logic here if needed
   }
+
+  double _calculateConcessionAmount() {
+    if (_selectedConcessionType == 'other') return _concession;
+    if (_selectedConcessionType == 'none') return 0;
+    final type = ConcessionType.values.firstWhere(
+      (t) => t.name == _selectedConcessionType,
+      orElse: () => ConcessionType.none,
+    );
+    return (_totalAmount * type.percentage) / 100;
+  }
+
+  double _finalAmount() {
+    return (_totalAmount - _calculateConcessionAmount() + _lateFee).clamp(0, double.infinity);
+  }
+
+  // ── Generate Fees ───────────────────────────────────────────────────────────
 
   Future<void> _generateFeesForStudent(String academicYear) async {
     if (_selectedStudent == null || _selectedClassId == null) return;
 
-    // Ensure fee configs are loaded
     List<ClassFeeConfig> configs = _classFeeConfigs ?? [];
     if (configs.isEmpty) {
       configs = await ref
@@ -989,8 +971,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
           const SnackBar(
             content: Text(
               'Is class ke liye koi fee type enable nahi hai.\n'
-              'Admin → Fees Management → Class Config mein'
-              ' fee types ON karein.',
+              'Admin → Fees → Class Config mein fee types ON karein.',
             ),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 5),
@@ -1003,13 +984,10 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     final double totalMonthlyAmount =
         enabledConfigs.fold(0.0, (sum, c) => sum + c.customAmount);
 
-    // Parse academic year start/end (e.g. "2024-25" → 2024 / 2025)
     final parts = academicYear.split('-');
     final startYear = int.tryParse(parts[0]) ?? DateTime.now().year;
     final endYear = parts.length > 1
-        ? (parts[1].length == 2
-            ? startYear + 1
-            : int.tryParse(parts[1]) ?? startYear + 1)
+        ? (parts[1].length == 2 ? startYear + 1 : int.tryParse(parts[1]) ?? startYear + 1)
         : startYear + 1;
 
     if (mounted) {
@@ -1022,19 +1000,17 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     for (final month in monthNames) {
       final monthIdx = monthIndex[month]!;
       final year = monthIdx >= 4 ? startYear : endYear;
-      generated += await ref
-          .read(feeRepoProvider)
-          .generateMonthlyFeesForStudent(
-            studentId: _selectedStudent!.id,
-            classId: _selectedClassId!,
-            academicYear: academicYear,
-            month: month,
-            year: year,
-            totalAmount: totalMonthlyAmount,
-          );
+      generated += await ref.read(feeRepoProvider).generateMonthlyFeesForStudent(
+        studentId: _selectedStudent!.id,
+        classId: _selectedClassId!,
+        academicYear: academicYear,
+        month: month,
+        year: year,
+        totalAmount: totalMonthlyAmount,
+      );
     }
 
-    // Refresh fee summary
+    // Refresh
     ref.invalidate(studentFeeSummaryProvider((
       studentId: _selectedStudentId!,
       academicYear: academicYear,
@@ -1045,8 +1021,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
         SnackBar(
           content: Text(
             generated > 0
-                ? '$generated mahine ki fees generate ho gayi! '
-                    '₹${totalMonthlyAmount.toStringAsFixed(0)}/month ✓'
+                ? '$generated mahine ki fees generate ho gayi! ₹${totalMonthlyAmount.toStringAsFixed(0)}/month ✓'
                 : 'Fees pehle se exist karti hain.',
           ),
           backgroundColor: generated > 0 ? Colors.green : Colors.blue,
@@ -1056,43 +1031,72 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     }
   }
 
+  // ── Collect Fees ─────────────────────────────────────────────────────────────
+  // This is the core fix: after recording the payment, we also update
+  // each selected month's student_monthly_fees record to 'paid'.
+
   Future<void> _collectFees(String academicYear) async {
     if (_selectedMonths.isEmpty || _selectedStudent == null) return;
 
+    final concessionAmount = _calculateConcessionAmount();
+    final finalAmt = _finalAmount();
+
     try {
       final receiptNo = await ref.read(feeRepoProvider).generateReceiptNo();
-      
-      // Create payment record
+
+      // 1. Create fee_payments record
       final payment = FeePayment(
         id: '',
         studentId: _selectedStudentId!,
-        amount: _totalAmount - _concession,
+        amount: finalAmt,
         paymentDate: DateTime.now(),
         paymentMethod: _paymentMethod,
         receiptNo: receiptNo,
         academicYear: academicYear,
-        concession: _concession,
+        concession: concessionAmount,
+        concessionType: _selectedConcessionType,
+        lateFee: _lateFee,
         remarks: 'Months: ${_selectedMonths.join(", ")}',
         createdAt: DateTime.now(),
       );
 
       await ref.read(feeRepoProvider).createFeePayment(payment);
 
-      // Show receipt with full student details
+      // 2. ✅ KEY FIX: Mark each selected month as 'paid' in student_monthly_fees
+      await ref.read(feeRepoProvider).markMonthlyFeesAsPaid(
+        studentId: _selectedStudentId!,
+        academicYear: academicYear,
+        monthLabels: _selectedMonths.toList(),
+        totalPaidAmount: finalAmt,
+        concessionAmount: concessionAmount,
+      );
+
+      // 3. Print receipt
       await _printReceipt(payment, _selectedStudent!);
 
-      // Clear selection
+      // 4. Refresh all relevant providers
+      final studentId = _selectedStudentId!;
+      ref.invalidate(studentPaymentsProvider((
+        studentId: studentId,
+        academicYear: academicYear,
+      )));
+      ref.invalidate(studentFeeSummaryProvider((
+        studentId: studentId,
+        academicYear: academicYear,
+      )));
+      ref.invalidate(studentMonthlyFeesProvider((
+        studentId: studentId,
+        academicYear: academicYear,
+      )));
+
+      // 5. Clear selection
       setState(() {
         _selectedMonths.clear();
         _totalAmount = 0;
         _concession = 0;
+        _selectedConcessionType = 'none';
+        _lateFee = 0;
       });
-
-      // Refresh
-      ref.invalidate(studentFeeSummaryProvider((
-        studentId: _selectedStudentId!,
-        academicYear: academicYear,
-      )));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1111,14 +1115,16 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
     }
   }
 
+  // ── Print Receipt ────────────────────────────────────────────────────────────
+
   Future<void> _printReceipt(FeePayment payment, Student student) async {
     final pdf = pw.Document();
-    
     final dateFormat = DateFormat('dd MMM yyyy');
-    
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a5,
+        margin: const pw.EdgeInsets.all(24),
         build: (context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
@@ -1126,7 +1132,11 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             pw.Center(
               child: pw.Column(
                 children: [
-                  pw.Text('NEMPS SCHOOL', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(
+                    'NEMPS SCHOOL',
+                    style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+                  ),
+                  pw.SizedBox(height: 4),
                   pw.Text('Fee Receipt', style: const pw.TextStyle(fontSize: 14)),
                 ],
               ),
@@ -1134,10 +1144,10 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
             pw.SizedBox(height: 10),
             pw.Divider(thickness: 2),
             pw.SizedBox(height: 10),
-            
-            // Receipt Details
+
+            // Receipt & Student Details
             pw.Container(
-              padding: const pw.EdgeInsets.all(8),
+              padding: const pw.EdgeInsets.all(10),
               decoration: pw.BoxDecoration(
                 color: PdfColors.grey100,
                 borderRadius: pw.BorderRadius.circular(5),
@@ -1151,7 +1161,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                       pw.Text('Date: ${dateFormat.format(payment.paymentDate)}'),
                     ],
                   ),
-                  pw.SizedBox(height: 5),
+                  pw.SizedBox(height: 6),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
@@ -1159,19 +1169,19 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                       pw.Text('Roll No: ${student.rollNo}'),
                     ],
                   ),
-                  pw.SizedBox(height: 5),
+                  pw.SizedBox(height: 6),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text('Class: ${student.className} - ${student.section}'),
-                      pw.Text('Academic Year: ${payment.academicYear}'),
+                      pw.Text('AY: ${payment.academicYear}'),
                     ],
                   ),
                 ],
               ),
             ),
-            pw.SizedBox(height: 10),
-            
+            pw.SizedBox(height: 8),
+
             // Parent Details
             pw.Container(
               padding: const pw.EdgeInsets.all(8),
@@ -1179,28 +1189,22 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                 border: pw.Border.all(color: PdfColors.grey300),
                 borderRadius: pw.BorderRadius.circular(5),
               ),
-              child: pw.Row(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text('Father: ${student.parentName}', style: const pw.TextStyle(fontSize: 10)),
-                        pw.SizedBox(height: 2),
-                        pw.Text('Mother: ${student.motherName}', style: const pw.TextStyle(fontSize: 10)),
-                      ],
-                    ),
-                  ),
+                  pw.Text('Father: ${student.parentName}', style: const pw.TextStyle(fontSize: 10)),
+                  pw.SizedBox(height: 2),
+                  pw.Text('Mother: ${student.motherName}', style: const pw.TextStyle(fontSize: 10)),
                 ],
               ),
             ),
             pw.SizedBox(height: 10),
             pw.Divider(),
-            pw.SizedBox(height: 10),
-            
+            pw.SizedBox(height: 8),
+
             // Amount Details
             pw.Container(
-              padding: const pw.EdgeInsets.all(10),
+              padding: const pw.EdgeInsets.all(12),
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(),
                 borderRadius: pw.BorderRadius.circular(5),
@@ -1211,28 +1215,43 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
                       pw.Text('Months Paid:'),
-                      pw.Text(payment.remarks?.replaceFirst('Months: ', '') ?? ''),
+                      pw.Expanded(
+                        child: pw.Text(
+                          payment.remarks?.replaceFirst('Months: ', '') ?? '',
+                          textAlign: pw.TextAlign.right,
+                        ),
+                      ),
                     ],
                   ),
-                  pw.SizedBox(height: 5),
+                  pw.SizedBox(height: 6),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text('Total Amount:'),
-                      pw.Text('₹${payment.amount.toStringAsFixed(0)}'),
+                      pw.Text('Base Amount:'),
+                      pw.Text('₹${(_totalAmount > 0 ? _totalAmount : payment.amount + payment.concession).toStringAsFixed(0)}'),
                     ],
                   ),
                   if (payment.concession > 0) ...[
-                    pw.SizedBox(height: 5),
+                    pw.SizedBox(height: 4),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Concession:'),
+                        pw.Text('Concession (${payment.concessionType}):'),
                         pw.Text('-₹${payment.concession.toStringAsFixed(0)}'),
                       ],
                     ),
                   ],
-                  pw.SizedBox(height: 5),
+                  if (payment.lateFee > 0) ...[
+                    pw.SizedBox(height: 4),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('Late Fee:'),
+                        pw.Text('+₹${payment.lateFee.toStringAsFixed(0)}'),
+                      ],
+                    ),
+                  ],
+                  pw.SizedBox(height: 6),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
@@ -1242,7 +1261,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                   ),
                   pw.SizedBox(height: 10),
                   pw.Divider(),
-                  pw.SizedBox(height: 5),
+                  pw.SizedBox(height: 6),
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
@@ -1253,12 +1272,12 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                 ],
               ),
             ),
-            
+
             pw.Spacer(),
-            
+
             // Footer
             pw.Divider(),
-            pw.SizedBox(height: 5),
+            pw.SizedBox(height: 6),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
@@ -1267,12 +1286,7 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                   children: [
                     pw.Text('Parent Signature', style: const pw.TextStyle(fontSize: 10)),
                     pw.SizedBox(height: 20),
-                    pw.Container(
-                      width: 100,
-                      decoration: const pw.BoxDecoration(
-                        border: pw.Border(bottom: pw.BorderSide()),
-                      ),
-                    ),
+                    pw.Container(width: 100, decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide()))),
                   ],
                 ),
                 pw.Column(
@@ -1280,19 +1294,17 @@ class _FeeCollectionScreenState extends ConsumerState<FeeCollectionScreen> {
                   children: [
                     pw.Text('Receiver Signature', style: const pw.TextStyle(fontSize: 10)),
                     pw.SizedBox(height: 20),
-                    pw.Container(
-                      width: 100,
-                      decoration: const pw.BoxDecoration(
-                        border: pw.Border(bottom: pw.BorderSide()),
-                      ),
-                    ),
+                    pw.Container(width: 100, decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide()))),
                   ],
                 ),
               ],
             ),
-            pw.SizedBox(height: 10),
+            pw.SizedBox(height: 8),
             pw.Center(
-              child: pw.Text('This is a computer generated receipt', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
+              child: pw.Text(
+                'This is a computer generated receipt',
+                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey),
+              ),
             ),
           ],
         ),

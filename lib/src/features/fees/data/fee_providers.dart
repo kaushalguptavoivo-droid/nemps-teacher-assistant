@@ -69,7 +69,7 @@ final paymentHistoryProvider = FutureProvider.family<List<FeePayment>, String>(
   return ref.read(feeRepoProvider).getPaymentHistory(studentFeeId);
 });
 
-// ── Student Monthly Fees (New) ───────────────────────────────────────────────
+// ── Student Monthly Fees ─────────────────────────────────────────────────────
 
 final studentMonthlyFeesProvider = FutureProvider.family<List<StudentMonthlyFee>, ({
   String studentId,
@@ -78,7 +78,7 @@ final studentMonthlyFeesProvider = FutureProvider.family<List<StudentMonthlyFee>
   return ref.read(feeRepoProvider).getStudentMonthlyFees(args.studentId, args.academicYear);
 });
 
-// ── Student Fee Summary (New) ────────────────────────────────────────────────
+// ── Student Fee Summary ──────────────────────────────────────────────────────
 
 final studentFeeSummaryProvider = FutureProvider.family<StudentFeeSummary, ({
   String studentId,
@@ -87,7 +87,7 @@ final studentFeeSummaryProvider = FutureProvider.family<StudentFeeSummary, ({
   return ref.read(feeRepoProvider).getStudentFeeSummary(args.studentId, args.academicYear);
 });
 
-// ── Student Payments (New) ───────────────────────────────────────────────────
+// ── Student Payments ─────────────────────────────────────────────────────────
 
 final studentPaymentsProvider = FutureProvider.family<List<FeePayment>, ({
   String studentId,
@@ -96,14 +96,18 @@ final studentPaymentsProvider = FutureProvider.family<List<FeePayment>, ({
   return ref.read(feeRepoProvider).getStudentPayments(args.studentId, args.academicYear);
 });
 
-// ── Due Students Provider ───────────────────────────────────────────────────
+// ── Due Students ─────────────────────────────────────────────────────────────
+// Single authoritative definition — used by both fee_collection and fee_reports.
 
-final dueStudentsProvider = FutureProvider.family<List<DueStudent>, String>((ref, academicYear) async {
+final dueStudentsProvider = FutureProvider.family<List<DueStudent>, String>(
+    (ref, academicYear) async {
   return ref.read(feeRepoProvider).getDueStudents(academicYear);
 });
 
-// ── Daily Collection Provider ───────────────────────────────────────────────
+// ── Daily Collection ─────────────────────────────────────────────────────────
+// Takes a DateTime. fee_reports_screen converts its date string to DateTime.
 
-final dailyCollectionProvider = FutureProvider.family<DailyCollection, DateTime>((ref, date) async {
+final dailyCollectionProvider = FutureProvider.family<DailyCollection, DateTime>(
+    (ref, date) async {
   return ref.read(feeRepoProvider).getDailyCollection(date);
 });
