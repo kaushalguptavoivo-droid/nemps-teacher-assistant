@@ -11,4 +11,13 @@ class File {
 
   Future<String> readAsString() async => throw UnsupportedError(
       'dart:io File is not available on web.');
+
+  Future<File> writeAsBytes(List<int> bytes, {bool flush = false}) async =>
+      throw UnsupportedError(
+          'dart:io File is not available on web. Use bytes-based API.');
+
+  Future<File> writeAsString(String contents,
+          {bool flush = false}) async =>
+      throw UnsupportedError(
+          'dart:io File is not available on web.');
 }
