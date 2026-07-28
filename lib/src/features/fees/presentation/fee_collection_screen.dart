@@ -1082,10 +1082,7 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
             concessionAmount: concessionAmt,
           );
 
-      // 4. Print receipt
-      await _printReceipt(payment, student);
-
-      // 5. Refresh providers
+      // 4. Refresh providers
       ref.invalidate(studentPaymentsProvider(
           (studentId: student.id, academicYear: academicYear)));
       ref.invalidate(studentFeeSummaryProvider(
@@ -1094,7 +1091,7 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
           (studentId: student.id, academicYear: academicYear)));
       ref.invalidate(allPaymentsProvider(academicYear));
 
-      // 6. Clear state
+      // 5. Clear state
       setState(() {
         _selectedMonths.clear();
         _totalAmount = 0;
@@ -1104,12 +1101,52 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
         _isCollecting = false;
       });
 
+      // 6. Show success dialog with print option
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Payment successful! Receipt: $receiptNo'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 4),
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 28),
+                SizedBox(width: 10),
+                Text('Payment Successful!',
+                    style: TextStyle(fontSize: 18)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _receiptInfoRow('Student', student.fullName),
+                _receiptInfoRow('Receipt No', receiptNo),
+                _receiptInfoRow('Amount Paid',
+                    '₹${finalAmt.toStringAsFixed(0)}'),
+                _receiptInfoRow('Months', monthsCovered),
+                _receiptInfoRow(
+                    'Payment Mode', _paymentMethod.toUpperCase()),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close',
+                    style: TextStyle(color: Colors.grey)),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await _printReceipt(payment, student);
+                },
+                icon: const Icon(Icons.print, size: 18),
+                label: const Text('Print Receipt'),
+                style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5)),
+              ),
+            ],
           ),
         );
       }
@@ -1399,6 +1436,29 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                   fontSize: 11,
                   fontWeight: pw.FontWeight.bold,
                   color: color)),
+        ],
+      ),
+    );
+  }
+
+  // ── Receipt Info Row helper (used in success dialog) ───────────────────────
+
+  static Widget _receiptInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text('$label:',
+                style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 13)),
+          ),
         ],
       ),
     );
