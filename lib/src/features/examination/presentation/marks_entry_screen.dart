@@ -2,9 +2,10 @@
 // Spreadsheet-style grid: Students (rows) × Subjects (columns)
 // One tab per term. Auto-save with offline fallback. Lock-aware.
 
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:convert' show utf8;
+import 'dart:io' if (dart.library.html) 'package:nemps_teacher_assistant/src/core/stubs/io_stub.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -988,13 +989,20 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
         'marks_${widget.term.termName.replaceAll(' ', '_')}.csv';
 
     try {
-      // Save to temp file first — required on Android for Share to work
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/$filename');
-      await file.writeAsBytes(utf8.encode(csvStr));
-
+      final csvBytes = Uint8List.fromList(utf8.encode(csvStr));
+      XFile xfile;
+      if (kIsWeb) {
+        // Web: in-memory XFile works fine
+        xfile = XFile.fromData(csvBytes, mimeType: 'text/csv', name: filename);
+      } else {
+        // Mobile: Save to temp dir first — Android requires a real file path
+        final dir = await getTemporaryDirectory();
+        final file = File('${dir.path}/$filename');
+        await file.writeAsBytes(csvBytes);
+        xfile = XFile(file.path, mimeType: 'text/csv', name: filename);
+      }
       await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'text/csv', name: filename)],
+        [xfile],
         subject: 'Marks Export — ${widget.term.termName}',
       );
     } catch (e) {
@@ -1143,20 +1151,21 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
       if (bytes != null) {
         final filename =
             'marks_${widget.term.termName.replaceAll(' ', '_')}.xlsx';
-        // Save to temp file — required on Android for Share
-        final dir = await getTemporaryDirectory();
-        final file = File('${dir.path}/$filename');
-        await file.writeAsBytes(bytes);
-
+        const mime =
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        final xlBytes = Uint8List.fromList(bytes);
+        XFile xfile;
+        if (kIsWeb) {
+          xfile = XFile.fromData(xlBytes, mimeType: mime, name: filename);
+        } else {
+          // Mobile: save to temp dir first — Android requires a real file path
+          final dir = await getTemporaryDirectory();
+          final file = File('${dir.path}/$filename');
+          await file.writeAsBytes(xlBytes);
+          xfile = XFile(file.path, mimeType: mime, name: filename);
+        }
         await Share.shareXFiles(
-          [
-            XFile(
-              file.path,
-              mimeType:
-                  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-              name: filename,
-            )
-          ],
+          [xfile],
           subject: 'Marks Export — ${widget.term.termName}',
         );
       }
