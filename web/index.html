@@ -162,76 +162,97 @@
   <script src="flutter_bootstrap.js" async></script>
 
   <script>
-    // PWA Install Prompt Handler
-    let deferredPrompt;
-    const banner = document.getElementById('pwa-install-banner');
-    const installBtn = document.getElementById('pwa-install-btn');
-    const closeBtn = document.getElementById('pwa-close-btn');
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isInStandaloneMode = () =>
+      ('standalone' in navigator && navigator.standalone) ||
+      window.matchMedia('(display-mode: standalone)').matches;
+
+    // Dismissed state expires after 7 days so the prompt comes back
+    function isDismissed() {
+      const ts = localStorage.getItem('pwa-dismissed-at');
+      if (!ts) return false;
+      return Date.now() - parseInt(ts, 10) < 7 * 24 * 60 * 60 * 1000;
+    }
+    function setDismissed() {
+      localStorage.setItem('pwa-dismissed-at', Date.now().toString());
+    }
+
+    const banner      = document.getElementById('pwa-install-banner');
+    const installBtn  = document.getElementById('pwa-install-btn');
+    const closeBtn    = document.getElementById('pwa-close-btn');
     const loadingScreen = document.getElementById('loading-screen');
 
-    // Hide loading screen when Flutter is ready
-    window.addEventListener('flutter-first-frame', function() {
+    let deferredPrompt = null;
+
+    // ── Loading screen ────────────────────────────────────────────────────────
+    window.addEventListener('flutter-first-frame', function () {
       setTimeout(() => {
         if (loadingScreen) loadingScreen.style.display = 'none';
       }, 500);
     });
 
-    // Capture install prompt
+    // ── iOS install instructions ──────────────────────────────────────────────
+    function showIosInstructions() {
+      if (!banner || isDismissed() || isInStandaloneMode()) return;
+
+      // Swap banner content to iOS-specific guide
+      const content = banner.querySelector('.content');
+      const installBtnEl = banner.querySelector('.install-btn');
+      if (content) {
+        content.querySelector('.title').textContent = 'Install NEMPS App';
+        content.querySelector('.subtitle').innerHTML =
+          'Tap <strong>Share ⬆</strong> then <strong>"Add to Home Screen"</strong>';
+      }
+      if (installBtnEl) installBtnEl.style.display = 'none';
+
+      banner.classList.add('show');
+    }
+
+    // ── Android / Desktop install prompt ─────────────────────────────────────
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      
-      // Show install banner after 3 seconds
+
+      if (isDismissed() || isInStandaloneMode()) return;
+
+      // Show banner after 4 s — gives Flutter time to render first
       setTimeout(() => {
-        if (banner && !localStorage.getItem('pwa-install-dismissed')) {
-          banner.classList.add('show');
-        }
-      }, 3000);
+        if (banner) banner.classList.add('show');
+      }, 4000);
     });
 
-    // Install button click
     if (installBtn) {
       installBtn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          deferredPrompt = null;
-          banner.classList.remove('show');
-          if (outcome === 'accepted') {
-            localStorage.setItem('pwa-installed', 'true');
-          }
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        if (banner) banner.classList.remove('show');
+        if (outcome === 'accepted') {
+          localStorage.removeItem('pwa-dismissed-at');
         }
       });
     }
 
-    // Close button click
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
-        banner.classList.remove('show');
-        localStorage.setItem('pwa-install-dismissed', 'true');
+        if (banner) banner.classList.remove('show');
+        setDismissed();
       });
     }
 
-    // Hide banner when installed
     window.addEventListener('appinstalled', () => {
-      banner.classList.remove('show');
-      localStorage.setItem('pwa-installed', 'true');
+      if (banner) banner.classList.remove('show');
+      localStorage.removeItem('pwa-dismissed-at');
     });
 
-    // Desktop back button handling
-    window.addEventListener('popstate', function(e) {
-      // Handle browser back button on desktop PWA
-      if (window.history.state && window.history.state.navigationId) {
-        // Let Flutter handle the navigation
-      }
-    });
-
-    // Prevent accidental navigation away
-    window.addEventListener('beforeunload', function(e) {
-      // Only warn if there's unsaved data
-      // e.preventDefault();
-      // e.returnValue = '';
-    });
+    // ── Trigger iOS banner after Flutter loads ────────────────────────────────
+    if (isIos() && !isInStandaloneMode()) {
+      window.addEventListener('flutter-first-frame', () => {
+        setTimeout(showIosInstructions, 5000);
+      });
+    }
   </script>
 </body>
 </html>

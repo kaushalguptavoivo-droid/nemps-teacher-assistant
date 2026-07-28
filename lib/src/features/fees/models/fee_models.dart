@@ -160,9 +160,6 @@ class ClassFeeConfig {
         'due_date': dueDate.toIso8601String().substring(0, 10),
         'late_fee': lateFee,
         'concession_allowed': concessionAllowed,
-        'installment_plan': installmentPlan,
-        'sibling_discount_2nd': siblingDiscount2nd,
-        'sibling_discount_3rd': siblingDiscount3rd,
       };
 
   Map<String, dynamic> toUpdateMap() => {
@@ -171,9 +168,6 @@ class ClassFeeConfig {
         'due_date': dueDate.toIso8601String().substring(0, 10),
         'late_fee': lateFee,
         'concession_allowed': concessionAllowed,
-        'installment_plan': installmentPlan,
-        'sibling_discount_2nd': siblingDiscount2nd,
-        'sibling_discount_3rd': siblingDiscount3rd,
       };
 }
 
