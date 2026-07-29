@@ -220,6 +220,38 @@ class _FeeConfigScreenState extends ConsumerState<FeeConfigScreen>
   }
 }
 
+// ── Phase 3C: dedicated screens ────────────────────────────────────────────
+// Each wraps existing (unmodified) tab-content widgets in their own
+// Scaffold + AppBar so Fees Management can be a menu of real screens
+// instead of tabs nested inside tabs.
+
+class FeeTypesScreen extends StatelessWidget {
+  const FeeTypesScreen({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Fee Types')),
+        body: const _FeeTypesTab(),
+      );
+}
+
+class ClassFeeConfigScreen extends StatelessWidget {
+  const ClassFeeConfigScreen({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Class Fee Config')),
+        body: const _ClassFeeConfigTab(),
+      );
+}
+
+class FeeReportsHomeScreen extends StatelessWidget {
+  const FeeReportsHomeScreen({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Fee Reports')),
+        body: const _FeeReportsTab(),
+      );
+}
+
 // ── Fee Types Tab ─────────────────────────────────────────────────────────────
 
 class _FeeTypesTab extends ConsumerWidget {

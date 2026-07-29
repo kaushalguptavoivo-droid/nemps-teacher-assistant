@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../core/models/models.dart';
@@ -11,43 +12,181 @@ import '../fees/presentation/fee_config_screen.dart';
 class AdminPanelScreen extends ConsumerWidget {
   const AdminPanelScreen({super.key});
 
+  static const _items = [
+    _AdminMenuItem(
+      icon: Icons.class_rounded,
+      color: Color(0xFF4F46E5),
+      title: 'Classes',
+      subtitle: 'Class banayein, edit/delete karein',
+      route: '/admin/classes',
+    ),
+    _AdminMenuItem(
+      icon: Icons.people_rounded,
+      color: Color(0xFF0891B2),
+      title: 'Students',
+      subtitle: 'Sabhi students manage karein, class change karein',
+      route: '/admin/students',
+    ),
+    _AdminMenuItem(
+      icon: Icons.person_rounded,
+      color: Color(0xFF059669),
+      title: 'Teachers',
+      subtitle: 'Teacher profiles aur unki classes assign karein',
+      route: '/admin/teachers',
+    ),
+    _AdminMenuItem(
+      icon: Icons.notifications_rounded,
+      color: Color(0xFFD97706),
+      title: 'Notices',
+      subtitle: 'School/class ke liye notice bhejein',
+      route: '/admin/notices',
+    ),
+    _AdminMenuItem(
+      icon: Icons.history_rounded,
+      color: Color(0xFF7C3AED),
+      title: 'Activity Log',
+      subtitle: 'Teachers ki activity dekhein',
+      route: '/admin/activity',
+    ),
+    _AdminMenuItem(
+      icon: Icons.assignment_rounded,
+      color: Color(0xFF0D9488),
+      title: 'Exam Management',
+      subtitle: 'Sessions, exam pattern, subjects, grades, promotion',
+      route: '/admin/exams',
+    ),
+    _AdminMenuItem(
+      icon: Icons.currency_rupee,
+      color: Color(0xFFDB2777),
+      title: 'Fees Management',
+      subtitle: 'Fee types, class config, collection, reports',
+      route: '/admin/fees',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DefaultTabController(
-      length: 7,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Admin Panel'),
-          bottom: const TabBar(
-            isScrollable: true,
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(icon: Icon(Icons.class_), text: 'Classes'),
-              Tab(icon: Icon(Icons.people), text: 'Students'),
-              Tab(icon: Icon(Icons.person), text: 'Teachers'),
-              Tab(icon: Icon(Icons.notifications), text: 'Notices'),
-              Tab(icon: Icon(Icons.history), text: 'Activity'),
-              Tab(icon: Icon(Icons.assignment_rounded), text: 'Exam Mgmt'),
-              Tab(icon: Icon(Icons.currency_rupee), text: 'Fees Mgmt'),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            const _AdminClassesTab(),
-            const _AdminStudentsTab(),
-            const _AdminTeachersTab(),
-            _NoticeTab(classes: ref.watch(allClassesProvider)),
-            const _TeacherActivityTab(),
-            const AdminExamTab(),
-            const FeeConfigScreen(),
-          ],
-        ),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Admin Panel')),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, i) {
+          final item = _items[i];
+          return Card(
+            elevation: 0,
+            margin: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => context.push(item.route),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: item.color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(item.icon, color: item.color),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.title,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 15)),
+                          const SizedBox(height: 2),
+                          Text(item.subtitle,
+                              style: TextStyle(
+                                  fontSize: 12.5, color: Colors.grey[600])),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
+}
+
+class _AdminMenuItem {
+  const _AdminMenuItem({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.route,
+  });
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final String route;
+}
+
+// ── Phase 3B: dedicated screens ────────────────────────────────────────────
+// Each wraps the existing (unmodified) tab-content widget in its own
+// Scaffold + AppBar, so it can be opened as a real standalone screen with
+// its own back button and title instead of living inside a shared TabBar.
+
+class AdminClassesScreen extends StatelessWidget {
+  const AdminClassesScreen({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Classes')),
+        body: const _AdminClassesTab(),
+      );
+}
+
+class AdminStudentsScreen extends StatelessWidget {
+  const AdminStudentsScreen({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Students')),
+        body: const _AdminStudentsTab(),
+      );
+}
+
+class AdminTeachersScreen extends StatelessWidget {
+  const AdminTeachersScreen({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Teachers')),
+        body: const _AdminTeachersTab(),
+      );
+}
+
+class AdminNoticesScreen extends ConsumerWidget {
+  const AdminNoticesScreen({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+        appBar: AppBar(title: const Text('Notices')),
+        body: _NoticeTab(classes: ref.watch(allClassesProvider)),
+      );
+}
+
+class AdminActivityScreen extends StatelessWidget {
+  const AdminActivityScreen({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Teacher Activity Log')),
+        body: const _TeacherActivityTab(),
+      );
 }
 
 // ── Notices Tab ───────────────────────────────────────────────────────────────

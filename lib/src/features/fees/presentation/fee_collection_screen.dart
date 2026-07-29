@@ -1205,10 +1205,22 @@ class _ReceiptHistoryTabState extends ConsumerState<_ReceiptHistoryTab> {
                           style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.green)),
-                      IconButton(
-                        icon: const Icon(Icons.print, size: 18),
-                        tooltip: 'Print receipt',
-                        onPressed: () => _printReceipt(p),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.print, size: 18),
+                            tooltip: 'Print receipt',
+                            onPressed: () => _printReceipt(p),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete_outline,
+                                size: 18, color: Colors.red[400]),
+                            tooltip: 'Receipt delete karein',
+                            onPressed: () =>
+                                _confirmDeletePayment(p, academicYear),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1223,104 +1235,336 @@ class _ReceiptHistoryTabState extends ConsumerState<_ReceiptHistoryTab> {
     );
   }
 
+  // Deletes a payment AND reverses whatever it applied to the covered
+  // months (paid_amount/status), so a mistakenly-recorded payment can be
+  // fully undone — the fee goes back to due/partial, not stuck as "paid"
+  // with no receipt to show for it.
+  Future<void> _confirmDeletePayment(
+      FeePayment p, String academicYear) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, color: Colors.red[400], size: 32),
+        title: const Text('Receipt delete karein?'),
+        content: Text(
+          'Receipt #${p.receiptNo} (₹${p.amount.toStringAsFixed(0)}) delete '
+          'hone ke baad ${p.monthsCovered != null && p.monthsCovered!.isNotEmpty ? "in months (${p.monthsCovered}) ki" : "is student ki"} '
+          'fee wapas due/partial ho jayegi. Ye action undo nahi ho sakta.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red[600]),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Haan, Delete Karein'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ref.read(feeRepoProvider).deletePayment(p.id);
+      ref.invalidate(allPaymentsProvider(academicYear));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Receipt delete ho gaya, fee status reset ho gaya ✓'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete nahi ho saka: $e')),
+        );
+      }
+    }
+  }
+
+  // Full, professional school-fee-receipt layout: letterhead, bordered
+  // details block, an itemised fee table (not just one "amount" line),
+  // amount-in-words, and signature lines — the format schools actually use,
+  // instead of a bare list of label/value rows.
   Future<void> _printReceipt(FeePayment p) async {
+    final netPaid = p.amount;
+    final schoolName = (p.schoolName?.isNotEmpty ?? false)
+        ? p.schoolName!
+        : 'NEMPS School';
+
     final doc = pw.Document();
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a5,
-        build: (context) => pw.Padding(
-          padding: const pw.EdgeInsets.all(24),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(p.schoolName ?? 'NEMPS School',
-                  style: pw.TextStyle(
-                      fontSize: 18, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              pw.Text('Fee Receipt', style: const pw.TextStyle(fontSize: 12)),
-              pw.Divider(),
-              pw.SizedBox(height: 8),
-              _pdfRow('Receipt No', p.receiptNo),
-              _pdfRow('Date',
-                  DateFormat('dd MMM yyyy').format(p.paymentDate)),
-              if (p.studentName != null && p.studentName!.isNotEmpty)
-                _pdfRow('Student Name', p.studentName!),
-              if (p.studentRollNo != null && p.studentRollNo!.isNotEmpty)
-                _pdfRow('Roll No', p.studentRollNo!),
-              if (p.className != null && p.className!.isNotEmpty)
-                _pdfRow('Class', p.className!),
-              if (p.fatherName != null && p.fatherName!.isNotEmpty)
-                _pdfRow("Father's Name", p.fatherName!),
-              if (p.monthsCovered != null && p.monthsCovered!.isNotEmpty)
-                _pdfWrapRow('Months', p.monthsCovered!),
-              _pdfRow('Payment Method', p.paymentMethod.toUpperCase()),
-              _pdfRow('Payment Type',
-                  p.isPartial ? 'Partial Payment' : 'Full Payment'),
-              if (p.concession > 0)
-                _pdfRow('Concession', '₹${p.concession.toStringAsFixed(0)}'),
-              if (p.lateFee > 0)
-                _pdfRow('Late Fee', '₹${p.lateFee.toStringAsFixed(0)}'),
-              pw.Divider(),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        margin: const pw.EdgeInsets.all(20),
+        build: (context) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // ── Letterhead ──────────────────────────────────────────────
+            pw.Center(
+              child: pw.Column(
                 children: [
-                  pw.Text('Amount Paid',
-                      style:
-                          pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                  pw.Text('₹${p.amount.toStringAsFixed(0)}',
-                      style:
-                          pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                  pw.Text(schoolName,
+                      style: pw.TextStyle(
+                          fontSize: 20, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 2),
+                  pw.Text('FEE RECEIPT',
+                      style: pw.TextStyle(
+                          fontSize: 11,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.grey700,
+                          letterSpacing: 2)),
                 ],
               ),
-              if (p.isPartial) ...[
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  'Note: Ye partial payment hai — baaki amount abhi pending hai.',
-                  style: pw.TextStyle(
-                      fontSize: 9, fontStyle: pw.FontStyle.italic),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Divider(thickness: 1.2, color: PdfColors.grey800),
+            pw.SizedBox(height: 8),
+
+            // ── Receipt No / Date strip ─────────────────────────────────
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                _pdfLabelValue('Receipt No', '#${p.receiptNo}'),
+                _pdfLabelValue(
+                    'Date', DateFormat('dd MMM yyyy').format(p.paymentDate)),
+              ],
+            ),
+            pw.SizedBox(height: 10),
+
+            // ── Student details block ────────────────────────────────────
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(8),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey400, width: 0.7),
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  if (p.studentName != null && p.studentName!.isNotEmpty)
+                    _pdfRow('Student Name', p.studentName!),
+                  pw.Row(
+                    children: [
+                      if (p.studentRollNo != null &&
+                          p.studentRollNo!.isNotEmpty)
+                        pw.Expanded(child: _pdfRow('Roll No', p.studentRollNo!)),
+                      if (p.className != null && p.className!.isNotEmpty)
+                        pw.Expanded(child: _pdfRow('Class', p.className!)),
+                    ],
+                  ),
+                  if (p.fatherName != null && p.fatherName!.isNotEmpty)
+                    _pdfRow("Father's Name", p.fatherName!),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 10),
+
+            // ── Fee breakdown table ───────────────────────────────────────
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.6),
+              columnWidths: const {
+                0: pw.FlexColumnWidth(3),
+                1: pw.FlexColumnWidth(2),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    _pdfCell('Particulars', bold: true),
+                    _pdfCell('Amount (₹)', bold: true, alignRight: true),
+                  ],
+                ),
+                pw.TableRow(children: [
+                  _pdfCell(p.monthsCovered != null && p.monthsCovered!.isNotEmpty
+                      ? 'Fee for: ${p.monthsCovered}'
+                      : 'Fee Payment'),
+                  _pdfCell(_gross(p).toStringAsFixed(0), alignRight: true),
+                ]),
+                if (p.concession > 0)
+                  pw.TableRow(children: [
+                    _pdfCell('Less: Concession (${p.concessionType})'),
+                    _pdfCell('- ${p.concession.toStringAsFixed(0)}',
+                        alignRight: true),
+                  ]),
+                if (p.lateFee > 0)
+                  pw.TableRow(children: [
+                    _pdfCell('Add: Late Fee'),
+                    _pdfCell('+ ${p.lateFee.toStringAsFixed(0)}',
+                        alignRight: true),
+                  ]),
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey100),
+                  children: [
+                    _pdfCell('Net Amount Paid', bold: true),
+                    _pdfCell('₹${netPaid.toStringAsFixed(0)}',
+                        bold: true, alignRight: true),
+                  ],
                 ),
               ],
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text('Amount in words: ${_amountInWords(netPaid)} Rupees Only',
+                style: pw.TextStyle(
+                    fontSize: 9, fontStyle: pw.FontStyle.italic)),
+            pw.SizedBox(height: 8),
+
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                _pdfLabelValue('Payment Mode', p.paymentMethod.toUpperCase()),
+                _pdfLabelValue(
+                    'Status', p.isPartial ? 'PARTIAL' : 'PAID IN FULL'),
+              ],
+            ),
+            if (p.isPartial) ...[
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'Note: Ye partial payment hai — baaki amount abhi pending hai.',
+                style:
+                    pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic),
+              ),
             ],
-          ),
+
+            pw.Spacer(),
+            pw.Divider(color: PdfColors.grey400),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Container(
+                        width: 110,
+                        child: pw.Divider(color: PdfColors.grey600)),
+                    pw.Text("Parent's Signature",
+                        style: const pw.TextStyle(fontSize: 8)),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Container(
+                        width: 110,
+                        child: pw.Divider(color: PdfColors.grey600)),
+                    pw.Text('Authorised Signatory',
+                        style: const pw.TextStyle(fontSize: 8)),
+                  ],
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 4),
+            pw.Center(
+              child: pw.Text(
+                'This is a computer-generated receipt.',
+                style: pw.TextStyle(
+                    fontSize: 7.5,
+                    color: PdfColors.grey600,
+                    fontStyle: pw.FontStyle.italic),
+              ),
+            ),
+          ],
         ),
       ),
     );
     await Printing.layoutPdf(onLayout: (_) => doc.save());
   }
 
-  // For short values that always fit on one line next to the label.
-  pw.Widget _pdfRow(String label, String value) => pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(vertical: 2),
-        child: pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text(label, style: const pw.TextStyle(fontSize: 11)),
-            pw.Text(value,
-                style: pw.TextStyle(
-                    fontSize: 11, fontWeight: pw.FontWeight.bold)),
-          ],
+  // Gross amount before concession/late-fee adjustments, so the table's
+  // "Particulars" line and the deduction/addition lines foot correctly to
+  // Net Amount Paid.
+  double _gross(FeePayment p) => p.amount + p.concession - p.lateFee;
+
+  pw.Widget _pdfCell(String text, {bool bold = false, bool alignRight = false}) =>
+      pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        child: pw.Text(
+          text,
+          textAlign: alignRight ? pw.TextAlign.right : pw.TextAlign.left,
+          style: pw.TextStyle(
+              fontSize: 10, fontWeight: bold ? pw.FontWeight.bold : null),
         ),
       );
 
-  // For values that can be long (e.g. many months joined together) — label
-  // sits above, value gets the full page width and wraps onto new lines
-  // instead of overflowing/overlapping the label like a fixed-width Row does.
-  pw.Widget _pdfWrapRow(String label, String value) => pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(vertical: 4),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(label,
-                style: const pw.TextStyle(
-                    fontSize: 11, color: PdfColors.grey700)),
-            pw.SizedBox(height: 2),
-            pw.Text(
-              value,
+  pw.Widget _pdfLabelValue(String label, String value) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(label,
               style:
-                  pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
-              softWrap: true,
-            ),
-          ],
+                  const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey700)),
+          pw.Text(value,
+              style:
+                  pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+        ],
+      );
+
+  // For short values that always fit on one line next to the label.
+  pw.Widget _pdfRow(String label, String value) => pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+        child: pw.RichText(
+          text: pw.TextSpan(
+            children: [
+              pw.TextSpan(
+                  text: '$label: ',
+                  style: const pw.TextStyle(
+                      fontSize: 9.5, color: PdfColors.grey700)),
+              pw.TextSpan(
+                  text: value,
+                  style: pw.TextStyle(
+                      fontSize: 10.5, fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
         ),
       );
+
+  // Converts a whole-rupee amount to words using the Indian numbering
+  // system (lakh/crore) so the receipt matches how school receipts
+  // conventionally spell out the amount.
+  String _amountInWords(double amount) {
+    final n = amount.round();
+    if (n == 0) return 'Zero';
+    const ones = [
+      '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight',
+      'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen',
+      'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
+    ];
+    const tens = [
+      '', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy',
+      'Eighty', 'Ninety'
+    ];
+    String twoDigits(int v) {
+      if (v < 20) return ones[v];
+      return '${tens[v ~/ 10]}${v % 10 != 0 ? ' ${ones[v % 10]}' : ''}';
+    }
+
+    String threeDigits(int v) {
+      if (v >= 100) {
+        final rest = v % 100;
+        return '${ones[v ~/ 100]} Hundred${rest != 0 ? ' ${twoDigits(rest)}' : ''}';
+      }
+      return twoDigits(v);
+    }
+
+    var remaining = n;
+    final crore = remaining ~/ 10000000;
+    remaining %= 10000000;
+    final lakh = remaining ~/ 100000;
+    remaining %= 100000;
+    final thousand = remaining ~/ 1000;
+    remaining %= 1000;
+    final hundred = remaining;
+
+    final parts = <String>[];
+    if (crore > 0) parts.add('${threeDigits(crore)} Crore');
+    if (lakh > 0) parts.add('${threeDigits(lakh)} Lakh');
+    if (thousand > 0) parts.add('${threeDigits(thousand)} Thousand');
+    if (hundred > 0) parts.add(threeDigits(hundred));
+    return parts.join(' ');
+  }
 }

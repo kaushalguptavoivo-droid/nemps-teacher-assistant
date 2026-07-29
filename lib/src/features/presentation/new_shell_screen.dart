@@ -24,15 +24,15 @@ class NewShellScreen extends ConsumerWidget {
     // Role-based navigation items
     final navItems = isAdmin ? [
       _NavItemData(icon: Icons.dashboard_rounded, label: 'Dashboard', route: '/dashboard'),
-      _NavItemData(icon: Icons.people_rounded, label: 'Students', route: '/dashboard'),
-      _NavItemData(icon: Icons.check_circle_rounded, label: 'Attendance', route: '/dashboard'),
+      _NavItemData(icon: Icons.people_rounded, label: 'Students', route: '/students-home'),
+      _NavItemData(icon: Icons.check_circle_rounded, label: 'Attendance', route: '/attendance-home'),
       _NavItemData(icon: Icons.analytics_rounded, label: 'Reports', route: '/reports'),
       _NavItemData(icon: Icons.admin_panel_settings_rounded, label: 'Admin', route: '/admin'),
     ] : [
       _NavItemData(icon: Icons.dashboard_rounded, label: 'Dashboard', route: '/dashboard'),
-      _NavItemData(icon: Icons.people_rounded, label: 'Students', route: '/dashboard'),
-      _NavItemData(icon: Icons.check_circle_rounded, label: 'Attendance', route: '/dashboard'),
-      _NavItemData(icon: Icons.assignment_rounded, label: 'Homework', route: '/dashboard'),
+      _NavItemData(icon: Icons.people_rounded, label: 'Students', route: '/students-home'),
+      _NavItemData(icon: Icons.check_circle_rounded, label: 'Attendance', route: '/attendance-home'),
+      _NavItemData(icon: Icons.assignment_rounded, label: 'Homework', route: '/homework-home'),
       _NavItemData(icon: Icons.analytics_rounded, label: 'Results', route: '/reports'),
     ];
 
@@ -232,8 +232,8 @@ class _MobileDrawer extends StatelessWidget {
         _MenuTileData(icon: Icons.dashboard_rounded, title: 'Dashboard', index: 0, route: '/dashboard'),
       ]),
       _MenuSectionData('MANAGEMENT', [
-        _MenuTileData(icon: Icons.people_rounded, title: 'Students', index: 1, route: '/dashboard'),
-        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Attendance', index: 2, route: '/dashboard'),
+        _MenuTileData(icon: Icons.people_rounded, title: 'Students', index: 1, route: '/students-home'),
+        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Attendance', index: 2, route: '/attendance-home'),
       ]),
       _MenuSectionData('ACADEMICS', [
         _MenuTileData(icon: Icons.analytics_rounded, title: 'Reports', index: 3, route: '/reports'),
@@ -252,9 +252,9 @@ class _MobileDrawer extends StatelessWidget {
         _MenuTileData(icon: Icons.dashboard_rounded, title: 'Dashboard', index: 0, route: '/dashboard'),
       ]),
       _MenuSectionData('MY TASKS', [
-        _MenuTileData(icon: Icons.people_rounded, title: 'My Students', index: 1, route: '/dashboard'),
-        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Mark Attendance', index: 2, route: '/dashboard'),
-        _MenuTileData(icon: Icons.assignment_rounded, title: 'Homework', index: 3, route: '/dashboard'),
+        _MenuTileData(icon: Icons.people_rounded, title: 'My Students', index: 1, route: '/students-home'),
+        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Mark Attendance', index: 2, route: '/attendance-home'),
+        _MenuTileData(icon: Icons.assignment_rounded, title: 'Homework', index: 3, route: '/homework-home'),
       ]),
       _MenuSectionData('ACADEMICS', [
         _MenuTileData(icon: Icons.analytics_rounded, title: 'Results', index: 4, route: '/reports'),
@@ -364,8 +364,8 @@ class _DesktopSidebar extends StatelessWidget {
         _MenuTileData(icon: Icons.dashboard_rounded, title: 'Dashboard', index: 0, route: '/dashboard'),
       ]),
       _MenuSectionData('MANAGEMENT', [
-        _MenuTileData(icon: Icons.people_rounded, title: 'Students', index: 1, route: '/dashboard'),
-        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Attendance', index: 2, route: '/dashboard'),
+        _MenuTileData(icon: Icons.people_rounded, title: 'Students', index: 1, route: '/students-home'),
+        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Attendance', index: 2, route: '/attendance-home'),
       ]),
       _MenuSectionData('ACADEMICS', [
         _MenuTileData(icon: Icons.analytics_rounded, title: 'Reports', index: 3, route: '/reports'),
@@ -384,9 +384,9 @@ class _DesktopSidebar extends StatelessWidget {
         _MenuTileData(icon: Icons.dashboard_rounded, title: 'Dashboard', index: 0, route: '/dashboard'),
       ]),
       _MenuSectionData('MY TASKS', [
-        _MenuTileData(icon: Icons.people_rounded, title: 'My Students', index: 1, route: '/dashboard'),
-        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Mark Attendance', index: 2, route: '/dashboard'),
-        _MenuTileData(icon: Icons.assignment_rounded, title: 'Homework', index: 3, route: '/dashboard'),
+        _MenuTileData(icon: Icons.people_rounded, title: 'My Students', index: 1, route: '/students-home'),
+        _MenuTileData(icon: Icons.check_circle_rounded, title: 'Mark Attendance', index: 2, route: '/attendance-home'),
+        _MenuTileData(icon: Icons.assignment_rounded, title: 'Homework', index: 3, route: '/homework-home'),
       ]),
       _MenuSectionData('ACADEMICS', [
         _MenuTileData(icon: Icons.analytics_rounded, title: 'Results', index: 4, route: '/reports'),

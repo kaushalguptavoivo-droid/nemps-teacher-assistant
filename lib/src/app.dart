@@ -17,6 +17,14 @@ import 'features/examination/presentation/analytics_screen.dart';
 import 'features/presentation/attendance_register_screen.dart';
 // Feature 2: Fee Collection direct access
 import 'features/fees/presentation/fee_collection_screen.dart';
+// Phase 3A: dedicated class-picker landing screens for nav items that
+// previously all pointed at '/dashboard'.
+import 'features/presentation/class_picker_screen.dart';
+// Phase 3B/3C: dedicated Admin/Fees/Exam screens (replaces nested tabs).
+import 'features/presentation/admin_panel_screen.dart';
+import 'features/fees/presentation/fee_config_screen.dart';
+import 'features/fees/presentation/fees_home_screen.dart';
+import 'features/examination/presentation/admin_exam_tab.dart';
 
 /// Notifier that GoRouter listens to for auth state changes.
 /// This ensures the router re-evaluates redirects when Supabase restores
@@ -36,6 +44,12 @@ class _AuthNotifier extends ValueNotifier<User?> {
 }
 
 final _authNotifier = _AuthNotifier();
+
+// Route builders for ClassPickerScreen (Phase 3A) — kept as top-level
+// functions so they're const-constructor-compatible.
+String _studentsRoute(String classId) => '/students/$classId';
+String _attendanceRoute(String classId) => '/attendance/$classId';
+String _homeworkRoute(String classId) => '/homework/$classId';
 
 class NempsApp extends ConsumerStatefulWidget {
   const NempsApp({super.key});
@@ -162,6 +176,94 @@ class _NempsAppState extends ConsumerState<NempsApp> {
           path: '/fee-collection',
           builder: (_, __) =>
               const NewShellScreen(child: FeeCollectionScreen()),
+        ),
+        // ── Phase 3A: dedicated nav landing screens ─────────────────────
+        // "Students" / "Attendance" / "Homework" each need a class picked
+        // first — these give each its own real screen instead of all three
+        // silently falling back to '/dashboard'.
+        GoRoute(
+          path: '/students-home',
+          builder: (_, __) => const NewShellScreen(
+            child: ClassPickerScreen(
+              title: 'Students',
+              subtitle: 'Students dekhne ke liye class chunein',
+              icon: Icons.people_rounded,
+              destinationBuilder: _studentsRoute,
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/attendance-home',
+          builder: (_, __) => const NewShellScreen(
+            child: ClassPickerScreen(
+              title: 'Attendance',
+              subtitle: 'Attendance lene ke liye class chunein',
+              icon: Icons.check_circle_rounded,
+              destinationBuilder: _attendanceRoute,
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/homework-home',
+          builder: (_, __) => const NewShellScreen(
+            child: ClassPickerScreen(
+              title: 'Homework',
+              subtitle: 'Homework dene/check karne ke liye class chunein',
+              icon: Icons.assignment_rounded,
+              destinationBuilder: _homeworkRoute,
+            ),
+          ),
+        ),
+        // ── Phase 3B: Admin Panel split into dedicated screens ────────────
+        GoRoute(
+          path: '/admin/classes',
+          builder: (_, __) => const NewShellScreen(child: AdminClassesScreen()),
+        ),
+        GoRoute(
+          path: '/admin/students',
+          builder: (_, __) => const NewShellScreen(child: AdminStudentsScreen()),
+        ),
+        GoRoute(
+          path: '/admin/teachers',
+          builder: (_, __) => const NewShellScreen(child: AdminTeachersScreen()),
+        ),
+        GoRoute(
+          path: '/admin/notices',
+          builder: (_, __) => const NewShellScreen(child: AdminNoticesScreen()),
+        ),
+        GoRoute(
+          path: '/admin/activity',
+          builder: (_, __) => const NewShellScreen(child: AdminActivityScreen()),
+        ),
+        GoRoute(
+          path: '/admin/exams',
+          builder: (_, __) => NewShellScreen(
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Exam Management')),
+              body: const AdminExamTab(),
+            ),
+          ),
+        ),
+        // ── Phase 3C: Fees Management split into dedicated screens ────────
+        GoRoute(
+          path: '/admin/fees',
+          builder: (_, __) => const NewShellScreen(child: FeesHomeScreen()),
+        ),
+        GoRoute(
+          path: '/admin/fees/types',
+          builder: (_, __) => const NewShellScreen(child: FeeTypesScreen()),
+        ),
+        GoRoute(
+          path: '/admin/fees/class-config',
+          builder: (_, __) => const NewShellScreen(child: ClassFeeConfigScreen()),
+        ),
+        GoRoute(
+          path: '/admin/fees/reports',
+          builder: (_, __) => const NewShellScreen(child: FeeReportsHomeScreen()),
+        ),
+        GoRoute(
+          path: '/admin/fees/advanced',
+          builder: (_, __) => const NewShellScreen(child: FeeConfigScreen()),
         ),
       ],
     );
