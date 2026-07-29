@@ -271,6 +271,7 @@ class StudentMonthlyFee {
 class FeePayment {
   FeePayment({
     required this.id,
+    required this.studentFeeId,
     required this.studentId,
     required this.amount,
     required this.paymentDate,
@@ -286,6 +287,7 @@ class FeePayment {
   });
 
   final String id;
+  final String studentFeeId;
   final String studentId;
   final double amount;
   final DateTime paymentDate;
@@ -308,6 +310,7 @@ class FeePayment {
   factory FeePayment.fromMap(Map<String, dynamic> m) {
     final fp = FeePayment(
       id: m['id'] as String,
+      studentFeeId: m['student_fee_id'] as String? ?? '',
       studentId: m['student_id'] as String,
       amount: (m['amount'] as num).toDouble(),
       paymentDate: DateTime.parse(m['payment_date'] as String),
@@ -330,6 +333,7 @@ class FeePayment {
 
   Map<String, dynamic> toInsertMap() {
     final map = <String, dynamic>{
+      'student_fee_id': studentFeeId,
       'student_id': studentId,
       'amount': amount,
       'payment_date': paymentDate.toIso8601String().substring(0, 10),
