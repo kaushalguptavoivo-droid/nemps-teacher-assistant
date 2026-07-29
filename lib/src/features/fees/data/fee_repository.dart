@@ -170,9 +170,10 @@ class FeeRepository {
     });
   }
 
-  // ── Payment History — fixed to use student_id ─────────────────────────────
-  // NOTE: Previously this incorrectly used 'student_fee_id' (non-existent column).
-  // Now uses 'student_id' which is the actual FK in fee_payments.
+  // ── Payment History ─────────────────────────────────────────────────────────
+  // Looks up by student_id (fee_payments also has a NOT NULL student_fee_id
+  // FK, but querying history for a student spans multiple student_fees rows,
+  // so student_id is the right column to filter on here).
 
   Future<List<FeePayment>> getPaymentHistory(String studentId) async {
     try {
