@@ -302,7 +302,7 @@ class _FeeTypesList extends ConsumerWidget {
     final nameCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
-    String frequency = 'one_time';
+    String frequency = 'monthly';
     bool isMandatory = true;
     bool dependsOnTransport = false;
 
@@ -354,10 +354,11 @@ class _FeeTypesList extends ConsumerWidget {
                   items: const [
                     DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
                     DropdownMenuItem(value: 'quarterly', child: Text('Quarterly')),
+                    DropdownMenuItem(value: 'half_yearly', child: Text('Half Yearly')),
                     DropdownMenuItem(value: 'annually', child: Text('Annually')),
                     DropdownMenuItem(value: 'one-time', child: Text('One Time')),
                   ],
-                  onChanged: (v) => setSt(() => frequency = v ?? 'one-time'),
+                  onChanged: (v) => setSt(() => frequency = v ?? 'monthly'),
                 ),
               ],
             ),
@@ -391,7 +392,7 @@ class _FeeTypesList extends ConsumerWidget {
         frequency: frequency,
         academicYear: academicYear,
         isActive: true,
-        isOneTime: frequency == 'one_time',
+        isOneTime: frequency == 'one-time',
         isMandatory: isMandatory,
         dependsOnTransport: dependsOnTransport,
         createdAt: DateTime.now(),
@@ -536,6 +537,8 @@ class _FeeTypeCard extends ConsumerWidget {
         return 'Monthly';
       case 'quarterly':
         return 'Quarterly';
+      case 'half_yearly':
+        return 'Half Yearly';
       case 'annually':
         return 'Annually';
       case 'one-time':
@@ -827,6 +830,8 @@ class _ClassFeeConfigCard extends ConsumerWidget {
         return 'Monthly';
       case 'quarterly':
         return 'Quarterly';
+      case 'half_yearly':
+        return 'Half Yearly';
       case 'annually':
         return 'Annually';
       case 'one-time':

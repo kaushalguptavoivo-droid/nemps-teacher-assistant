@@ -86,11 +86,14 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
   String _selectedConcessionType = 'none';
   double _lateFee = 0;
   bool _isCollecting = false;
+  bool _isPartialPayment = false;
 
   List<ClassFeeConfig>? _classFeeConfigs;
 
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
+  final _concessionController = TextEditingController(text: '0');
+  final _partialAmountController = TextEditingController();
   List<Student> _searchResults = [];
   bool _showSearchResults = false;
 
@@ -98,6 +101,8 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _concessionController.dispose();
+    _partialAmountController.dispose();
     super.dispose();
   }
 
@@ -385,6 +390,11 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
       _selectedMonths.clear();
       _totalAmount = 0;
       _classFeeConfigs = null;
+      _manualConcession = 0;
+      _selectedConcessionType = 'none';
+      _concessionController.text = '0';
+      _isPartialPayment = false;
+      _partialAmountController.clear();
     });
     _loadClassFeeConfigs(student.classId);
   }
@@ -459,6 +469,11 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                   _selectedMonths.clear();
                   _totalAmount = 0;
                   _classFeeConfigs = null;
+                  _manualConcession = 0;
+                  _selectedConcessionType = 'none';
+                  _concessionController.text = '0';
+                  _isPartialPayment = false;
+                  _partialAmountController.clear();
                 });
               },
             ),
@@ -629,6 +644,19 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
 
   // ── Payment Section ─────────────────────────────────────────────────────────
 
+  // Net amount payable after concession (never negative).
+  double get _netPayable {
+    final net = _totalAmount - _manualConcession;
+    return net < 0 ? 0 : net;
+  }
+
+  // The amount that will actually be collected right now — full net-payable
+  // amount, or whatever the teacher typed in for a partial payment.
+  double get _amountToCollectNow {
+    if (!_isPartialPayment) return _netPayable;
+    return double.tryParse(_partialAmountController.text.trim()) ?? 0;
+  }
+
   Widget _buildPaymentSection(String academicYear) {
     return _sectionCard(
       title: 'Collect Payment',
@@ -651,7 +679,166 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                       fontWeight: FontWeight.bold, fontSize: 18)),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+
+          // ── Concession ────────────────────────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: DropdownButtonFormField<String>(
+                  value: _selectedConcessionType,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Concession',
+                    prefixIcon: Icon(Icons.percent),
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: ConcessionType.values
+                      .map((c) => DropdownMenuItem(
+                            value: c.name,
+                            child: Text(
+                              c.percentage > 0
+                                  ? '${c.label} (${c.percentage}%)'
+                                  : c.label,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    final type = ConcessionType.values.firstWhere(
+                        (c) => c.name == v,
+                        orElse: () => ConcessionType.none);
+                    setState(() {
+                      _selectedConcessionType = type.name;
+                      // Auto-suggest an amount from the percentage — the
+                      // teacher can still overwrite it below.
+                      final suggested = _totalAmount * type.percentage / 100;
+                      _manualConcession = suggested;
+                      _concessionController.text =
+                          suggested > 0 ? suggested.toStringAsFixed(0) : '0';
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: TextField(
+                  controller: _concessionController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount ₹',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  onChanged: (v) {
+                    setState(() {
+                      _manualConcession = double.tryParse(v.trim()) ?? 0;
+                      if (_manualConcession > _totalAmount) {
+                        _manualConcession = _totalAmount;
+                      }
+                      if (_manualConcession < 0) _manualConcession = 0;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          if (_manualConcession > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Concession (${ConcessionType.values.firstWhere((c) => c.name == _selectedConcessionType, orElse: () => ConcessionType.none).label})',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text('- ₹${_manualConcession.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ],
+
+          const Divider(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Net Payable',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('₹${_netPayable.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Color(0xFF4F46E5))),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // ── Full vs Partial Payment ──────────────────────────────────
+          const Text('Payment Type',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          const SizedBox(height: 8),
+          SegmentedButton<bool>(
+            segments: const [
+              ButtonSegment(
+                  value: false,
+                  label: Text('Full Payment'),
+                  icon: Icon(Icons.check_circle_outline)),
+              ButtonSegment(
+                  value: true,
+                  label: Text('Partial Payment'),
+                  icon: Icon(Icons.payments_outlined)),
+            ],
+            selected: {_isPartialPayment},
+            onSelectionChanged: (sel) {
+              setState(() {
+                _isPartialPayment = sel.first;
+                if (_isPartialPayment) {
+                  _partialAmountController.text =
+                      _netPayable > 0 ? _netPayable.toStringAsFixed(0) : '';
+                } else {
+                  _partialAmountController.clear();
+                }
+              });
+            },
+          ),
+
+          if (_isPartialPayment) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _partialAmountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Amount Collecting Now ₹',
+                prefixIcon: Icon(Icons.currency_rupee),
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 8),
+            Builder(builder: (context) {
+              final balance = _netPayable - _amountToCollectNow;
+              if (_amountToCollectNow <= 0 || _amountToCollectNow > _netPayable) {
+                return Text(
+                  _amountToCollectNow > _netPayable
+                      ? 'Amount, Net Payable se zyada nahi ho sakta.'
+                      : 'Amount 0 se zyada honi chahiye.',
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
+                );
+              }
+              return Text(
+                'Balance rahega: ₹${balance.toStringAsFixed(0)}',
+                style: TextStyle(color: Colors.orange[800], fontSize: 12),
+              );
+            }),
+          ],
+
+          const SizedBox(height: 16),
           DropdownButtonFormField<String>(
             value: _paymentMethod,
             decoration: const InputDecoration(
@@ -674,7 +861,9 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: _isCollecting || _totalAmount <= 0
+              onPressed: _isCollecting ||
+                      _amountToCollectNow <= 0 ||
+                      _amountToCollectNow > _netPayable
                   ? null
                   : () => _collectPayment(academicYear),
               icon: _isCollecting
@@ -686,7 +875,7 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
                   : const Icon(Icons.check_circle),
               label: Text(_isCollecting
                   ? 'Processing...'
-                  : 'Collect ₹${_totalAmount.toStringAsFixed(0)}'),
+                  : 'Collect ₹${_amountToCollectNow.toStringAsFixed(0)}'),
             ),
           ),
         ],
@@ -696,12 +885,16 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
 
   Future<void> _collectPayment(String academicYear) async {
     final student = _selectedStudent;
-    if (student == null || _selectedMonths.isEmpty || _totalAmount <= 0) {
+    final collectedAmount = _amountToCollectNow;
+    if (student == null ||
+        _selectedMonths.isEmpty ||
+        collectedAmount <= 0 ||
+        collectedAmount > _netPayable) {
       return;
     }
 
     setState(() => _isCollecting = true);
-    final collectedAmount = _totalAmount;
+    final paymentType = collectedAmount >= _netPayable ? 'full' : 'partial';
 
     try {
       final repo = ref.read(feeRepoProvider);
@@ -717,8 +910,10 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
 
       final receiptNo = await repo.generateReceiptNo();
       final monthsList = _selectedMonths.toList()..sort();
+      final classLabel =
+          '${student.className} ${student.section}'.trim();
 
-      await repo.createFeePayment(FeePayment(
+      final payment = FeePayment(
         id: '',
         studentFeeId: studentFeeId,
         studentId: student.id,
@@ -732,8 +927,16 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
         lateFee: _lateFee,
         remarks: 'Months: ${monthsList.join(", ")}',
         monthsCovered: monthsList.join(", "),
+        paymentType: paymentType,
         createdAt: DateTime.now(),
-      ));
+      )
+        ..studentName = student.fullName
+        ..className = classLabel
+        ..fatherName = student.parentName
+        ..studentRollNo = student.rollNo
+        ..schoolName = 'NEMPS School';
+
+      await repo.createFeePayment(payment);
 
       await repo.markMonthlyFeesAsPaid(
         studentId: student.id,
@@ -762,12 +965,17 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
           _selectedMonths.clear();
           _totalAmount = 0;
           _manualConcession = 0;
+          _selectedConcessionType = 'none';
+          _concessionController.text = '0';
+          _isPartialPayment = false;
+          _partialAmountController.clear();
           _lateFee = 0;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                '₹${collectedAmount.toStringAsFixed(0)} payment collect ho gaya! Receipt: $receiptNo ✓'),
+            content: Text(paymentType == 'partial'
+                ? '₹${collectedAmount.toStringAsFixed(0)} partial payment collect ho gaya! Receipt: $receiptNo ✓'
+                : '₹${collectedAmount.toStringAsFixed(0)} payment collect ho gaya! Receipt: $receiptNo ✓'),
             backgroundColor: Colors.green,
           ),
         );
@@ -1035,13 +1243,19 @@ class _ReceiptHistoryTabState extends ConsumerState<_ReceiptHistoryTab> {
               _pdfRow('Receipt No', p.receiptNo),
               _pdfRow('Date',
                   DateFormat('dd MMM yyyy').format(p.paymentDate)),
-              if (p.studentName != null)
-                _pdfRow('Student', p.studentName!),
+              if (p.studentName != null && p.studentName!.isNotEmpty)
+                _pdfRow('Student Name', p.studentName!),
+              if (p.studentRollNo != null && p.studentRollNo!.isNotEmpty)
+                _pdfRow('Roll No', p.studentRollNo!),
               if (p.className != null && p.className!.isNotEmpty)
                 _pdfRow('Class', p.className!),
+              if (p.fatherName != null && p.fatherName!.isNotEmpty)
+                _pdfRow("Father's Name", p.fatherName!),
               if (p.monthsCovered != null && p.monthsCovered!.isNotEmpty)
-                _pdfRow('Months', p.monthsCovered!),
+                _pdfWrapRow('Months', p.monthsCovered!),
               _pdfRow('Payment Method', p.paymentMethod.toUpperCase()),
+              _pdfRow('Payment Type',
+                  p.isPartial ? 'Partial Payment' : 'Full Payment'),
               if (p.concession > 0)
                 _pdfRow('Concession', '₹${p.concession.toStringAsFixed(0)}'),
               if (p.lateFee > 0)
@@ -1058,6 +1272,14 @@ class _ReceiptHistoryTabState extends ConsumerState<_ReceiptHistoryTab> {
                           pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                 ],
               ),
+              if (p.isPartial) ...[
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Note: Ye partial payment hai — baaki amount abhi pending hai.',
+                  style: pw.TextStyle(
+                      fontSize: 9, fontStyle: pw.FontStyle.italic),
+                ),
+              ],
             ],
           ),
         ),
@@ -1066,6 +1288,7 @@ class _ReceiptHistoryTabState extends ConsumerState<_ReceiptHistoryTab> {
     await Printing.layoutPdf(onLayout: (_) => doc.save());
   }
 
+  // For short values that always fit on one line next to the label.
   pw.Widget _pdfRow(String label, String value) => pw.Padding(
         padding: const pw.EdgeInsets.symmetric(vertical: 2),
         child: pw.Row(
@@ -1075,6 +1298,28 @@ class _ReceiptHistoryTabState extends ConsumerState<_ReceiptHistoryTab> {
             pw.Text(value,
                 style: pw.TextStyle(
                     fontSize: 11, fontWeight: pw.FontWeight.bold)),
+          ],
+        ),
+      );
+
+  // For values that can be long (e.g. many months joined together) — label
+  // sits above, value gets the full page width and wraps onto new lines
+  // instead of overflowing/overlapping the label like a fixed-width Row does.
+  pw.Widget _pdfWrapRow(String label, String value) => pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 4),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(label,
+                style: const pw.TextStyle(
+                    fontSize: 11, color: PdfColors.grey700)),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              value,
+              style:
+                  pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+              softWrap: true,
+            ),
           ],
         ),
       );

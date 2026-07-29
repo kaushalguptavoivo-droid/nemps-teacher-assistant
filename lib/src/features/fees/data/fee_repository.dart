@@ -457,6 +457,47 @@ class FeeRepository {
     return 1;
   }
 
+  // ── Ensure Monthly Fees Exist (used by Due List) ────────────────────────────
+  // Monthly fee rows are normally created lazily the first time a student is
+  // opened in the Collect Fees screen. Reports (like the Due List) iterate
+  // ALL active students, so a student who was never opened there has zero
+  // rows in student_monthly_fees — which made them silently look "not due"
+  // even though they genuinely owe fees. This fills in the missing rows
+  // on-the-fly (idempotent — skips students who already have rows), so the
+  // Due List reflects what's actually owed instead of what happens to be
+  // pre-generated.
+  Future<void> ensureMonthlyFeesGenerated({
+    required String studentId,
+    required String classId,
+    required String academicYear,
+  }) async {
+    final existing = await getStudentMonthlyFees(studentId, academicYear);
+    if (existing.isNotEmpty) return; // already generated, nothing to do
+
+    final configs = await getClassFeeConfigs(classId, academicYear);
+    final enabled = configs.where((c) => c.isEnabled).toList();
+    if (enabled.isEmpty) return; // no fee configured for this class yet
+
+    final monthlyAmount =
+        enabled.fold<double>(0, (sum, c) => sum + c.customAmount);
+    if (monthlyAmount <= 0) return;
+
+    final startYear =
+        int.tryParse(academicYear.split('-').first) ?? DateTime.now().year;
+
+    for (final month in monthNames) {
+      final year = (monthIndex[month] ?? 4) >= 4 ? startYear : startYear + 1;
+      await generateMonthlyFeesForStudent(
+        studentId: studentId,
+        classId: classId,
+        academicYear: academicYear,
+        month: month,
+        year: year,
+        totalAmount: monthlyAmount,
+      );
+    }
+  }
+
   // ── Receipt Number Generator ──────────────────────────────────────────────
 
   Future<String> generateReceiptNo() async {
@@ -537,14 +578,32 @@ class FeeRepository {
     try {
       final students = await _client
           .from('students')
-          .select()
+          .select('*, classes(name, section)')
           .eq('active', true);
 
       final dueStudents = <DueStudent>[];
 
       for (final student in students) {
-        final fees =
-            await getStudentMonthlyFees(student['id'] as String, academicYear);
+        final studentId = student['id'] as String;
+        final classId = student['class_id'] as String? ?? '';
+
+        // Backfill missing monthly-fee rows first — otherwise a student who
+        // was never opened in Collect Fees has no rows at all and would
+        // wrongly be skipped as "not due".
+        if (classId.isNotEmpty) {
+          try {
+            await ensureMonthlyFeesGenerated(
+              studentId: studentId,
+              classId: classId,
+              academicYear: academicYear,
+            );
+          } catch (_) {
+            // Don't let one student's misconfigured class fee break the
+            // whole Due List — fall through and use whatever rows exist.
+          }
+        }
+
+        final fees = await getStudentMonthlyFees(studentId, academicYear);
 
         double totalPending = 0;
         final List<String> monthsPending = [];
@@ -562,15 +621,14 @@ class FeeRepository {
         }
 
         if (monthsPending.isNotEmpty) {
+          final classInfo = student['classes'] as Map<String, dynamic>?;
           dueStudents.add(DueStudent(
-            id: student['id'] as String,
-            studentId: student['id'] as String,
+            id: studentId,
+            studentId: studentId,
             studentName: student['full_name'] as String? ?? '',
             rollNo: student['roll_no'] as String? ?? '',
-            className: student['class_name'] as String? ??
-                student['className'] as String? ??
-                '',
-            section: student['section'] as String? ?? '',
+            className: classInfo?['name'] as String? ?? '',
+            section: classInfo?['section'] as String? ?? '',
             totalPending: totalPending,
             monthsPending: monthsPending,
             lastPaidDate: lastPaid,

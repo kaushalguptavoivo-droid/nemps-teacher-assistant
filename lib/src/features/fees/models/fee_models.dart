@@ -283,6 +283,7 @@ class FeePayment {
     this.lateFee = 0,
     this.remarks,
     this.monthsCovered,
+    this.paymentType = 'full',
     required this.createdAt,
   });
 
@@ -299,6 +300,7 @@ class FeePayment {
   final double lateFee;
   final String? remarks;
   final String? monthsCovered; // e.g. "April 2024, May 2024, June 2024"
+  final String paymentType; // 'full' or 'partial'
   final DateTime createdAt;
 
   // Mutable lookup fields — set after construction
@@ -306,6 +308,9 @@ class FeePayment {
   String? studentRollNo;
   String? className;
   String? schoolName;
+  String? fatherName;
+
+  bool get isPartial => paymentType == 'partial';
 
   factory FeePayment.fromMap(Map<String, dynamic> m) {
     final fp = FeePayment(
@@ -322,12 +327,14 @@ class FeePayment {
       lateFee: (m['late_fee'] as num?)?.toDouble() ?? 0,
       remarks: m['remarks'] as String?,
       monthsCovered: m['months_covered'] as String?,
+      paymentType: m['payment_type'] as String? ?? 'full',
       createdAt: DateTime.parse(m['created_at'] as String),
     );
     fp.studentName = m['student_name'] as String?;
-    fp.studentRollNo = m['student_roll_no'] as String?;
+    fp.studentRollNo = m['roll_no'] as String?;
     fp.className = m['class_name'] as String?;
     fp.schoolName = m['school_name'] as String?;
+    fp.fatherName = m['father_name'] as String?;
     return fp;
   }
 
@@ -345,10 +352,13 @@ class FeePayment {
       'late_fee': lateFee,
       'remarks': remarks,
       'months_covered': monthsCovered,
+      'payment_type': paymentType,
     };
     if (studentName != null) map['student_name'] = studentName;
     if (className != null) map['class_name'] = className;
     if (schoolName != null) map['school_name'] = schoolName;
+    if (fatherName != null) map['father_name'] = fatherName;
+    if (studentRollNo != null) map['roll_no'] = studentRollNo;
     return map;
   }
 }
