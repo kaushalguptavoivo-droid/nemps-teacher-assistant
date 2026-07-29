@@ -386,12 +386,22 @@ class FeeRepository {
   Future<String> generateReceiptNo() async {
     final year = DateTime.now().year;
     try {
+      // Use the highest existing suffix, not the row count — counting rows
+      // produces a number that's already taken (and rejected by the unique
+      // index on receipt_no) whenever a payment has been deleted.
       final data = await _client
           .from('fee_payments')
-          .select('id')
+          .select('receipt_no')
           .like('receipt_no', 'R-$year-%');
-      final count = (data as List).length;
-      return 'R-$year-${(count + 1).toString().padLeft(4, '0')}';
+      var maxSeq = 0;
+      for (final row in data) {
+        final receiptNo = row['receipt_no'] as String?;
+        if (receiptNo == null) continue;
+        final suffix = receiptNo.split('-').last;
+        final seq = int.tryParse(suffix);
+        if (seq != null && seq > maxSeq) maxSeq = seq;
+      }
+      return 'R-$year-${(maxSeq + 1).toString().padLeft(4, '0')}';
     } catch (e) {
       return 'R-$year-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
     }
