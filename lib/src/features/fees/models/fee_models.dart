@@ -231,7 +231,10 @@ class StudentMonthlyFee {
         month: m['month'] as String,
         year: (m['year'] as num?)?.toInt() ?? DateTime.now().year,
         academicYear: m['academic_year'] as String? ?? '',
-        totalAmount: (m['total_amount'] as num).toDouble(),
+        // 'amount' is the real column on student_monthly_fees — the table
+        // has never had a 'total_amount' column (confirmed against the
+        // live schema), even though older code assumed it did.
+        totalAmount: (m['amount'] as num).toDouble(),
         paidAmount: (m['paid_amount'] as num?)?.toDouble() ?? 0,
         status: m['status'] as String? ?? 'due',
         concession: (m['concession'] as num?)?.toDouble() ?? 0,
@@ -245,11 +248,15 @@ class StudentMonthlyFee {
 
   Map<String, dynamic> toInsertMap() => {
         'student_id': studentId,
-        'class_id': classId,
+        // NOTE: student_monthly_fees has no 'class_id' column on the live
+        // database — sending it causes PGRST204 ("could not find the
+        // column"). classId is kept on this model for the caller's
+        // convenience but is intentionally NOT sent here.
         'month': month,
         'year': year,
         'academic_year': academicYear,
-        'total_amount': totalAmount,
+        // Real column is 'amount', not 'total_amount'.
+        'amount': totalAmount,
         'paid_amount': paidAmount,
         'status': status,
         'concession': concession,
