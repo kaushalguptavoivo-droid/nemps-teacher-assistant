@@ -1101,16 +1101,13 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
         ..className =
             '${student.className ?? ""} ${student.section ?? ""}'.trim();
 
-      // 2. Save to DB
-      await ref.read(feeRepoProvider).createFeePayment(payment);
-
-      // 3. Mark each month as paid in student_monthly_fees
-      await ref.read(feeRepoProvider).markMonthlyFeesAsPaid(
-            studentId: student.id,
-            academicYear: academicYear,
+      // 2. Save the payment AND mark the covered months paid/partial in a
+      //    single DB transaction — avoids a receipt existing with no
+      //    matching status update (or vice versa) if the connection drops
+      //    between the two steps.
+      await ref.read(feeRepoProvider).collectMonthlyFeePayment(
+            payment: payment,
             monthLabels: _selectedMonths.toList(),
-            totalPaidAmount: finalAmt,
-            concessionAmount: concessionAmt,
           );
 
       // 4. Refresh providers
