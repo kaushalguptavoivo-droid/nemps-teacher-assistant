@@ -475,18 +475,33 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
       studentId: _selectedStudentId!,
       academicYear: academicYear,
     )));
+    final monthlyFeesAsync = ref.watch(studentMonthlyFeesProvider((
+      studentId: _selectedStudentId!,
+      academicYear: academicYear,
+    )));
 
     return _sectionCard(
       title: 'Fee Status',
       icon: Icons.account_balance_wallet,
       child: summaryAsync.when(
-        data: (summary) => _buildSummaryContent(summary, academicYear),
+        data: (summary) => monthlyFeesAsync.when(
+          data: (monthlyFees) =>
+              _buildSummaryContent(summary, monthlyFees, academicYear),
+          loading: () => const Center(
+              child: Padding(
+            padding: EdgeInsets.all(24),
+            child: CircularProgressIndicator(),
+          )),
+          error: (e, _) => Text('Error loading months: $e',
+              style: const TextStyle(color: Colors.red)),
+        ),
         loading: () => const Center(
             child: Padding(
           padding: EdgeInsets.all(24),
           child: CircularProgressIndicator(),
         )),
         error: (e, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Error loading fees: $e',
                 style: const TextStyle(color: Colors.red)),
@@ -502,8 +517,10 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
     );
   }
 
-  Widget _buildSummaryContent(
-      StudentFeeSummary summary, String academicYear) {
+  Widget _buildSummaryContent(StudentFeeSummary summary,
+      List<StudentMonthlyFee> monthlyFees, String academicYear) {
+    final pendingFees = monthlyFees.where((f) => f.isPending).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -553,14 +570,14 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
         ],
 
         // Pending months (selectable)
-        if (summary.monthsPending.isNotEmpty) ...[
+        if (pendingFees.isNotEmpty) ...[
           const SizedBox(height: 16),
           Row(children: [
             const Icon(Icons.pending,
                 color: Colors.orange, size: 16),
             const SizedBox(width: 6),
             Text(
-              'Pending Months (${summary.monthsPending.length}) — tap to select:',
+              'Pending Months (${pendingFees.length}) — tap to select:',
               style: const TextStyle(
                   fontWeight: FontWeight.bold, fontSize: 13),
             ),
@@ -569,6 +586,496 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: summary.monthsPending
-                .map((m) => FilterChip(
-  
+            children: pendingFees.map((f) {
+              final label = '${f.month} ${f.year}';
+              final selected = _selectedMonths.contains(label);
+              return FilterChip(
+                label: Text(
+                    '$label (₹${f.pendingAmount.toStringAsFixed(0)})',
+                    style: const TextStyle(fontSize: 11)),
+                selected: selected,
+                selectedColor: Colors.orange[100],
+                checkmarkColor: Colors.orange[800],
+                onSelected: (sel) {
+                  setState(() {
+                    if (sel) {
+                      _selectedMonths.add(label);
+                      _totalAmount += f.pendingAmount;
+                    } else {
+                      _selectedMonths.remove(label);
+                      _totalAmount -= f.pendingAmount;
+                    }
+                    if (_totalAmount < 0) _totalAmount = 0;
+                  });
+                },
+              );
+            }).toList(),
+          ),
+        ] else if (monthlyFees.isEmpty) ...[
+          const SizedBox(height: 12),
+          const Text(
+              'Is student ke liye abhi tak koi fee generate nahi hui.',
+              style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _generateFeesForStudent(academicYear),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Generate Fees'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── Payment Section ─────────────────────────────────────────────────────────
+
+  Widget _buildPaymentSection(String academicYear) {
+    return _sectionCard(
+      title: 'Collect Payment',
+      icon: Icons.payments,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Selected Months: ${(_selectedMonths.toList()..sort()).join(", ")}',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Total Amount',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              Text('₹${_totalAmount.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _paymentMethod,
+            decoration: const InputDecoration(
+              labelText: 'Payment Method',
+              prefixIcon: Icon(Icons.payment),
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: const [
+              DropdownMenuItem(value: 'cash', child: Text('Cash')),
+              DropdownMenuItem(value: 'upi', child: Text('UPI')),
+              DropdownMenuItem(value: 'card', child: Text('Card')),
+              DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
+              DropdownMenuItem(
+                  value: 'online', child: Text('Online Transfer')),
+            ],
+            onChanged: (v) => setState(() => _paymentMethod = v ?? 'cash'),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _isCollecting || _totalAmount <= 0
+                  ? null
+                  : () => _collectPayment(academicYear),
+              icon: _isCollecting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_circle),
+              label: Text(_isCollecting
+                  ? 'Processing...'
+                  : 'Collect ₹${_totalAmount.toStringAsFixed(0)}'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _collectPayment(String academicYear) async {
+    final student = _selectedStudent;
+    if (student == null || _selectedMonths.isEmpty || _totalAmount <= 0) {
+      return;
+    }
+
+    setState(() => _isCollecting = true);
+    final collectedAmount = _totalAmount;
+
+    try {
+      final repo = ref.read(feeRepoProvider);
+
+      // fee_payments.student_fee_id is NOT NULL on the live DB — the monthly
+      // flow has no natural 1:1 student_fees row, so make sure one exists.
+      final studentFeeId = await repo.ensureStudentFeeId(
+        studentId: student.id,
+        classId: student.classId,
+        academicYear: academicYear,
+        amount: collectedAmount,
+      );
+
+      final receiptNo = await repo.generateReceiptNo();
+      final monthsList = _selectedMonths.toList()..sort();
+
+      await repo.createFeePayment(FeePayment(
+        id: '',
+        studentFeeId: studentFeeId,
+        studentId: student.id,
+        amount: collectedAmount,
+        paymentDate: DateTime.now(),
+        paymentMethod: _paymentMethod,
+        receiptNo: receiptNo,
+        academicYear: academicYear,
+        concession: _manualConcession,
+        concessionType: _selectedConcessionType,
+        lateFee: _lateFee,
+        remarks: 'Months: ${monthsList.join(", ")}',
+        monthsCovered: monthsList.join(", "),
+        createdAt: DateTime.now(),
+      ));
+
+      await repo.markMonthlyFeesAsPaid(
+        studentId: student.id,
+        academicYear: academicYear,
+        monthLabels: monthsList,
+        totalPaidAmount: collectedAmount,
+        concessionAmount: _manualConcession,
+      );
+
+      ref.invalidate(studentFeeSummaryProvider((
+        studentId: student.id,
+        academicYear: academicYear,
+      )));
+      ref.invalidate(studentMonthlyFeesProvider((
+        studentId: student.id,
+        academicYear: academicYear,
+      )));
+      ref.invalidate(allPaymentsProvider(academicYear));
+      ref.invalidate(studentPaymentsProvider((
+        studentId: student.id,
+        academicYear: academicYear,
+      )));
+
+      if (mounted) {
+        setState(() {
+          _selectedMonths.clear();
+          _totalAmount = 0;
+          _manualConcession = 0;
+          _lateFee = 0;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '₹${collectedAmount.toStringAsFixed(0)} payment collect ho gaya! Receipt: $receiptNo ✓'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCollecting = false);
+    }
+  }
+
+  // ── Generate Fees for Student ────────────────────────────────────────────────
+
+  Future<void> _generateFeesForStudent(String academicYear) async {
+    final student = _selectedStudent;
+    if (student == null) return;
+
+    var configs = _classFeeConfigs;
+    if (configs == null) {
+      await _loadClassFeeConfigs(student.classId);
+      configs = _classFeeConfigs;
+    }
+    if (configs == null) return;
+
+    final enabled = configs.where((c) => c.isEnabled).toList();
+    if (enabled.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Is class ke liye koi fee type enabled nahi hai. Pehle Class Config set karein.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    final monthlyAmount =
+        enabled.fold<double>(0, (sum, c) => sum + c.customAmount);
+    final startYear = int.tryParse(academicYear.split('-').first) ??
+        DateTime.now().year;
+
+    try {
+      var created = 0;
+      for (final month in monthNames) {
+        final year = (monthIndex[month] ?? 4) >= 4 ? startYear : startYear + 1;
+        created += await ref.read(feeRepoProvider).generateMonthlyFeesForStudent(
+              studentId: student.id,
+              classId: student.classId,
+              academicYear: academicYear,
+              month: month,
+              year: year,
+              totalAmount: monthlyAmount,
+            );
+      }
+
+      ref.invalidate(studentFeeSummaryProvider((
+        studentId: student.id,
+        academicYear: academicYear,
+      )));
+      ref.invalidate(studentMonthlyFeesProvider((
+        studentId: student.id,
+        academicYear: academicYear,
+      )));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$created months ke fees generate ho gaye ✓'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // ── Reusable Section Card ────────────────────────────────────────────────────
+
+  Widget _sectionCard({
+    required String title,
+    required IconData icon,
+    required Widget child,
+  }) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: const Color(0xFF4F46E5)),
+                const SizedBox(width: 8),
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Reusable Summary Chip ────────────────────────────────────────────────────
+
+  Widget _chip(String label, double amount, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(label,
+              style: TextStyle(fontSize: 11, color: color.withOpacity(0.9))),
+          const SizedBox(height: 4),
+          Text('₹${amount.toStringAsFixed(0)}',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RECEIPT HISTORY TAB
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _ReceiptHistoryTab extends ConsumerStatefulWidget {
+  const _ReceiptHistoryTab();
+
+  @override
+  ConsumerState<_ReceiptHistoryTab> createState() =>
+      _ReceiptHistoryTabState();
+}
+
+class _ReceiptHistoryTabState extends ConsumerState<_ReceiptHistoryTab> {
+  @override
+  Widget build(BuildContext context) {
+    final activeSession = ref.watch(activeSessionProvider);
+    return activeSession.when(
+      data: (session) {
+        if (session == null) {
+          return const Center(
+              child: Text('Koi active session nahi hai.'));
+        }
+        return _buildList(session.label);
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+    );
+  }
+
+  Widget _buildList(String academicYear) {
+    final paymentsAsync = ref.watch(allPaymentsProvider(academicYear));
+    return paymentsAsync.when(
+      data: (payments) {
+        if (payments.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Text('Abhi tak koi payment record nahi hai.',
+                  style: TextStyle(color: Colors.grey)),
+            ),
+          );
+        }
+        return RefreshIndicator(
+          onRefresh: () async =>
+              ref.invalidate(allPaymentsProvider(academicYear)),
+          child: ListView.separated(
+            padding: const EdgeInsets.all(12),
+            itemCount: payments.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, i) {
+              final p = payments[i];
+              return Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: const Color(0xFF4F46E5).withOpacity(0.1),
+                    child: const Icon(Icons.receipt,
+                        color: Color(0xFF4F46E5), size: 20),
+                  ),
+                  title: Text(
+                    p.studentName?.isNotEmpty == true
+                        ? p.studentName!
+                        : 'Receipt: ${p.receiptNo}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    '${DateFormat('dd MMM yyyy').format(p.paymentDate)}'
+                    '${p.monthsCovered != null && p.monthsCovered!.isNotEmpty ? ' • ${p.monthsCovered}' : ''}'
+                    '\nReceipt: ${p.receiptNo} • ${p.paymentMethod.toUpperCase()}',
+                  ),
+                  isThreeLine: true,
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('₹${p.amount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green)),
+                      IconButton(
+                        icon: const Icon(Icons.print, size: 18),
+                        tooltip: 'Print receipt',
+                        onPressed: () => _printReceipt(p),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+    );
+  }
+
+  Future<void> _printReceipt(FeePayment p) async {
+    final doc = pw.Document();
+    doc.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a5,
+        build: (context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(24),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(p.schoolName ?? 'NEMPS School',
+                  style: pw.TextStyle(
+                      fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 4),
+              pw.Text('Fee Receipt', style: const pw.TextStyle(fontSize: 12)),
+              pw.Divider(),
+              pw.SizedBox(height: 8),
+              _pdfRow('Receipt No', p.receiptNo),
+              _pdfRow('Date',
+                  DateFormat('dd MMM yyyy').format(p.paymentDate)),
+              if (p.studentName != null)
+                _pdfRow('Student', p.studentName!),
+              if (p.className != null && p.className!.isNotEmpty)
+                _pdfRow('Class', p.className!),
+              if (p.monthsCovered != null && p.monthsCovered!.isNotEmpty)
+                _pdfRow('Months', p.monthsCovered!),
+              _pdfRow('Payment Method', p.paymentMethod.toUpperCase()),
+              if (p.concession > 0)
+                _pdfRow('Concession', '₹${p.concession.toStringAsFixed(0)}'),
+              if (p.lateFee > 0)
+                _pdfRow('Late Fee', '₹${p.lateFee.toStringAsFixed(0)}'),
+              pw.Divider(),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Amount Paid',
+                      style:
+                          pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                  pw.Text('₹${p.amount.toStringAsFixed(0)}',
+                      style:
+                          pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (_) => doc.save());
+  }
+
+  pw.Widget _pdfRow(String label, String value) => pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 2),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(label, style: const pw.TextStyle(fontSize: 11)),
+            pw.Text(value,
+                style: pw.TextStyle(
+                    fontSize: 11, fontWeight: pw.FontWeight.bold)),
+          ],
+        ),
+      );
+}

@@ -322,6 +322,42 @@ class FeeRepository {
     return result as String;
   }
 
+  // ── Ensure a student_fees row exists (for fee_payments FK) ──────────────────
+  // fee_payments.student_fee_id is NOT NULL on the live DB. The monthly-fee
+  // flow (student_monthly_fees) has no natural 1:1 student_fees row per
+  // payment, so we reuse an existing student_fees row for this student/year
+  // if one exists, or create a minimal one on the fly so the payment insert
+  // always has a valid, non-null FK to satisfy the constraint.
+  Future<String> ensureStudentFeeId({
+    required String studentId,
+    required String classId,
+    required String academicYear,
+    required double amount,
+  }) async {
+    final existing = await getStudentFees(
+      studentId: studentId,
+      academicYear: academicYear,
+    );
+    if (existing.isNotEmpty) return existing.first.id;
+
+    final feeTypes = await getFeeTypes(academicYear);
+    if (feeTypes.isEmpty) {
+      throw StateError(
+          'Koi fee type configured nahi hai $academicYear ke liye. Pehle Fee Types set up karein.');
+    }
+
+    return createStudentFee(StudentFee(
+      id: '',
+      studentId: studentId,
+      feeTypeId: feeTypes.first.id,
+      classId: classId,
+      academicYear: academicYear,
+      amount: amount,
+      dueDate: DateTime.now(),
+      createdAt: DateTime.now(),
+    ));
+  }
+
   // ── Fee Payment ─────────────────────────────────────────────────────────────
 
   Future<String> createFeePayment(FeePayment payment) async {
