@@ -13,10 +13,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
-
-// Matches the indigo used across the app (AppTheme's primary is private).
-const _kPrimary = Color(0xFF4F46E5);
 
 class ClassPickerScreen extends ConsumerWidget {
   const ClassPickerScreen({
@@ -80,8 +78,8 @@ class ClassPickerScreen extends ConsumerWidget {
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                         leading: CircleAvatar(
-                          backgroundColor: _kPrimary.withOpacity(0.12),
-                          child: Icon(icon, color: _kPrimary),
+                          backgroundColor: AppTheme.primary.withOpacity(0.12),
+                          child: Icon(icon, color: AppTheme.primary),
                         ),
                         title: Text('Class ${room.label}',
                             style:
