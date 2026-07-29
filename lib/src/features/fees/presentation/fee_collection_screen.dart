@@ -391,10 +391,15 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
   Future<void> _loadClassFeeConfigs(String classId) async {
     final session = await ref.read(activeSessionProvider.future);
     if (session == null) return;
-    final configs = await ref
-        .read(feeRepoProvider)
-        .getClassFeeConfigs(classId, session.label);
-    if (mounted) setState(() => _classFeeConfigs = configs);
+    try {
+      final configs = await ref
+          .read(feeRepoProvider)
+          .getClassFeeConfigs(classId, session.label);
+      if (mounted) setState(() => _classFeeConfigs = configs);
+    } catch (_) {
+      // Leave _classFeeConfigs null so _generateFeesForStudent retries the
+      // fetch (and surfaces the real error) instead of silently caching [].
+    }
   }
 
   // ── Student Card ────────────────────────────────────────────────────────────
@@ -961,9 +966,22 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
 
     List<ClassFeeConfig> configs = _classFeeConfigs ?? [];
     if (configs.isEmpty) {
-      configs = await ref
-          .read(feeRepoProvider)
-          .getClassFeeConfigs(_selectedClassId!, academicYear);
+      try {
+        configs = await ref
+            .read(feeRepoProvider)
+            .getClassFeeConfigs(_selectedClassId!, academicYear);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Fee config load karne mein error: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 6),
+            ),
+          );
+        }
+        return;
+      }
       if (mounted) setState(() => _classFeeConfigs = configs);
     }
 
@@ -1000,19 +1018,32 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
     }
 
     int generated = 0;
-    for (final month in monthNames) {
-      final monthIdx = monthIndex[month]!;
-      final year = monthIdx >= 4 ? startYear : endYear;
-      generated += await ref
-          .read(feeRepoProvider)
-          .generateMonthlyFeesForStudent(
-            studentId: _selectedStudent!.id,
-            classId: _selectedClassId!,
-            academicYear: academicYear,
-            month: month,
-            year: year,
-            totalAmount: totalMonthly,
-          );
+    try {
+      for (final month in monthNames) {
+        final monthIdx = monthIndex[month]!;
+        final year = monthIdx >= 4 ? startYear : endYear;
+        generated += await ref
+            .read(feeRepoProvider)
+            .generateMonthlyFeesForStudent(
+              studentId: _selectedStudent!.id,
+              classId: _selectedClassId!,
+              academicYear: academicYear,
+              month: month,
+              year: year,
+              totalAmount: totalMonthly,
+            );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fees generate karne mein error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 8),
+          ),
+        );
+      }
+      return;
     }
 
     ref.invalidate(studentFeeSummaryProvider((
