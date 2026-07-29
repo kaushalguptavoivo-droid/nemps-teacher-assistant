@@ -1414,6 +1414,7 @@ class _FeeCollectionTabState extends ConsumerState<_FeeCollectionTab> {
       final receiptNo = await ref.read(feeRepoProvider).generateReceiptNo();
       await ref.read(feeRepoProvider).createFeePayment(FeePayment(
         id: '',
+        studentFeeId: fee.id,
         studentId: fee.studentId,
         amount: amount,
         paymentDate: paymentDate,
