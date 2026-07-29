@@ -282,14 +282,43 @@ class FeeRepository {
       final existing = await getStudentMonthFee(studentId, month, year);
       if (existing == null) continue;
 
+      final newPaid = existing.paidAmount + perMonth;
+      final newConcession = existing.concession + perConcession;
+      // Only mark 'paid' when the amount actually covers what's due —
+      // otherwise 'partial'. The model already understands this status
+      // (see StudentMonthlyFee.isPending), it just was never written here.
+      final newStatus =
+          newPaid >= (existing.totalAmount - newConcession) ? 'paid' : 'partial';
+
       await _client.from('student_monthly_fees').update({
-        'paid_amount': existing.paidAmount + perMonth,
-        'status': 'paid',
-        'concession': existing.concession + perConcession,
+        'paid_amount': newPaid,
+        'status': newStatus,
+        'concession': newConcession,
         'paid_date': DateTime.now().toIso8601String().substring(0, 10),
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', existing.id);
     }
+  }
+
+  // ── Collect Fee Payment (atomic) ────────────────────────────────────────────
+  // Records the payment AND marks the covered months paid/partial in a single
+  // DB transaction via RPC, instead of two separate client calls. Prevents a
+  // dropped connection between the two steps from leaving a receipt with no
+  // matching status update (or vice versa). Use this instead of calling
+  // createFeePayment() + markMonthlyFeesAsPaid() separately.
+
+  Future<String> collectMonthlyFeePayment({
+    required FeePayment payment,
+    required List<String> monthLabels,
+  }) async {
+    if (monthLabels.isEmpty) {
+      throw ArgumentError('At least one month must be selected');
+    }
+    final result = await _client.rpc('collect_fee_payment', params: {
+      'p_payment': payment.toInsertMap(),
+      'p_month_labels': monthLabels,
+    });
+    return result as String;
   }
 
   // ── Fee Payment ─────────────────────────────────────────────────────────────
@@ -304,8 +333,14 @@ class FeeRepository {
     return id;
   }
 
+  // Deletes the payment AND reverses whatever it applied to
+  // student_monthly_fees (paid_amount/status), atomically via RPC.
+  // Previously this only deleted the fee_payments row, leaving the months it
+  // had marked paid stuck as "paid" forever with no matching receipt.
   Future<void> deletePayment(String paymentId) async {
-    await _client.from('fee_payments').delete().eq('id', paymentId);
+    await _client.rpc('delete_fee_payment', params: {
+      'p_payment_id': paymentId,
+    });
   }
 
   Future<List<FeePayment>> getStudentPayments(
@@ -627,33 +662,40 @@ class FeeRepository {
     required DateTime dueDate,
   }) async {
     final batch = <Map<String, dynamic>>[];
-    final now = DateTime.now().toUtc().toIso8601String();
 
+    // Only the columns that should actually change on a re-generate go in
+    // the payload. id/paid_amount/status/concession/late_fee_applied are
+    // deliberately left out:
+    //  - 'id' omitted so the upsert never overwrites an existing row's
+    //    primary key (it only supplies one via the column default on a true
+    //    INSERT; on a conflict it's simply not touched).
+    //  - paid_amount/status/concession/late_fee_applied omitted so
+    //    re-running "Generate Fees" (e.g. after editing a class fee config)
+    //    can never reset a student's already-recorded payment progress —
+    //    those columns only get their DEFAULT on first insert and are left
+    //    alone on every subsequent conflict/update.
     for (final student in students) {
       for (final config in configs) {
         if (config.isEnabled) {
           batch.add({
-            'id': _uuid.v4(),
             'student_id': student['id'],
             'fee_type_id': config.feeTypeId,
             'class_id': classId,
             'academic_year': academicYear,
             'amount': config.customAmount,
-            'paid_amount': 0,
-            'status': 'due',
             'due_date': dueDate.toIso8601String().substring(0, 10),
-            'concession': 0,
-            'late_fee_applied': 0,
-            'created_at': now,
           });
         }
       }
     }
 
     if (batch.isNotEmpty) {
+      // No ignoreDuplicates: an existing (student_id, fee_type_id,
+      // academic_year) row now gets amount/due_date/class_id UPDATED instead
+      // of the call being a silent no-op — this is what actually makes
+      // re-generating fees after a config change take effect.
       await _client.from('student_fees').upsert(batch,
-          onConflict: 'student_id,fee_type_id,academic_year',
-          ignoreDuplicates: true);
+          onConflict: 'student_id,fee_type_id,academic_year');
     }
   }
 
