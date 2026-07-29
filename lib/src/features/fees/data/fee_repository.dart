@@ -70,7 +70,10 @@ class FeeRepository {
           .eq('academic_year', academicYear);
       return data.map((r) => ClassFeeConfig.fromMap(r)).toList();
     } catch (e) {
-      return [];
+      // Re-throw instead of silently returning []. A caught-and-hidden
+      // error here previously looked identical to "no fee types enabled",
+      // which made real failures (auth, RLS, bad data) undiagnosable.
+      rethrow;
     }
   }
 
@@ -219,18 +222,19 @@ class FeeRepository {
 
   Future<StudentMonthlyFee?> getStudentMonthFee(
       String studentId, String month, int year) async {
-    try {
-      final data = await _client
-          .from('student_monthly_fees')
-          .select()
-          .eq('student_id', studentId)
-          .eq('month', month)
-          .eq('year', year)
-          .maybeSingle();
-      return data != null ? StudentMonthlyFee.fromMap(data) : null;
-    } catch (e) {
-      return null;
-    }
+    // .maybeSingle() already returns null (no throw) when no row matches,
+    // so any exception caught here is a real error (RLS, network, bad
+    // data) — it must not be silently treated as "record doesn't exist",
+    // or callers like generateMonthlyFeesForStudent will proceed to
+    // insert on top of a masked failure.
+    final data = await _client
+        .from('student_monthly_fees')
+        .select()
+        .eq('student_id', studentId)
+        .eq('month', month)
+        .eq('year', year)
+        .maybeSingle();
+    return data != null ? StudentMonthlyFee.fromMap(data) : null;
   }
 
   Future<void> createStudentMonthlyFee(StudentMonthlyFee fee) async {
