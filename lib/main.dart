@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'src/app.dart';
 import 'src/core/config/app_config.dart';
 import 'src/core/services/notification_service.dart';
+import 'src/core/services/background_notice_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +55,9 @@ Future<void> main() async {
     unawaited(NotificationService.scheduleDailyAttendanceReminder());
     unawaited(NotificationService.scheduleDailyHomeworkReminder());
   }
+  // Notice alerts even when the app is fully closed — see
+  // background_notice_service.dart for how/why this works and its limits.
+  unawaited(BackgroundNoticeService.init());
 
   runApp(const ProviderScope(child: NempsApp()));
 }

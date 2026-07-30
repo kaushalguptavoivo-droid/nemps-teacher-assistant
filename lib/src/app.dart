@@ -24,6 +24,7 @@ import 'features/presentation/class_picker_screen.dart';
 import 'features/presentation/admin_panel_screen.dart';
 import 'features/fees/presentation/fee_config_screen.dart';
 import 'features/fees/presentation/fees_home_screen.dart';
+import 'features/fees/presentation/fee_reports_screen.dart';
 import 'features/examination/presentation/admin_exam_tab.dart';
 
 /// Notifier that GoRouter listens to for auth state changes.
@@ -259,7 +260,7 @@ class _NempsAppState extends ConsumerState<NempsApp> {
         ),
         GoRoute(
           path: '/admin/fees/reports',
-          builder: (_, __) => const NewShellScreen(child: FeeReportsHomeScreen()),
+          builder: (_, __) => const NewShellScreen(child: FeeReportsScreen()),
         ),
         GoRoute(
           path: '/admin/fees/advanced',

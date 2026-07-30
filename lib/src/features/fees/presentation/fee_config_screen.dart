@@ -193,21 +193,43 @@ class _FeeConfigScreenState extends ConsumerState<FeeConfigScreen>
 
   Future<void> _exportFees() async {
     try {
+      final activeSession = await ref.read(activeSessionProvider.future);
+      if (activeSession == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Koi active academic session nahi hai')),
+          );
+        }
+        return;
+      }
+      final feeTypes =
+          await ref.read(feeTypesProvider(activeSession.label).future);
+
       final data = [
-        ['Fee Type', 'Amount', 'Frequency', 'Due Date', 'Class']
+        ['Fee Type', 'Description', 'Amount', 'Frequency', 'Mandatory', 'Active'],
+        ...feeTypes.map((f) => [
+              f.name,
+              f.description,
+              f.amount.toStringAsFixed(0),
+              f.frequency,
+              f.isMandatory ? 'Yes' : 'No',
+              f.isActive ? 'Yes' : 'No',
+            ]),
       ];
 
       final csvData = const ListToCsvConverter().convert(data);
       final bytes = Uint8List.fromList(csvData.codeUnits);
 
       await Share.shareXFiles(
-        [XFile.fromData(bytes, mimeType: 'text/csv', name: 'fees_export.csv')],
-        subject: 'Fees Export',
+        [XFile.fromData(bytes, mimeType: 'text/csv', name: 'fee_types_export.csv')],
+        subject: 'Fee Types Export',
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Fees exported!'), backgroundColor: Colors.green),
+          SnackBar(
+              content: Text('${feeTypes.length} fee types exported!'),
+              backgroundColor: Colors.green),
         );
       }
     } catch (e) {
@@ -240,15 +262,6 @@ class ClassFeeConfigScreen extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('Class Fee Config')),
         body: const _ClassFeeConfigTab(),
-      );
-}
-
-class FeeReportsHomeScreen extends StatelessWidget {
-  const FeeReportsHomeScreen({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Fee Reports')),
-        body: const _FeeReportsTab(),
       );
 }
 
@@ -1959,8 +1972,94 @@ class _FeeReportsContentState extends ConsumerState<_FeeReportsContent>
   }
 
   Future<void> _exportReport() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Export feature coming soon!')),
-    );
+    try {
+      List<List<dynamic>> data;
+      String fileName;
+
+      if (_exportType == 'due') {
+        final dueStudents =
+            await ref.read(dueStudentsProvider(widget.academicYear).future);
+        data = [
+          ['Student Name', 'Class', 'Section', 'Months Pending', 'Total Due (₹)'],
+          ...dueStudents.map((s) => [
+                s.studentName,
+                s.className,
+                s.section,
+                s.monthsPending.join('; '),
+                s.totalPending.toStringAsFixed(0),
+              ]),
+        ];
+        fileName = 'fees_due_list.csv';
+      } else if (_exportType == 'collection') {
+        final collection =
+            await ref.read(dailyCollectionProvider(_selectedDate).future);
+        data = [
+          ['Receipt No', 'Student Name', 'Amount (₹)', 'Payment Method'],
+          ...collection.payments.map((p) => [
+                p.receiptNo,
+                p.studentName ?? '',
+                p.amount.toStringAsFixed(0),
+                p.paymentMethod.toUpperCase(),
+              ]),
+        ];
+        fileName =
+            'fees_collection_${DateFormat('ddMMyyyy').format(_selectedDate)}.csv';
+      } else {
+        final payments =
+            await ref.read(allPaymentsProvider(widget.academicYear).future);
+        data = [
+          [
+            'Receipt No',
+            'Date',
+            'Student Name',
+            'Class',
+            'Amount (₹)',
+            'Payment Method',
+            'Months Covered'
+          ],
+          ...payments.map((p) => [
+                p.receiptNo,
+                DateFormat('dd/MM/yyyy').format(p.paymentDate),
+                p.studentName ?? '',
+                p.className ?? '',
+                p.amount.toStringAsFixed(0),
+                p.paymentMethod.toUpperCase(),
+                p.monthsCovered ?? '',
+              ]),
+        ];
+        fileName = 'fees_student_ledger.csv';
+      }
+
+      if (data.length <= 1) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Export ke liye koi data nahi mila')),
+          );
+        }
+        return;
+      }
+
+      final csvData = const ListToCsvConverter().convert(data);
+      final bytes = Uint8List.fromList(csvData.codeUnits);
+
+      await Share.shareXFiles(
+        [XFile.fromData(bytes, mimeType: 'text/csv', name: fileName)],
+        subject: 'Fee Report Export',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('${data.length - 1} rows exported!'),
+              backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }

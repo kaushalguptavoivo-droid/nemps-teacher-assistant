@@ -1297,7 +1297,21 @@ class _ReceiptHistoryTabState extends ConsumerState<_ReceiptHistoryTab> {
         ? p.schoolName!
         : 'NEMPS School';
 
-    final doc = pw.Document();
+    // The PDF package's default core font (Helvetica) has no ₹ glyph, so it
+    // was rendering as a box (□). Noto Sans includes the Rupee sign, so we
+    // load it as the document's default font — fixes ₹ everywhere in this
+    // receipt, not just one spot.
+    final regularFont = await PdfGoogleFonts.notoSansRegular();
+    final boldFont = await PdfGoogleFonts.notoSansBold();
+    final italicFont = await PdfGoogleFonts.notoSansItalic();
+
+    final doc = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: regularFont,
+        bold: boldFont,
+        italic: italicFont,
+      ),
+    );
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a5,

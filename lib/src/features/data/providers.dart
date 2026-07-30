@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/models/models.dart';
 import '../../core/services/notification_service.dart';
+import '../../core/services/background_notice_service.dart';
 import 'school_repository.dart';
 
 final repoProvider =
@@ -133,6 +134,7 @@ final noticesProvider =
             if (lastNoticeId != null && lastNoticeId != newest.id) {
               // A new notice arrived — push a notification
               NotificationService.showNotice(newest.title, newest.body);
+              BackgroundNoticeService.markAlerted(newest.id);
             }
             lastNoticeId = newest.id;
           } else {
@@ -171,6 +173,7 @@ final allNoticesProvider = StreamProvider<List<Notice>>((ref) {
             final newest = notices.first;
             if (lastNoticeId != null && lastNoticeId != newest.id) {
               NotificationService.showNotice(newest.title, newest.body);
+              BackgroundNoticeService.markAlerted(newest.id);
             }
             lastNoticeId = newest.id;
           } else {

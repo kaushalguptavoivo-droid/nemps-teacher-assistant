@@ -4,6 +4,10 @@ import 'package:intl/intl.dart';
 import '../../core/models/models.dart';
 import '../../core/theme/app_theme.dart';
 import '../data/providers.dart';
+import 'class_picker_screen.dart';
+
+// Route builder for the "Print Result Cards" class picker below.
+String _resultsRoute(String classId) => '/results/$classId';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -92,45 +96,18 @@ class ReportsScreen extends ConsumerWidget {
             title: 'Print Result Cards',
             subtitle: 'PDF - Class wise report cards',
             color: Colors.purple,
-            onTap: () => _showPrintDialog(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPrintDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.print_rounded, color: Colors.purple),
-            SizedBox(width: 8),
-            Text('Print Results'),
-          ],
-        ),
-        content: const Text(
-          'Select a class to print result cards.\n\n'
-          'PDF generate hoga jisme har student ka report card hoga.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Class select karein'),
-                  action: SnackBarAction(label: 'OK', onPressed: () {}),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ClassPickerScreen(
+                  title: 'Print Result Cards',
+                  subtitle:
+                      'Result cards print karne ke liye class chunein',
+                  icon: Icons.print_rounded,
+                  destinationBuilder: _resultsRoute,
                 ),
-              );
-            },
-            icon: const Icon(Icons.picture_as_pdf),
-            label: const Text('Select Class'),
+              ),
+            ),
           ),
         ],
       ),
