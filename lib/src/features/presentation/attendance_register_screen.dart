@@ -9,6 +9,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/models/models.dart';
 import '../data/providers.dart';
 
+int _compareRollNo(String a, String b) {
+  final na = int.tryParse(a.trim());
+  final nb = int.tryParse(b.trim());
+  if (na != null && nb != null) return na.compareTo(nb);
+  return a.compareTo(b);
+}
+
 // ── Data model for one student's register row ────────────────────────────────
 class _RegisterRow {
   const _RegisterRow({
@@ -104,10 +111,16 @@ class _AttendanceRegisterScreenState
       // All-time present counts
       final allTime = await repo.getAllTimePresentCounts(_selectedClassId!);
 
-      // Compute days in month that have any attendance record
-      final daysMarked = <int>{};
+      // Compute working days = days that have an actual Present/Absent
+      // record. Holiday ('H') and blank (no record at all) days must NOT
+      // count as working days.
+      final workingDaysMarked = <int>{};
       for (final dayMap in monthAtt.values) {
-        daysMarked.addAll(dayMap.keys);
+        for (final entry in dayMap.entries) {
+          if (entry.value == 'P' || entry.value == 'A') {
+            workingDaysMarked.add(entry.key);
+          }
+        }
       }
 
       final rows = students.map((s) {
@@ -122,12 +135,14 @@ class _AttendanceRegisterScreenState
           currentMonthPresent: currentPresent,
           allTimePresent: allTime[s.id] ?? 0,
         );
-      }).toList();
+      }).toList()
+        // Always show students roll-number wise.
+        ..sort((a, b) => _compareRollNo(a.rollNo, b.rollNo));
 
       if (!mounted) return;
       setState(() {
         _rows = rows;
-        _totalWorkingDays = daysMarked.length;
+        _totalWorkingDays = workingDaysMarked.length;
         _loading = false;
       });
     } catch (e) {
@@ -242,7 +257,7 @@ class _AttendanceRegisterScreenState
           color: cs.primaryContainer,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Text(
-            'Total Working Days (attendance marked): $_totalWorkingDays   '
+            'Total Working Days (Holiday excluded): $_totalWorkingDays   '
             '| Students: ${_rows.length}',
             style: TextStyle(
                 color: cs.onPrimaryContainer,
@@ -275,14 +290,16 @@ class _AttendanceRegisterScreenState
       if (s == 'P') return Colors.green.shade100;
       if (s == 'A') return Colors.red.shade100;
       if (s == 'H') return Colors.orange.shade100;
-      return Colors.transparent;
+      // Blank / no record — explicit light background so it never renders
+      // as a dark/black cell regardless of the theme behind it.
+      return Colors.grey.shade50;
     }
 
     Color textColor(String? s) {
       if (s == 'P') return Colors.green.shade800;
       if (s == 'A') return Colors.red.shade800;
       if (s == 'H') return Colors.orange.shade800;
-      return Colors.transparent;
+      return Colors.grey.shade50;
     }
 
     // ── Compute column totals (how many P per day) ─────────────────────────

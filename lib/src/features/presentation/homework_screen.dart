@@ -108,7 +108,7 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen>
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           tabs: const [
-            Tab(icon: Icon(Icons.add_circle_outline), text: 'Assign'),
+            Tab(icon: Icon(Icons.flash_on_rounded), text: 'Quick Send'),
             Tab(icon: Icon(Icons.send_rounded), text: 'Send to Parents'),
             Tab(icon: Icon(Icons.person_search_rounded), text: 'Student Pending'),
           ],
@@ -248,7 +248,11 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen>
   }
 }
 
-// ── Tab 1: Assign Homework ───────────────────────────────────────────────────
+// ── Tab 1: Quick Send — students + subjects, straight to WhatsApp ────────────
+// Teacher does NOT need a separate "assign" step: pick students (multi /
+// select all), pick subjects (multi / select all), optionally add one shared
+// note, then hit send. Homework gets saved in the background and a WhatsApp
+// message is sent student-wise (one by one, via _CombinedBulkDialog).
 
 class _AssignTab extends ConsumerStatefulWidget {
   const _AssignTab({required this.classId});
@@ -259,13 +263,14 @@ class _AssignTab extends ConsumerStatefulWidget {
 }
 
 class _AssignTabState extends ConsumerState<_AssignTab> {
-  String? selectedSubject;
-  final descController = TextEditingController();
-  bool saving = false;
+  final Set<String> _selectedSubjects = {};
+  final Set<String> _selectedStudentIds = {};
+  final _descController = TextEditingController();
+  bool _sending = false;
 
   @override
   void dispose() {
-    descController.dispose();
+    _descController.dispose();
     super.dispose();
   }
 
@@ -275,11 +280,10 @@ class _AssignTabState extends ConsumerState<_AssignTab> {
         .where((s) => s.isActive)
         .map((s) => s.subjectName)
         .toSet();
-    
+
     // Combine default subjects with database subjects
-    // Default subjects (GK, Sanskrit) are always available
     final allSubjects = {..._defaultSubjects, ...dbSubjectNames}.toList();
-    
+
     // Sort: default subjects first in order, then other subjects alphabetically
     allSubjects.sort((a, b) {
       final aIndex = _defaultSubjects.indexOf(a);
@@ -289,179 +293,300 @@ class _AssignTabState extends ConsumerState<_AssignTab> {
       if (bIndex >= 0) return 1;
       return a.compareTo(b);
     });
-    
+
     return allSubjects;
+  }
+
+  Future<void> _handleSend(List<Student> allStudents) async {
+    if (_selectedSubjects.isEmpty || _selectedStudentIds.isEmpty) return;
+    setState(() => _sending = true);
+    try {
+      final repo = ref.read(repoProvider);
+      final desc = _descController.text.trim();
+
+      // Save one homework row per selected subject (class-level record).
+      for (final subject in _selectedSubjects) {
+        await repo.saveHomework(
+          classId: widget.classId,
+          subject: subject,
+          description: desc,
+        );
+      }
+      ref.invalidate(homeworkProvider(widget.classId));
+      ref.invalidate(homeworkForDateProvider);
+
+      final today = DateTime.now();
+      final todaysHw = await ref.read(
+          homeworkForDateProvider((widget.classId, today)).future);
+      final hwToSend =
+          todaysHw.where((h) => _selectedSubjects.contains(h.subject)).toList();
+
+      final selectedStudents = allStudents
+          .where((s) => _selectedStudentIds.contains(s.id))
+          .toList()
+        ..sort((a, b) => _compareRollNo(a.rollNo, b.rollNo));
+
+      if (!mounted) return;
+
+      if (hwToSend.isEmpty || selectedStudents.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text(
+                  'Homework assign ho gaya, lekin WhatsApp send nahi ho paya.')),
+        );
+      } else {
+        await showDialog(
+          context: context,
+          builder: (ctx) => _CombinedBulkDialog(
+            students: selectedStudents,
+            selectedHomework: hwToSend,
+            classId: widget.classId,
+            date: today,
+          ),
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _selectedSubjects.clear();
+        _selectedStudentIds.clear();
+        _descController.clear();
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final homework = ref.watch(homeworkProvider(widget.classId));
+    final theme = Theme.of(context);
     final activeSession = ref.watch(activeSessionProvider);
-    
-    // Get subjects from database
+    final studentsAsync = ref.watch(studentsProvider(widget.classId));
+
     final subjectsAsync = activeSession.when(
       data: (session) => session == null
-          ? AsyncValue<List<ClassSubject>>.data([])
-          : ref.watch(classSubjectsProvider((classId: widget.classId, year: session.label))),
+          ? const AsyncValue<List<ClassSubject>>.data([])
+          : ref.watch(
+              classSubjectsProvider((classId: widget.classId, year: session.label))),
       loading: () => const AsyncValue<List<ClassSubject>>.loading(),
-      error: (e, _) => AsyncValue<List<ClassSubject>>.data([]),
+      error: (e, _) => const AsyncValue<List<ClassSubject>>.data([]),
     );
 
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
       children: [
-        // Assign form
-        Container(
-          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Aaj ka Homework Assign Karein',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              subjectsAsync.when(
-                data: (dbSubjects) {
-                  final allSubjects = _getAllSubjects(dbSubjects);
-                  return DropdownButtonFormField<String>(
-                    value: selectedSubject,
-                    decoration: const InputDecoration(
-                        labelText: 'Subject choose karein',
-                        prefixIcon: Icon(Icons.book_outlined)),
-                    items: allSubjects
-                        .map((s) => DropdownMenuItem(
-                            value: s,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                      color: _colorForSubject(s),
-                                      shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(s),
-                              ],
-                            )))
-                        .toList(),
-                    onChanged: (v) => setState(() => selectedSubject = v),
-                  );
-                },
-                loading: () => const LinearProgressIndicator(),
-                error: (e, _) => DropdownButtonFormField<String>(
-                  value: selectedSubject,
-                  decoration: const InputDecoration(
-                      labelText: 'Subject choose karein',
-                      prefixIcon: Icon(Icons.book_outlined)),
-                  items: _defaultSubjects
-                      .map((s) => DropdownMenuItem(
-                          value: s,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                    color: _colorForSubject(s),
-                                    shape: BoxShape.circle),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(s),
-                            ],
-                          )))
-                      .toList(),
-                  onChanged: (v) => setState(() => selectedSubject = v),
-                ),
+        // ── Heading ──────────────────────────────────────────────────
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.homeworkColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: descController,
-                decoration: const InputDecoration(
-                    labelText: 'Homework description',
-                    hintText: 'Kya karna hai likho...',
-                    prefixIcon: Icon(Icons.edit_note)),
-                maxLines: 2,
+              child: const Icon(Icons.flash_on_rounded,
+                  color: AppTheme.homeworkColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Quick Homework Send',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Students aur subjects chunein, seedha WhatsApp bhejein',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant)),
+                ],
               ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: (selectedSubject == null || saving)
-                      ? null
-                      : () async {
-                          setState(() => saving = true);
-                          try {
-                            await ref.read(repoProvider).saveHomework(
-                                  classId: widget.classId,
-                                  subject: selectedSubject!,
-                                  description: descController.text,
-                                );
-                            if (mounted) {
-                              descController.clear();
-                              setState(() {
-                                selectedSubject = null;
-                                saving = false;
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Homework assign ho gaya! ✓'),
-                                    backgroundColor: AppTheme.homeworkColor),
-                              );
-                              ref.invalidate(homeworkProvider(widget.classId));
-                              ref.invalidate(homeworkForDateProvider);
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              setState(() => saving = false);
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                  content: Text('Error: $e'),
-                                  backgroundColor: Colors.red));
-                            }
-                          }
-                        },
-                  icon: saving
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.add_task),
-                  label: Text(saving ? 'Saving...' : 'Assign Homework'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-        const Divider(height: 1),
-        // Homework list
-        Expanded(
-          child: homework.when(
-            data: (items) => items.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.assignment_outlined,
-                            size: 64,
-                            color: Theme.of(context).colorScheme.outlineVariant),
-                        const SizedBox(height: 12),
-                        const Text('Abhi koi homework assign nahi hua.'),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: items.length,
-                    itemBuilder: (_, index) {
-                      final hw = items[index];
-                      return _HomeworkCard(hw: hw, classId: widget.classId);
-                    },
-                  ),
-            error: (e, _) => Center(child: Text('Error: $e')),
-            loading: () => const Center(child: CircularProgressIndicator()),
+        const SizedBox(height: 20),
+
+        // ── Subjects picker ──────────────────────────────────────────
+        Row(
+          children: [
+            const Text('1. Subjects', style: TextStyle(fontWeight: FontWeight.w700)),
+            const Spacer(),
+            subjectsAsync.maybeWhen(
+              data: (dbSubjects) {
+                final allSubjects = _getAllSubjects(dbSubjects);
+                final allSelected = allSubjects.isNotEmpty &&
+                    _selectedSubjects.length == allSubjects.length;
+                return TextButton(
+                  style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero, minimumSize: const Size(60, 32)),
+                  onPressed: () => setState(() {
+                    if (allSelected) {
+                      _selectedSubjects.clear();
+                    } else {
+                      _selectedSubjects
+                        ..clear()
+                        ..addAll(allSubjects);
+                    }
+                  }),
+                  child: Text(allSelected ? 'Deselect All' : 'Select All',
+                      style: const TextStyle(fontSize: 13)),
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        subjectsAsync.when(
+          data: (dbSubjects) {
+            final allSubjects = _getAllSubjects(dbSubjects);
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: allSubjects.map((s) {
+                final selected = _selectedSubjects.contains(s);
+                final color = _colorForSubject(s);
+                return FilterChip(
+                  label: Text(s),
+                  selected: selected,
+                  showCheckmark: true,
+                  selectedColor: color.withOpacity(0.18),
+                  checkmarkColor: color,
+                  labelStyle: TextStyle(
+                      color: selected ? color : null,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.normal),
+                  side: BorderSide(color: selected ? color : theme.colorScheme.outlineVariant),
+                  onSelected: (v) => setState(() {
+                    if (v) {
+                      _selectedSubjects.add(s);
+                    } else {
+                      _selectedSubjects.remove(s);
+                    }
+                  }),
+                );
+              }).toList(),
+            );
+          },
+          loading: () => const LinearProgressIndicator(),
+          error: (e, _) => Text('Error: $e'),
+        ),
+        const SizedBox(height: 22),
+
+        // ── Students picker ────────────────────────────────────────────
+        Row(
+          children: [
+            const Text('2. Students', style: TextStyle(fontWeight: FontWeight.w700)),
+            const Spacer(),
+            studentsAsync.maybeWhen(
+              data: (list) {
+                final allSelected =
+                    list.isNotEmpty && _selectedStudentIds.length == list.length;
+                return TextButton(
+                  style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero, minimumSize: const Size(60, 32)),
+                  onPressed: () => setState(() {
+                    if (allSelected) {
+                      _selectedStudentIds.clear();
+                    } else {
+                      _selectedStudentIds
+                        ..clear()
+                        ..addAll(list.map((s) => s.id));
+                    }
+                  }),
+                  child: Text(allSelected ? 'Deselect All' : 'Select All',
+                      style: const TextStyle(fontSize: 13)),
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        studentsAsync.when(
+          data: (list) {
+            final sorted = [...list]
+              ..sort((a, b) => _compareRollNo(a.rollNo, b.rollNo));
+            if (sorted.isEmpty) {
+              return const Text('Is class mein koi student nahi hai');
+            }
+            return Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: sorted.asMap().entries.map((entry) {
+                  final s = entry.value;
+                  final selected = _selectedStudentIds.contains(s.id);
+                  return CheckboxListTile(
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: selected,
+                    onChanged: (v) => setState(() {
+                      if (v == true) {
+                        _selectedStudentIds.add(s.id);
+                      } else {
+                        _selectedStudentIds.remove(s.id);
+                      }
+                    }),
+                    title: Text('${s.rollNo} · ${s.fullName}',
+                        style: const TextStyle(fontSize: 14)),
+                  );
+                }).toList(),
+              ),
+            );
+          },
+          loading: () => const Center(
+              child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator())),
+          error: (e, _) => Text('Error: $e'),
+        ),
+        const SizedBox(height: 22),
+
+        // ── Optional shared note ───────────────────────────────────────
+        TextField(
+          controller: _descController,
+          decoration: const InputDecoration(
+              labelText: 'Note (optional)',
+              hintText: 'Sabhi selected subjects ke liye ek jaisa note...',
+              prefixIcon: Icon(Icons.edit_note)),
+          maxLines: 2,
+        ),
+        const SizedBox(height: 18),
+
+        // ── Send button ─────────────────────────────────────────────
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: FilledButton.icon(
+            onPressed: (_selectedSubjects.isEmpty ||
+                    _selectedStudentIds.isEmpty ||
+                    _sending)
+                ? null
+                : () {
+                    final list = studentsAsync.valueOrNull ?? [];
+                    _handleSend(list);
+                  },
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.whatsappColor),
+            icon: _sending
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.send_rounded),
+            label: Text(
+              _sending
+                  ? 'Sending...'
+                  : 'WhatsApp Bhejein (${_selectedStudentIds.length} students, ${_selectedSubjects.length} subjects)',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ),
       ],
@@ -821,7 +946,7 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '"Assign" tab mein pehle homework add karein',
+                      '"Quick Send" tab mein pehle homework add karein',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 13,
