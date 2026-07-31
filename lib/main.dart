@@ -12,6 +12,7 @@ import 'src/app.dart';
 import 'src/core/config/app_config.dart';
 import 'src/core/services/notification_service.dart';
 import 'src/core/services/background_notice_service.dart';
+import 'src/features/data/school_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +59,15 @@ Future<void> main() async {
   // Notice alerts even when the app is fully closed — see
   // background_notice_service.dart for how/why this works and its limits.
   unawaited(BackgroundNoticeService.init());
+
+  // Best-effort: nothing previously ever called the offline queue's flush,
+  // so any save that failed once (bad network, a stray DB conflict, etc.)
+  // sat in local storage forever and was never actually retried, even
+  // though the app showed a "Saved!" message at the time. Give it a chance
+  // to sync now that we're back online.
+  if (Supabase.instance.client.auth.currentSession != null) {
+    unawaited(SchoolRepository(Supabase.instance.client).sync());
+  }
 
   runApp(const ProviderScope(child: NempsApp()));
 }

@@ -1,0 +1,14 @@
+-- Fix: "Holiday" attendance was never showing up in the attendance register.
+--
+-- Root cause: the `attendance_status` enum in the database only had
+-- 'present' and 'absent' — 'holiday' was never added, even though the app
+-- (AttendanceStatus.holiday) has always tried to save it. Every attempt to
+-- save status='holiday' was rejected by Postgres with an
+-- "invalid input value for enum attendance_status" error. The app's
+-- saveAttendance() silently swallows that error and queues the row in the
+-- local offline outbox instead — so nothing was ever actually written to
+-- the attendance table, and the holiday never appeared when re-opening the
+-- register or in reports.
+--
+-- Fix: add 'holiday' as a valid enum value. Safe to re-run.
+ALTER TYPE public.attendance_status ADD VALUE IF NOT EXISTS 'holiday';

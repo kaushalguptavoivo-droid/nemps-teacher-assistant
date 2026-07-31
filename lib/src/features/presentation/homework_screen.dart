@@ -52,7 +52,7 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -103,6 +103,7 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen>
           tabs: const [
             Tab(icon: Icon(Icons.add_circle_outline), text: 'Assign'),
             Tab(icon: Icon(Icons.send_rounded), text: 'Send to Parents'),
+            Tab(icon: Icon(Icons.person_search_rounded), text: 'Student Pending'),
           ],
         ),
       ),
@@ -111,6 +112,7 @@ class _HomeworkScreenState extends ConsumerState<HomeworkScreen>
         children: [
           _AssignTab(classId: widget.classId),
           _CombinedSendTab(classId: widget.classId),
+          _StudentPendingTab(classId: widget.classId),
         ],
       ),
     );
@@ -1444,6 +1446,431 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
         selectedHomework: selected,
         classId: widget.classId,
         date: selectedDate,
+      ),
+    );
+  }
+}
+
+// ── Student Pending Tab ────────────────────────────────────────────────────────
+// Separate, standalone option: pick ONE student, see their homework status
+// across ALL recent subjects together, mark any/all of them as pending in one
+// go, then send a SINGLE WhatsApp message listing every pending subject —
+// instead of sending one message per subject.
+
+class _StudentPendingTab extends ConsumerStatefulWidget {
+  const _StudentPendingTab({required this.classId});
+  final String classId;
+
+  @override
+  ConsumerState<_StudentPendingTab> createState() =>
+      _StudentPendingTabState();
+}
+
+class _StudentPendingTabState extends ConsumerState<_StudentPendingTab> {
+  Student? selectedStudent;
+  // Teacher's in-session changes; merged on top of saved statuses.
+  final Map<String, String> _statusOverrides = {};
+  Map<String, String> _savedStatuses = {};
+  bool _loadingStatuses = false;
+  bool _saving = false;
+
+  Future<void> _selectStudent(Student student) async {
+    setState(() {
+      selectedStudent = student;
+      _savedStatuses = {};
+      _statusOverrides.clear();
+      _loadingStatuses = true;
+    });
+    try {
+      final hwList = await ref.read(homeworkProvider(widget.classId).future);
+      final ids = hwList.map((h) => h.id).toList();
+      final statuses = await ref
+          .read(repoProvider)
+          .getHomeworkStatusesForStudent(student.id, ids);
+      if (!mounted) return;
+      setState(() => _savedStatuses = statuses);
+    } finally {
+      if (mounted) setState(() => _loadingStatuses = false);
+    }
+  }
+
+  String _statusFor(String homeworkId) =>
+      _statusOverrides[homeworkId] ?? _savedStatuses[homeworkId] ?? 'not_checked';
+
+  void _markAllPending(List<Homework> hwList) {
+    setState(() {
+      for (final hw in hwList) {
+        _statusOverrides[hw.id] = 'incomplete';
+      }
+    });
+  }
+
+  Future<void> _saveAll() async {
+    if (selectedStudent == null || _statusOverrides.isEmpty) return;
+    setState(() => _saving = true);
+    try {
+      for (final entry in _statusOverrides.entries) {
+        await ref.read(repoProvider).markHomeworkStatus(
+              homeworkId: entry.key,
+              studentId: selectedStudent!.id,
+              status: entry.value,
+            );
+      }
+      if (!mounted) return;
+      setState(() {
+        _savedStatuses = {..._savedStatuses, ..._statusOverrides};
+        _statusOverrides.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Status save ho gaya! ✓'),
+            backgroundColor: AppTheme.homeworkColor),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _sendWhatsApp(List<Homework> pendingSubjects) async {
+    final student = selectedStudent;
+    if (student == null || pendingSubjects.isEmpty) return;
+    if (student.whatsapp.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Is student ka WhatsApp number nahi hai')),
+      );
+      return;
+    }
+    final parentName =
+        student.parentName.isNotEmpty ? student.parentName : 'Madam/Sir';
+    final subjectLines = List.generate(
+      pendingSubjects.length,
+      (i) => '${i + 1}. ${pendingSubjects[i].subject}',
+    ).join('\n');
+    final msg = '📚 *Pending Homework | लंबित गृहकार्य*\n\n'
+        'Dear $parentName / नमस्ते $parentName जी,\n\n'
+        '*${student.fullName}* ka niche diye gaye subjects ka homework abhi tak pending hai:\n\n'
+        '$subjectLines\n\n'
+        'Kripaya jald se jald karwayein. 🙏\n'
+        '— *New Era Modern Public School, Vrindavan*';
+    final uri = Uri.parse(
+        'https://wa.me/${student.whatsappE164}?text=${Uri.encodeComponent(msg)}');
+    await launchUrl(uri, mode: LaunchMode.platformDefault);
+    await ref.read(repoProvider).markWhatsAppSent(
+          classId: widget.classId,
+          studentId: student.id,
+          date: DateTime.now(),
+          type: 'homework',
+          subject: pendingSubjects.map((h) => h.subject).join(', '),
+        );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('WhatsApp message bhej diya! ✓'),
+            backgroundColor: AppTheme.whatsappColor),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final students = ref.watch(studentsProvider(widget.classId));
+    final homework = ref.watch(homeworkProvider(widget.classId));
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.pendingColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.person_search_rounded,
+                  color: AppTheme.pendingColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Student ka Pending Homework',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(
+                      'Ek bachche ka sabhi subjects ek saath dekhein, pending mark karein aur ek hi message mein bhejein',
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // ── Student picker ──────────────────────────────────────────────
+        students.when(
+          loading: () => const Center(
+              child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator())),
+          error: (e, _) => Text('Error: $e'),
+          data: (list) {
+            final sorted = [...list]
+              ..sort((a, b) => _compareRollNo(a.rollNo, b.rollNo));
+            if (sorted.isEmpty) {
+              return const Text('Is class mein koi student nahi hai');
+            }
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: theme.colorScheme.outlineVariant, width: 1.5),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  hint: const Text('Student chunein'),
+                  value: selectedStudent?.id,
+                  items: sorted
+                      .map((s) => DropdownMenuItem(
+                            value: s.id,
+                            child: Text('${s.rollNo} · ${s.fullName}'),
+                          ))
+                      .toList(),
+                  onChanged: (id) {
+                    if (id == null) return;
+                    final s = sorted.firstWhere((x) => x.id == id);
+                    _selectStudent(s);
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 20),
+
+        if (selectedStudent != null)
+          homework.when(
+            loading: () => const Center(
+                child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator())),
+            error: (e, _) => Text('Error: $e'),
+            data: (hwList) {
+              if (hwList.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 36, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Center(
+                      child: Text('Koi homework assign nahi hua abhi tak')),
+                );
+              }
+              if (_loadingStatuses) {
+                return const Center(
+                    child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator()));
+              }
+              final pendingList =
+                  hwList.where((h) => _statusFor(h.id) == 'incomplete').toList();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                          '${hwList.length} subject${hwList.length > 1 ? 's' : ''} (recent)',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurfaceVariant)),
+                      const Spacer(),
+                      TextButton.icon(
+                        onPressed: () => _markAllPending(hwList),
+                        icon: const Icon(Icons.playlist_add_check_rounded,
+                            size: 18),
+                        label: const Text('Sabhi Pending Mark Karo'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...hwList.map((hw) {
+                    final status = _statusFor(hw.id);
+                    final color = _colorForSubject(hw.subject);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: theme.colorScheme.outlineVariant,
+                            width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 40,
+                            decoration: BoxDecoration(
+                                color: color,
+                                borderRadius: BorderRadius.circular(4)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(hw.subject,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14)),
+                                Text(
+                                    DateFormat('dd MMM')
+                                        .format(hw.assignedDate),
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: theme
+                                            .colorScheme.onSurfaceVariant)),
+                              ],
+                            ),
+                          ),
+                          _MiniToggleChip(
+                            label: 'Done',
+                            selected: status == 'completed',
+                            color: AppTheme.attendanceColor,
+                            onTap: () => setState(
+                                () => _statusOverrides[hw.id] = 'completed'),
+                          ),
+                          const SizedBox(width: 6),
+                          _MiniToggleChip(
+                            label: 'Pending',
+                            selected: status == 'incomplete',
+                            color: AppTheme.absentColor,
+                            onTap: () => setState(
+                                () => _statusOverrides[hw.id] = 'incomplete'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed:
+                          _statusOverrides.isEmpty || _saving ? null : _saveAll,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.save_rounded),
+                      label: Text(_saving ? 'Saving...' : 'Status Save Karein'),
+                      style: FilledButton.styleFrom(
+                          backgroundColor: AppTheme.homeworkColor),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  if (pendingList.isNotEmpty) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.absentColor.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: AppTheme.absentColor.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        'Pending (${pendingList.length}): ${pendingList.map((h) => h.subject).join(", ")}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: AppTheme.absentColor),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: FilledButton.icon(
+                        onPressed: () => _sendWhatsApp(pendingList),
+                        style: FilledButton.styleFrom(
+                            backgroundColor: AppTheme.whatsappColor),
+                        icon: const Icon(Icons.message_rounded),
+                        label: Text(
+                            'WhatsApp Bhejein (${pendingList.length} subjects, 1 message)'),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class _MiniToggleChip extends StatelessWidget {
+  const _MiniToggleChip({
+    required this.label,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+              color: selected
+                  ? color
+                  : Theme.of(context).colorScheme.outline,
+              width: 1.2),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: selected
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurface),
+        ),
       ),
     );
   }

@@ -108,8 +108,20 @@ class SchoolRepository {
       'marked_by': _uid,
       'marked_at': DateTime.now().toUtc().toIso8601String(),
     };
+    // Give any previously-stuck offline writes a chance to sync first, so an
+    // old queued change for a *different* date never lingers indefinitely.
+    await _outbox.flush();
     try {
-      await _client.from('attendance').upsert(row, onConflict: 'id');
+      // IMPORTANT: conflict target is the table's real unique constraint
+      // (student_id, date), not the synthetic 'id' column. If a row for this
+      // student+date already exists under a different id (e.g. old data),
+      // upserting on 'id' alone causes a silent duplicate-key failure that
+      // repeats forever for that one date — this is what was blocking a
+      // specific date from ever saving. Targeting the real constraint means
+      // the existing row is always found and updated correctly.
+      await _client
+          .from('attendance')
+          .upsert(row, onConflict: 'student_id,date');
       await _logActivity('attendance_marked', classId, {'students': 1});
     } catch (_) {
       await _outbox.enqueue('attendance', row);
@@ -280,6 +292,7 @@ class SchoolRepository {
       'marked_by': _uid,
       'marked_at': DateTime.now().toUtc().toIso8601String(),
     };
+    await _outbox.flush();
     try {
       await _client.from('homework_status').upsert(
             row,
@@ -302,6 +315,29 @@ class SchoolRepository {
           .toList();
     } catch (e) {
       return [];
+    }
+  }
+
+  /// One student's status across several homework records at once — used by
+  /// the "Student Pending" screen so a teacher can see/mark pending homework
+  /// across multiple subjects for a single child in one place.
+  /// {homeworkId → status}. Homework with no row yet is left out of the map
+  /// (caller should treat missing = 'not_checked').
+  Future<Map<String, String>> getHomeworkStatusesForStudent(
+      String studentId, List<String> homeworkIds) async {
+    if (homeworkIds.isEmpty) return {};
+    try {
+      final data = await _client
+          .from('homework_status')
+          .select('homework_id, status')
+          .eq('student_id', studentId)
+          .inFilter('homework_id', homeworkIds);
+      return {
+        for (final row in data)
+          row['homework_id'] as String: row['status'] as String,
+      };
+    } catch (_) {
+      return {};
     }
   }
 
