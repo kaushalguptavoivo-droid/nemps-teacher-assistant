@@ -37,6 +37,13 @@ const _defaultSubjects = [
   'Computer', 'Drawing', 'EVS', 'GK', 'Sanskrit',
 ];
 
+int _compareRollNo(String a, String b) {
+  final na = int.tryParse(a.trim());
+  final nb = int.tryParse(b.trim());
+  if (na != null && nb != null) return na.compareTo(nb);
+  return a.compareTo(b);
+}
+
 class HomeworkScreen extends ConsumerStatefulWidget {
   const HomeworkScreen({super.key, required this.classId});
   final String classId;
