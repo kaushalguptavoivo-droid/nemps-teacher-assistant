@@ -253,6 +253,80 @@
         setTimeout(showIosInstructions, 5000);
       });
     }
+
+    // ── PWA Auto-Update ───────────────────────────────────────────────────────
+    // When a new deployment is pushed to Vercel, the Flutter service worker
+    // gets a new hash. This code detects that, activates the new SW immediately
+    // (skipWaiting), and silently reloads the app so users always get the
+    // latest version without manually refreshing.
+    (function initPwaAutoUpdate() {
+      if (!('serviceWorker' in navigator)) return;
+
+      var _reloading = false;
+
+      // Show a brief toast so users understand what's happening
+      function showUpdateToast() {
+        var toast = document.createElement('div');
+        toast.id = 'pwa-update-toast';
+        toast.style.cssText = [
+          'position:fixed',
+          'bottom:24px',
+          'left:50%',
+          'transform:translateX(-50%)',
+          'background:#1e40af',
+          'color:#fff',
+          'padding:12px 24px',
+          'border-radius:12px',
+          'font-family:system-ui,sans-serif',
+          'font-size:14px',
+          'font-weight:500',
+          'z-index:2147483647',
+          'box-shadow:0 4px 20px rgba(0,0,0,0.35)',
+          'pointer-events:none',
+          'white-space:nowrap',
+        ].join(';');
+        toast.textContent = '\uD83D\uDD04 App update ho rahi hai...';
+        document.body.appendChild(toast);
+      }
+
+      // When a new service worker takes control → reload page
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (_reloading) return;
+        _reloading = true;
+        showUpdateToast();
+        // Small delay so toast is visible before reload
+        setTimeout(function () { window.location.reload(); }, 1200);
+      });
+
+      // Wait for the Flutter SW registration to be ready, then:
+      //  1. Kick off an immediate update check
+      //  2. Poll for updates every 60 s
+      //  3. When a new SW is found, tell it to skipWaiting so it activates fast
+      navigator.serviceWorker.ready.then(function (reg) {
+        // Immediate check on page load
+        reg.update().catch(function () {});
+
+        // Periodic check — catches updates while the app is open
+        setInterval(function () {
+          reg.update().catch(function () {});
+        }, 60 * 1000);
+
+        // Listen for the new SW being downloaded
+        reg.addEventListener('updatefound', function () {
+          var newSW = reg.installing;
+          if (!newSW) return;
+
+          newSW.addEventListener('statechange', function () {
+            // 'installed' means it has been downloaded and cached but is
+            // waiting to activate. We force it to skip the waiting phase.
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              // Flutter's generated SW listens for this exact message format
+              newSW.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+      }).catch(function () {});
+    })();
   </script>
 </body>
 </html>
