@@ -825,14 +825,22 @@ class SchoolRepository {
     }
   }
 
-  /// Returns {studentId → all-time present count} for a class.
-  Future<Map<String, int>> getAllTimePresentCounts(String classId) async {
+  /// Returns {studentId → present count} for a class, counting every
+  /// 'present' record whose date is on or before [uptoDateInclusive]
+  /// (yyyy-MM-dd). If [uptoDateInclusive] is omitted, counts all records
+  /// ever (true all-time, including any future-dated ones).
+  Future<Map<String, int>> getAllTimePresentCounts(String classId,
+      {String? uptoDateInclusive}) async {
     try {
-      final data = await _client
+      var q = _client
           .from('attendance')
           .select('student_id, status')
           .eq('class_id', classId)
           .eq('status', 'present');
+      if (uptoDateInclusive != null) {
+        q = q.lte('date', uptoDateInclusive);
+      }
+      final data = await q;
       final Map<String, int> result = {};
       for (final row in data) {
         final sid = row['student_id'] as String;
