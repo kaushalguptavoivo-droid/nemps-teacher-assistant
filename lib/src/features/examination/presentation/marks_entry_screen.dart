@@ -653,15 +653,27 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
                       ),
                     ),
                   ],
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.upload_file_rounded, size: 15),
-                    label: const Text('Import'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      textStyle: const TextStyle(fontSize: 12),
-                      visualDensity: VisualDensity.compact,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 7),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: Theme.of(context).colorScheme.outline),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.upload_file_rounded,
+                            size: 15,
+                            color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Text('Import',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.primary,
+                                fontWeight: FontWeight.w600)),
+                      ],
                     ),
                   ),
                 ),
@@ -696,15 +708,27 @@ class _MarksGridState extends ConsumerState<_MarksGrid>
                     ),
                   ),
                 ],
-                child: OutlinedButton.icon(
-                    onPressed: () {},
-                  icon: const Icon(Icons.download_rounded, size: 15),
-                  label: const Text('Export'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    textStyle: const TextStyle(fontSize: 12),
-                    visualDensity: VisualDensity.compact,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.outline),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.download_rounded,
+                          size: 15,
+                          color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 6),
+                      Text('Export',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.w600)),
+                    ],
                   ),
                 ),
               ),

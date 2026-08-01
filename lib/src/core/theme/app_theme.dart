@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// Central design system for the app.
+///
+/// Both [light] and [dark] define the SAME set of component themes so
+/// switching modes (see the toggle in NewShellScreen) doesn't leave half
+/// the UI unstyled. Keep the two in sync when adding new component themes.
 class AppTheme {
   static const _primary = Color(0xFF4F46E5); // Indigo
   static const _secondary = Color(0xFF06B6D4); // Cyan
@@ -10,45 +15,89 @@ class AppTheme {
   // reference the brand color directly for icon circles etc.
   static const Color primary = _primary;
 
-  static ThemeData light() {
+  static const _radiusSm = 10.0;
+  static const _radiusMd = 12.0;
+  static const _radiusLg = 16.0;
+  static const _radiusXl = 18.0;
+
+  static ThemeData light() => _build(
+        brightness: Brightness.light,
+        scaffoldBackground: const Color(0xFFF7F8FC),
+        surface: Colors.white,
+        appBarBackground: _primary,
+        onAppBar: Colors.white,
+        borderColor: Colors.grey.withOpacity(0.15),
+        mutedText: Colors.grey[600]!,
+        dialogTitleColor: Colors.black87,
+        snackBg: const Color(0xFF1F2937),
+      );
+
+  static ThemeData dark() => _build(
+        brightness: Brightness.dark,
+        scaffoldBackground: const Color(0xFF111827),
+        surface: const Color(0xFF1F2937),
+        appBarBackground: const Color(0xFF1E1B4B),
+        onAppBar: Colors.white,
+        borderColor: Colors.white.withOpacity(0.12),
+        mutedText: Colors.grey[400]!,
+        dialogTitleColor: Colors.white,
+        snackBg: const Color(0xFF374151),
+      );
+
+  static ThemeData _build({
+    required Brightness brightness,
+    required Color scaffoldBackground,
+    required Color surface,
+    required Color appBarBackground,
+    required Color onAppBar,
+    required Color borderColor,
+    required Color mutedText,
+    required Color dialogTitleColor,
+    required Color snackBg,
+  }) {
+    final isDark = brightness == Brightness.dark;
     final base = ThemeData(
       useMaterial3: true,
+      brightness: brightness,
       colorScheme: ColorScheme.fromSeed(
         seedColor: _primary,
         secondary: _secondary,
         tertiary: _tertiary,
-        brightness: Brightness.light,
+        brightness: brightness,
       ),
     );
+    final textTheme = GoogleFonts.poppinsTextTheme(base.textTheme);
+
     return base.copyWith(
-      scaffoldBackgroundColor: const Color(0xFFF7F8FC),
-      textTheme: GoogleFonts.poppinsTextTheme(base.textTheme),
+      scaffoldBackgroundColor: scaffoldBackground,
+      textTheme: textTheme,
       cardTheme: CardThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.grey.withOpacity(0.15)),
+          borderRadius: BorderRadius.circular(_radiusLg),
+          side: BorderSide(color: borderColor),
         ),
-        color: Colors.white,
+        color: surface,
         surfaceTintColor: Colors.transparent,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: _primary,
-        foregroundColor: Colors.white,
+        backgroundColor: appBarBackground,
+        foregroundColor: onAppBar,
         elevation: 0,
         centerTitle: false,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: GoogleFonts.poppins(
           fontSize: 19,
           fontWeight: FontWeight.w600,
-          color: Colors.white,
+          color: onAppBar,
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: onAppBar),
+        actionsIconTheme: IconThemeData(color: onAppBar),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusMd)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
@@ -56,22 +105,32 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: _primary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: mutedText.withOpacity(0.3),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusMd)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          foregroundColor: _primary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusMd)),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           side: const BorderSide(color: _primary),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          foregroundColor: _primary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusSm)),
           textStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          foregroundColor: isDark ? Colors.white70 : Colors.black54,
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
@@ -80,9 +139,10 @@ class AppTheme {
         elevation: 2,
       ),
       listTileTheme: ListTileThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusMd)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         iconColor: _primary,
+        textColor: isDark ? Colors.white : Colors.black87,
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: Colors.white,
@@ -92,35 +152,49 @@ class AppTheme {
         unselectedLabelStyle: GoogleFonts.poppins(fontSize: 13),
       ),
       dialogTheme: DialogThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusXl)),
         titleTextStyle: GoogleFonts.poppins(
-            fontSize: 17, fontWeight: FontWeight.w600, color: Colors.black87),
+            fontSize: 17, fontWeight: FontWeight.w600, color: dialogTitleColor),
+        contentTextStyle: GoogleFonts.poppins(fontSize: 14, color: dialogTitleColor.withOpacity(0.8)),
         surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(_radiusXl)),
+        ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        backgroundColor: const Color(0xFF1F2937),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusSm)),
+        backgroundColor: snackBg,
+        contentTextStyle: GoogleFonts.poppins(color: Colors.white, fontSize: 13.5),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(color: _primary),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: Colors.white,
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: isDark ? _secondary : _primary),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: surface,
         selectedItemColor: _primary,
-        unselectedItemColor: Colors.grey,
+        unselectedItemColor: mutedText,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white,
-        indicatorColor: _primary.withOpacity(0.12),
+        backgroundColor: surface,
+        indicatorColor: _primary.withOpacity(0.16),
         surfaceTintColor: Colors.transparent,
         elevation: 2,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(color: selected ? _primary : mutedText);
+        }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return GoogleFonts.poppins(
             fontSize: 11.5,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            color: selected ? _primary : Colors.grey[600],
+            color: selected ? _primary : mutedText,
           );
         }),
       ),
@@ -135,82 +209,59 @@ class AppTheme {
             (s) => s.contains(WidgetState.selected) ? _primary : null),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+            (s) => s.contains(WidgetState.selected) ? _primary : mutedText),
+      ),
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(_radiusMd)),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(_radiusMd),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(_radiusMd),
           borderSide: const BorderSide(color: _primary, width: 1.6),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(_radiusMd),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.4),
+        ),
+        labelStyle: GoogleFonts.poppins(color: mutedText, fontSize: 13.5),
+        hintStyle: GoogleFonts.poppins(color: mutedText, fontSize: 13.5),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        backgroundColor: Colors.grey.withOpacity(0.1),
+        backgroundColor: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.withOpacity(0.1),
+        labelStyle: GoogleFonts.poppins(fontSize: 12.5, color: isDark ? Colors.white : Colors.black87),
+        side: BorderSide.none,
       ),
-      dividerTheme: DividerThemeData(
-          space: 1, thickness: 1, color: Colors.grey.withOpacity(0.15)),
-    );
-  }
-
-  static ThemeData dark() {
-    final base = ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: _primary,
-        secondary: _secondary,
-        tertiary: _tertiary,
-        brightness: Brightness.dark,
-      ),
-    );
-    return base.copyWith(
-      textTheme: GoogleFonts.poppinsTextTheme(base.textTheme),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        surfaceTintColor: Colors.transparent,
-      ),
-      appBarTheme: AppBarTheme(
-        backgroundColor: const Color(0xFF1E1B4B),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
-        surfaceTintColor: Colors.transparent,
-        titleTextStyle: GoogleFonts.poppins(
-          fontSize: 19,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+      dividerTheme: DividerThemeData(space: 1, thickness: 1, color: borderColor),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[800] : Colors.grey[900],
+          borderRadius: BorderRadius.circular(6),
         ),
+        textStyle: const TextStyle(color: Colors.white, fontSize: 12),
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        ),
-      ),
-      listTileTheme: ListTileThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(color: _secondary),
-      inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        filled: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      popupMenuTheme: PopupMenuThemeData(
+        color: surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusMd)),
       ),
     );
   }
 
-  // Color constants for cards/badges
-  static const attendanceColor = Color(0xFF10B981);  // green
-  static const absentColor = Color(0xFFEF4444);       // red
-  static const homeworkColor = Color(0xFF8B5CF6);     // violet
-  static const whatsappColor = Color(0xFF25D366);     // WA green
-  static const pendingColor = Color(0xFFF59E0B);      // amber
-  static const infoColor = Color(0xFF3B82F6);         // blue
+  // Semantic color constants used across cards/badges — same in both themes
+  // so status colors (e.g. "present" green) stay recognizable regardless
+  // of light/dark mode.
+  static const attendanceColor = Color(0xFF10B981); // green
+  static const absentColor = Color(0xFFEF4444); // red
+  static const homeworkColor = Color(0xFF8B5CF6); // violet
+  static const whatsappColor = Color(0xFF25D366); // WA green
+  static const pendingColor = Color(0xFFF59E0B); // amber
+  static const infoColor = Color(0xFF3B82F6); // blue
 }

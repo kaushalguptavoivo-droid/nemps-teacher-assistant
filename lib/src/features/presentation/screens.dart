@@ -1,7 +1,6 @@
 // Barrel export — all screens are split into individual files.
 // Import this file to get access to all screens.
 export 'login_screen.dart';
-export 'shell_screen.dart';
 export 'dashboard_screen.dart';
 export 'class_detail_screen.dart';
 export 'attendance_screen.dart';

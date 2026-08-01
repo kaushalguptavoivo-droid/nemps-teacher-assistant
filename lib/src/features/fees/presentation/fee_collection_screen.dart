@@ -205,7 +205,13 @@ class _CollectFeesTabState extends ConsumerState<_CollectFeesTab> {
               title: 'Student Select Karein',
               icon: Icons.person,
               child: studentsAsync.when(
-                data: (students) {
+                data: (rawStudents) {
+                  final students = [...rawStudents]..sort((a, b) {
+                      final na = int.tryParse(a.rollNo.trim());
+                      final nb = int.tryParse(b.rollNo.trim());
+                      if (na != null && nb != null) return na.compareTo(nb);
+                      return a.rollNo.compareTo(b.rollNo);
+                    });
                   if (students.isEmpty) {
                     return const Text('Is class mein koi student nahi');
                   }

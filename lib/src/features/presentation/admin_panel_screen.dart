@@ -879,7 +879,13 @@ class _AdminStudentsTabState extends ConsumerState<_AdminStudentsTab> {
               data: (all) {
                 final filtered = _filterClassId == null
                     ? all
-                    : all.where((s) => s.classId == _filterClassId).toList();
+                    : (all.where((s) => s.classId == _filterClassId).toList()
+                      ..sort((a, b) {
+                        final na = int.tryParse(a.rollNo.trim());
+                        final nb = int.tryParse(b.rollNo.trim());
+                        if (na != null && nb != null) return na.compareTo(nb);
+                        return a.rollNo.compareTo(b.rollNo);
+                      }));
                 if (filtered.isEmpty) {
                   return const Center(child: Text('Koi student nahi mila.'));
                 }
