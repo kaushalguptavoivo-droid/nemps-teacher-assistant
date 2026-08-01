@@ -24,13 +24,12 @@ class _RegisterRow {
     required this.fullName,
     required this.dayStatuses,        // day (1-31) → 'P'/'A'/'H'/null
     required this.currentMonthPresent,
+    required this.previousMonthPresent,
     required this.allTimePresent,
   });
   final String studentId, rollNo, fullName;
   final Map<int, String?> dayStatuses; // null = no record
-  final int currentMonthPresent, allTimePresent;
-
-  int get previousPresent => allTimePresent - currentMonthPresent;
+  final int currentMonthPresent, previousMonthPresent, allTimePresent;
 }
 
 // ── Screen ───────────────────────────────────────────────────────────────────
@@ -102,11 +101,24 @@ class _AttendanceRegisterScreenState
       final year = _selectedMonth.year;
       final month = _selectedMonth.month;
 
+      // The month immediately before the one currently selected (handles
+      // the January → previous December, year-1 rollover correctly).
+      final prevMonthDate = DateTime(year, month - 1);
+      final prevYear = prevMonthDate.year;
+      final prevMonth = prevMonthDate.month;
+
       final students = await repo.students(_selectedClassId!);
 
       // Current month attendance
       final monthAtt = await repo.getAttendanceForMonth(
           _selectedClassId!, year, month);
+
+      // Previous month attendance (real date-filtered query — NOT derived
+      // from all-time minus current month, which used to include every
+      // other month, including future ones, instead of just the one
+      // month right before the selected month).
+      final prevMonthAtt = await repo.getAttendanceForMonth(
+          _selectedClassId!, prevYear, prevMonth);
 
       // All-time present counts
       final allTime = await repo.getAllTimePresentCounts(_selectedClassId!);
@@ -127,12 +139,16 @@ class _AttendanceRegisterScreenState
         final dayMap = monthAtt[s.id] ?? {};
         final currentPresent =
             dayMap.values.where((v) => v == 'P').length;
+        final prevDayMap = prevMonthAtt[s.id] ?? {};
+        final previousPresent =
+            prevDayMap.values.where((v) => v == 'P').length;
         return _RegisterRow(
           studentId: s.id,
           rollNo: s.rollNo,
           fullName: s.fullName,
           dayStatuses: dayMap,
           currentMonthPresent: currentPresent,
+          previousMonthPresent: previousPresent,
           allTimePresent: allTime[s.id] ?? 0,
         );
       }).toList()
@@ -414,7 +430,7 @@ class _AttendanceRegisterScreenState
             Row(children: [
               ...days.map((d) => headerCell('$d', dayW)),
               headerCell('CMP', sumW),   // Current Month Present
-              headerCell('Prev', sumW),  // Previous attendance
+              headerCell('PMP', sumW),   // Previous Month Present (real, date-filtered)
               headerCell('Total', sumW), // All-time
             ]),
             // Data rows
@@ -425,7 +441,7 @@ class _AttendanceRegisterScreenState
                   }),
                   dataCell('${r.currentMonthPresent}', sumW,
                       fg: Colors.green.shade800, bold: true),
-                  dataCell('${r.previousPresent}', sumW,
+                  dataCell('${r.previousMonthPresent}', sumW,
                       fg: Colors.blue.shade700, bold: true),
                   dataCell('${r.allTimePresent}', sumW,
                       fg: cs.onSurface, bold: true),
