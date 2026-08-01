@@ -223,6 +223,18 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       final students = await ref.read(repoProvider).students(widget.classId);
       final excel = Excel.createExcel();
       final sheet = excel['Students'];
+
+      // Excel.createExcel() auto-creates a blank default sheet (usually
+      // named 'Sheet1'). If we leave it in place, the exported file opens
+      // on that empty tab and looks "blank" even though the real data is
+      // sitting on the 'Students' tab right next to it. Remove every
+      // other sheet and make 'Students' the one that opens by default.
+      for (final name in List<String>.from(excel.sheets.keys)) {
+        if (name != 'Students') {
+          excel.delete(name);
+        }
+      }
+      excel.setDefaultSheet('Students');
       
       // Header row
       final headers = ['Roll No', 'Full Name', 'Father Name', 'Mother Name', 'WhatsApp', 'Address', 'DOB', 'Fee Status'];
