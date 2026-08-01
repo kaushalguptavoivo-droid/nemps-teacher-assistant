@@ -25,11 +25,11 @@ class _RegisterRow {
     required this.dayStatuses,        // day (1-31) → 'P'/'A'/'H'/null
     required this.currentMonthPresent,
     required this.previousMonthPresent,
-    required this.allTimePresent,
+    required this.cumulativePresent,
   });
   final String studentId, rollNo, fullName;
   final Map<int, String?> dayStatuses; // null = no record
-  final int currentMonthPresent, previousMonthPresent, allTimePresent;
+  final int currentMonthPresent, previousMonthPresent, cumulativePresent;
 }
 
 // ── Screen ───────────────────────────────────────────────────────────────────
@@ -120,8 +120,15 @@ class _AttendanceRegisterScreenState
       final prevMonthAtt = await repo.getAttendanceForMonth(
           _selectedClassId!, prevYear, prevMonth);
 
-      // All-time present counts
-      final allTime = await repo.getAllTimePresentCounts(_selectedClassId!);
+      // Cumulative present count: selected month + every month before it
+      // (future months excluded). Bounded by the last day of the
+      // selected month — NOT a true forever all-time total.
+      final lastDayOfSelected = DateTime(year, month + 1, 0).day;
+      final uptoDate =
+          '$year-${month.toString().padLeft(2, '0')}-${lastDayOfSelected.toString().padLeft(2, '0')}';
+      final cumulative = await repo.getAllTimePresentCounts(
+          _selectedClassId!,
+          uptoDateInclusive: uptoDate);
 
       // Compute working days = days that have an actual Present/Absent
       // record. Holiday ('H') and blank (no record at all) days must NOT
@@ -149,7 +156,7 @@ class _AttendanceRegisterScreenState
           dayStatuses: dayMap,
           currentMonthPresent: currentPresent,
           previousMonthPresent: previousPresent,
-          allTimePresent: allTime[s.id] ?? 0,
+          cumulativePresent: cumulative[s.id] ?? 0,
         );
       }).toList()
         // Always show students roll-number wise.
@@ -329,6 +336,10 @@ class _AttendanceRegisterScreenState
     final sumOfRowTotals =
         _rows.fold(0, (a, r) => a + r.currentMonthPresent);
     final tallied = sumOfColTotals == sumOfRowTotals && _rows.isNotEmpty;
+    final sumPrevMonth =
+        _rows.fold(0, (a, r) => a + r.previousMonthPresent);
+    final sumCumulative =
+        _rows.fold(0, (a, r) => a + r.cumulativePresent);
 
     // ── Border style ───────────────────────────────────────────────────────
     Widget headerCell(String txt, double w, {Color? bg}) => Container(
@@ -431,7 +442,7 @@ class _AttendanceRegisterScreenState
               ...days.map((d) => headerCell('$d', dayW)),
               headerCell('CMP', sumW),   // Current Month Present
               headerCell('PMP', sumW),   // Previous Month Present (real, date-filtered)
-              headerCell('Total', sumW), // All-time
+              headerCell('Total', sumW), // Cumulative: selected month + all prior months
             ]),
             // Data rows
             ..._rows.map((r) => Row(children: [
@@ -443,16 +454,17 @@ class _AttendanceRegisterScreenState
                       fg: Colors.green.shade800, bold: true),
                   dataCell('${r.previousMonthPresent}', sumW,
                       fg: Colors.blue.shade700, bold: true),
-                  dataCell('${r.allTimePresent}', sumW,
+                  dataCell('${r.cumulativePresent}', sumW,
                       fg: cs.onSurface, bold: true),
                 ])),
             // Totals row
             Row(children: [
               ...days.map((d) =>
                   totalCell('${colTotals[d] ?? 0}', dayW)),
-              // Cross-verification cell (bottom-right intersection)
+              // CMP column sum, with a tally check against the day-by-day
+              // column totals (they must match — same data, two ways).
               Container(
-                width: sumW * 3,
+                width: sumW,
                 height: rowH,
                 color: tallied
                     ? Colors.green.shade200
@@ -461,7 +473,7 @@ class _AttendanceRegisterScreenState
                 child: Text(
                   tallied
                       ? '✓ $sumOfRowTotals'
-                      : '✗ R:$sumOfRowTotals C:$sumOfColTotals',
+                      : '✗ $sumOfRowTotals',
                   style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -470,6 +482,10 @@ class _AttendanceRegisterScreenState
                           : Colors.red.shade900),
                 ),
               ),
+              // PMP column sum
+              totalCell('$sumPrevMonth', sumW),
+              // Total (cumulative) column sum
+              totalCell('$sumCumulative', sumW),
             ]),
           ],
         ),
