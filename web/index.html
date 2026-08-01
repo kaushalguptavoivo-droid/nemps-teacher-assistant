@@ -268,11 +268,11 @@
         window.location.reload();
       });
 
-      // FIX: getRegistration() can return undefined if flutter_bootstrap.js
-      // (loaded with `async`) hasn't registered the service worker yet by
-      // the time this script runs — silently exiting before the update
-      // listeners are ever attached. `ready` waits until a service worker
-      // is actually active before resolving, so this always attaches.
+      // FIX: getRegistration() can resolve to undefined if flutter_bootstrap.js
+      // (loaded with `async`) hasn't registered the service worker yet by the
+      // time this script runs — silently exiting before the update listeners
+      // are ever attached. `ready` waits until a service worker is actually
+      // active before resolving, so this always attaches correctly.
       navigator.serviceWorker.ready.then((reg) => {
         if (!reg) return;
 
