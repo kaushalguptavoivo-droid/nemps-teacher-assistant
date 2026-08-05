@@ -1371,7 +1371,7 @@ class _CombinedSendTabState extends ConsumerState<_CombinedSendTab> {
   String _buildCombinedGroupMessage(List<Homework> selected, String dateStr) {
     final lines = selected.map((hw) {
       final emoji = _subjectEmoji(hw.subject);
-      return '$emoji *${hw.subject}:* ${hw.description.isNotEmpty ? hw.description : "(Dekha jayega)"}';
+      return '$emoji *${hw.subject}:* ${hw.description.isNotEmpty ? hw.description : "(Work not complete)"}';
     }).join('\n');
     return '📚 *Homework | गृहकार्य*\n'
         'Date: $dateStr\n\n'
@@ -2099,7 +2099,7 @@ class _CombinedBulkDialogState extends ConsumerState<_CombinedBulkDialog> {
     final dateStr = DateFormat('dd MMM yyyy').format(widget.date);
     final lines = widget.selectedHomework.map((hw) {
       final emoji = _subjectEmoji(hw.subject);
-      return '$emoji *${hw.subject}:* ${hw.description.isNotEmpty ? hw.description : "Dekha jayega"}';
+      return '$emoji *${hw.subject}:* ${hw.description.isNotEmpty ? hw.description : "Work not complete"}';
     }).join('\n');
     return '📚 *Homework Reminder | गृहकार्य सूचना*\n\n'
         'Dear $parentName / नमस्ते $parentName जी,\n\n'
